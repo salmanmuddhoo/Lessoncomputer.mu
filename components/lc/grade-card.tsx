@@ -1,65 +1,88 @@
 import Link from 'next/link'
-import { ArrowRight, Video, Users } from 'lucide-react'
+import { Video, Users, Star } from 'lucide-react'
 import type { Grade } from '@/lib/types/database'
 
 interface GradeCardProps {
   grade: Grade & { videoCount?: number; liveClassCount?: number }
 }
 
+const SUBJECT_LABELS: Record<string, string> = {
+  'grade-7':  'Mathematics · Science · English · French',
+  'grade-8':  'Mathematics · Science · English · French',
+  'grade-9':  'Mathematics · Physics · Chemistry · Biology',
+  'grade-10': 'Mathematics · Physics · Chemistry · Biology',
+  'grade-11': 'SC Core Subjects · Electives',
+  'grade-12': 'HSC Core Subjects · Electives',
+}
+
 export function GradeCard({ grade }: GradeCardProps) {
+  const subjects = SUBJECT_LABELS[grade.slug] ?? 'Core Subjects & Electives'
+
   return (
-    <Link href={`/grades/${grade.slug}`}>
-      <div className="group bg-card rounded-2xl overflow-hidden lc-shadow lc-card-hover border border-border/60 cursor-pointer h-full flex flex-col">
-        {/* Coloured band — like the product image area in Boty */}
+    <Link href={`/grades/${grade.slug}`} className="group block">
+      <div className="bg-card rounded-2xl overflow-hidden lc-shadow lc-card-hover border border-border/50">
+
+        {/* — Image area (Boty product photo equivalent) — */}
         <div
-          className="h-28 flex items-center justify-center relative overflow-hidden"
-          style={{ backgroundColor: `${grade.color}18` }}
+          className="relative aspect-[4/3] flex flex-col items-center justify-center overflow-hidden"
+          style={{ backgroundColor: `${grade.color}14` }}
         >
-          <span
-            className="font-serif text-5xl font-bold opacity-90"
-            style={{ color: grade.color }}
-          >
+          {/* Background circles for depth */}
+          <div className="absolute w-48 h-48 rounded-full opacity-10" style={{ background: grade.color, top: '-20%', right: '-10%' }} />
+          <div className="absolute w-32 h-32 rounded-full opacity-8"  style={{ background: grade.color, bottom: '-10%', left: '-5%' }} />
+
+          {/* Grade number — the hero element */}
+          <span className="relative font-serif font-bold text-[5rem] leading-none" style={{ color: grade.color }}>
             {grade.name.replace('Grade ', '')}
           </span>
-          {/* Subtle pattern */}
-          <div
-            className="absolute inset-0 opacity-10"
-            style={{
-              backgroundImage: `radial-gradient(circle at 20% 80%, ${grade.color} 0%, transparent 50%), radial-gradient(circle at 80% 20%, ${grade.color} 0%, transparent 50%)`,
-            }}
-          />
+          <span className="relative text-xs font-semibold tracking-[0.2em] uppercase mt-1" style={{ color: grade.color, opacity: 0.7 }}>
+            Grade
+          </span>
         </div>
 
-        {/* Content */}
-        <div className="p-5 flex flex-col flex-1">
-          <h3 className="font-serif font-semibold text-lg text-foreground mb-1 group-hover:text-primary lc-transition">
+        {/* — Info area (Boty product info equivalent) — */}
+        <div className="p-5">
+          {/* Subjects — like brand name in Boty */}
+          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase truncate mb-1.5">
+            {subjects}
+          </p>
+
+          {/* Grade name — like product name in Boty (serif) */}
+          <h3 className="font-serif font-semibold text-lg text-foreground mb-3 group-hover:text-primary lc-transition">
             {grade.name}
+            {grade.name.includes('SC') || grade.name.includes('HSC') ? '' : ' — Secondary'}
           </h3>
 
-          {grade.description && (
-            <p className="text-sm text-muted-foreground mb-4 leading-relaxed line-clamp-2">
-              {grade.description}
-            </p>
-          )}
+          {/* Rating row */}
+          <div className="flex items-center gap-1 mb-3">
+            {[1,2,3,4,5].map((s) => (
+              <Star key={s} className="w-3.5 h-3.5 fill-primary text-primary" />
+            ))}
+            <span className="text-xs text-muted-foreground ml-1">Student Rated</span>
+          </div>
 
-          <div className="mt-auto flex items-center justify-between">
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              {(grade.videoCount ?? 0) > 0 && (
-                <span className="flex items-center gap-1">
-                  <Video className="w-3 h-3" />
-                  {grade.videoCount}
-                </span>
-              )}
-              {(grade.liveClassCount ?? 0) > 0 && (
-                <span className="flex items-center gap-1">
-                  <Users className="w-3 h-3" />
-                  {grade.liveClassCount} live
-                </span>
-              )}
-            </div>
-            <span className="flex items-center gap-1 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 lc-transition">
-              Explore <ArrowRight className="w-3 h-3" />
-            </span>
+          {/* Content count — like price in Boty */}
+          <div className="flex items-center gap-4 text-sm text-foreground/80 mb-4 font-medium">
+            {(grade.videoCount ?? 0) > 0 && (
+              <span className="flex items-center gap-1.5">
+                <Video className="w-3.5 h-3.5 text-primary" />
+                {grade.videoCount} videos
+              </span>
+            )}
+            {(grade.liveClassCount ?? 0) > 0 && (
+              <span className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-primary" />
+                {grade.liveClassCount} live
+              </span>
+            )}
+            {!grade.videoCount && !grade.liveClassCount && (
+              <span className="text-muted-foreground text-xs">Content coming soon</span>
+            )}
+          </div>
+
+          {/* CTA — like "Add to Cart" in Boty */}
+          <div className="w-full py-2.5 px-4 rounded-xl bg-secondary text-center text-sm font-semibold text-foreground group-hover:bg-primary group-hover:text-primary-foreground lc-transition">
+            Explore Grade
           </div>
         </div>
       </div>

@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true },
+  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: false },
   { label: 'Videos', href: '/admin/videos', icon: Video },
   { label: 'Live Classes', href: '/admin/live-classes', icon: Radio },
   { label: 'Grades', href: '/admin/grades', icon: BookOpen },

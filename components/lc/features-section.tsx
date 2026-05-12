@@ -4,49 +4,50 @@ const FEATURES = [
   {
     icon: Video,
     title: 'HD Video Lessons',
-    description: 'Pre-recorded lessons you can pause, rewind, and rewatch as many times as you need.',
+    description: 'Pause, rewind, and rewatch as many times as you need. Every lesson recorded in crystal-clear quality.',
   },
   {
     icon: Users,
     title: 'Live Interactive Classes',
-    description: 'Join scheduled sessions with teachers and ask questions in real time. Replays included.',
+    description: 'Join live sessions, ask questions in real time, and get instant feedback from expert teachers.',
   },
   {
     icon: BookOpen,
     title: 'Grade-Organised Content',
-    description: 'Every lesson is mapped to the Mauritius national curriculum from Grade 7 to Grade 12.',
+    description: 'Every lesson mapped to the Mauritius national curriculum — from Grade 7 right through to HSC.',
   },
   {
     icon: Zap,
-    title: 'Learn at Your Pace',
-    description: 'No deadlines. Start any lesson whenever you\'re ready and revisit as often as you need.',
+    title: 'Learn at Your Own Pace',
+    description: 'No deadlines, no pressure. Start any lesson whenever you\'re ready and revisit it whenever you like.',
   },
   {
     icon: Shield,
-    title: 'Trusted by Schools',
-    description: 'Content created and verified by qualified Mauritian educators with years of experience.',
+    title: 'Trusted by Students',
+    description: 'Content created and verified by qualified, experienced Mauritian educators you can trust.',
   },
   {
     icon: Award,
-    title: 'Exam-Focused',
-    description: 'Lessons aligned to SC and HSC syllabi to maximise your results in national examinations.',
+    title: 'Exam-Focused Lessons',
+    description: 'Targeted at SC and HSC exam syllabi to give you the best possible shot at top results.',
   },
 ]
 
 export function FeaturesSection() {
   return (
-    <section className="py-20 md:py-24 border-b border-border bg-secondary/30">
+    <section className="py-20 md:py-24 bg-secondary/40 border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-14">
-          <p className="text-xs font-semibold tracking-widest text-primary uppercase mb-3">Why LessonComputer</p>
+
+        {/* Boty-style section header */}
+        <div className="max-w-xl mb-14">
+          <p className="text-xs font-semibold tracking-[0.15em] text-primary uppercase mb-3">Why LessonComputer</p>
           <h2 className="font-serif text-4xl md:text-5xl font-bold text-foreground leading-tight">
-            Everything you need
-            <br />
-            to succeed
+            Everything you need to succeed
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Feature grid — Boty card style */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {FEATURES.map((feature) => (
             <div
               key={feature.title}
@@ -55,7 +56,7 @@ export function FeaturesSection() {
               <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-5">
                 <feature.icon className="w-5 h-5 text-primary" />
               </div>
-              <h3 className="font-serif font-semibold text-lg mb-2">{feature.title}</h3>
+              <h3 className="font-serif font-semibold text-[1.05rem] text-foreground mb-2">{feature.title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
             </div>
           ))}
