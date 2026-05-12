@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import type { Video } from '@/lib/types/database'
+import type { Video, Chapter } from '@/lib/types/database'
 
 function extractStreamableId(url: string): string | null {
   const match = url.match(/streamable\.com\/([a-z0-9]+)/i)
@@ -32,6 +32,7 @@ const schema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().optional(),
   grade_id: z.string().min(1, 'Please select a grade'),
+  chapter_id: z.string().optional(),
   streamable_url: z.string().url('Please enter a valid URL').refine(
     (url) => extractStreamableId(url) !== null,
     'Must be a valid Streamable URL (e.g. https://streamable.com/abc123)'
@@ -54,6 +55,8 @@ export function VideoForm({ grades, video }: VideoFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [chapters, setChapters] = useState<Chapter[]>([])
+  const [loadingChapters, setLoadingChapters] = useState(false)
   const isEditing = !!video
 
   const {
@@ -68,6 +71,7 @@ export function VideoForm({ grades, video }: VideoFormProps) {
       title: video?.title ?? '',
       description: video?.description ?? '',
       grade_id: video?.grade_id ?? '',
+      chapter_id: video?.chapter_id ?? undefined,
       streamable_url: video?.streamable_url ?? '',
       thumbnail_url: video?.thumbnail_url ?? '',
       price: video?.price ?? 0,
@@ -79,7 +83,29 @@ export function VideoForm({ grades, video }: VideoFormProps) {
 
   const isFree = watch('is_free')
   const streamableUrl = watch('streamable_url')
+  const selectedGradeId = watch('grade_id')
   const streamableId = streamableUrl ? extractStreamableId(streamableUrl) : null
+
+  // Load chapters whenever selected grade changes
+  useEffect(() => {
+    if (!selectedGradeId) { setChapters([]); return }
+    setLoadingChapters(true)
+    const supabase = createClient()
+    supabase
+      .from('chapters')
+      .select('*')
+      .eq('grade_id', selectedGradeId)
+      .order('order_index')
+      .then(({ data }) => {
+        setChapters(data ?? [])
+        setLoadingChapters(false)
+        // Clear chapter selection if it doesn't belong to the new grade
+        const currentChapterId = watch('chapter_id')
+        if (currentChapterId && !(data ?? []).find((c) => c.id === currentChapterId)) {
+          setValue('chapter_id', undefined)
+        }
+      })
+  }, [selectedGradeId])
 
   async function onSubmit(data: FormData) {
     setLoading(true)
@@ -89,6 +115,7 @@ export function VideoForm({ grades, video }: VideoFormProps) {
       title: data.title,
       description: data.description || null,
       grade_id: data.grade_id,
+      chapter_id: data.chapter_id || null,
       streamable_url: data.streamable_url,
       thumbnail_url: data.thumbnail_url || null,
       price: data.is_free ? 0 : data.price,
@@ -179,7 +206,7 @@ export function VideoForm({ grades, video }: VideoFormProps) {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Grade *</Label>
             <Select
@@ -199,6 +226,45 @@ export function VideoForm({ grades, video }: VideoFormProps) {
           </div>
 
           <div className="space-y-2">
+            <Label>Chapter</Label>
+            <Select
+              value={watch('chapter_id') ?? '__none__'}
+              onValueChange={(v) => setValue('chapter_id', v === '__none__' ? undefined : v)}
+              disabled={!selectedGradeId || loadingChapters}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={
+                  !selectedGradeId ? 'Select a grade first' :
+                  loadingChapters ? 'Loading…' :
+                  chapters.length === 0 ? 'No chapters yet' :
+                  'Optional — select chapter'
+                } />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No chapter</SelectItem>
+                {chapters.map((ch) => (
+                  <SelectItem key={ch.id} value={ch.id}>{ch.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedGradeId && chapters.length === 0 && !loadingChapters && (
+              <p className="text-xs text-muted-foreground">
+                No chapters for this grade yet.{' '}
+                <a
+                  href={`/admin/grades/${selectedGradeId}/chapters`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  Add chapters
+                </a>
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
             <Label htmlFor="duration_minutes">Duration (minutes)</Label>
             <Input
               id="duration_minutes"
@@ -208,16 +274,16 @@ export function VideoForm({ grades, video }: VideoFormProps) {
               {...register('duration_minutes')}
             />
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="thumbnail_url">Thumbnail URL (optional)</Label>
-          <Input
-            id="thumbnail_url"
-            type="url"
-            placeholder="https://example.com/thumbnail.jpg"
-            {...register('thumbnail_url')}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="thumbnail_url">Thumbnail URL (optional)</Label>
+            <Input
+              id="thumbnail_url"
+              type="url"
+              placeholder="https://example.com/thumbnail.jpg"
+              {...register('thumbnail_url')}
+            />
+          </div>
         </div>
       </div>
 
@@ -271,7 +337,7 @@ export function VideoForm({ grades, video }: VideoFormProps) {
       </Card>
 
       {/* Actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           type="submit"
           disabled={loading}
