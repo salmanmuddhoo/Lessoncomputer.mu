@@ -17,6 +17,11 @@ export interface Database {
         Insert: Omit<Grade, 'id' | 'created_at'>
         Update: Partial<Omit<Grade, 'id' | 'created_at'>>
       }
+      chapters: {
+        Row: Chapter
+        Insert: Omit<Chapter, 'id' | 'created_at'>
+        Update: Partial<Omit<Chapter, 'id' | 'created_at'>>
+      }
       videos: {
         Row: Video
         Insert: Omit<Video, 'id' | 'created_at'>
@@ -63,11 +68,22 @@ export interface Grade {
   created_at: string
 }
 
+export interface Chapter {
+  id: string
+  grade_id: string
+  title: string
+  description: string | null
+  order_index: number
+  created_at: string
+  grade?: Grade
+}
+
 export interface Video {
   id: string
   title: string
   description: string | null
   grade_id: string
+  chapter_id: string | null
   streamable_url: string
   thumbnail_url: string | null
   price: number
@@ -77,6 +93,7 @@ export interface Video {
   created_by: string
   created_at: string
   grade?: Grade
+  chapter?: Chapter
 }
 
 export interface LiveClass {

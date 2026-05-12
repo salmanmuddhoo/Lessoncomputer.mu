@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, Plus, Pencil, Trash2, Check, X } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Check, X, BookOpen } from 'lucide-react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -194,11 +195,18 @@ export default function AdminGradesPage() {
                         {g.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
-                      <GradeDialog grade={g} onDone={load} />
-                      <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => deleteGrade(g.id)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/admin/grades/${g.id}/chapters`}>
+                            <BookOpen className="w-3.5 h-3.5 mr-1" /> Chapters
+                          </Link>
+                        </Button>
+                        <GradeDialog grade={g} onDone={load} />
+                        <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => deleteGrade(g.id)}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
