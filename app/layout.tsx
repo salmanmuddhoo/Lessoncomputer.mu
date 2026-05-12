@@ -1,48 +1,32 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
-import { DM_Sans, Playfair_Display } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
-import { CartProvider } from '@/components/boty/cart-context'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
-const dmSans = DM_Sans({ 
+const inter = Inter({
   subsets: ["latin"],
-  variable: '--font-dm-sans',
-  weight: ['300', '400', '500', '600']
-});
-
-const playfairDisplay = Playfair_Display({ 
-  subsets: ["latin"],
-  variable: '--font-playfair',
-  weight: ['400', '500', '600', '700']
-});
+  variable: '--font-inter',
+})
 
 export const metadata: Metadata = {
-  title: 'Boty — Natural Skincare',
-  description: 'Premium natural skincare and body care products. Glow gently with Boty.',
-  generator: 'v0.app',
-  keywords: ['skincare', 'natural', 'organic', 'beauty', 'body care', 'cruelty-free'],
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+  title: {
+    default: 'LessonComputer.mu — Learn at Your Own Pace',
+    template: '%s | LessonComputer.mu',
+  },
+  description: 'The leading online learning platform in Mauritius. Watch video lessons and join live classes organised by grade.',
+  keywords: ['online learning', 'Mauritius', 'education', 'live classes', 'video lessons', 'grades'],
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://lessoncomputer.mu'),
+  openGraph: {
+    title: 'LessonComputer.mu',
+    description: 'The leading online learning platform in Mauritius.',
+    type: 'website',
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#F7F4EF',
+  themeColor: '#09090B',
 }
 
 export default function RootLayout({
@@ -51,11 +35,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`${dmSans.variable} ${playfairDisplay.variable} font-sans antialiased`}>
-        <CartProvider>
-          {children}
-        </CartProvider>
+    <html lang="en" className="dark">
+      <body className={`${inter.variable} font-sans antialiased`}>
+        {children}
+        <Toaster richColors theme="dark" />
         <Analytics />
       </body>
     </html>
