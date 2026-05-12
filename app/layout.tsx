@@ -1,13 +1,20 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { DM_Sans, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
-const inter = Inter({
+const dmSans = DM_Sans({
   subsets: ["latin"],
-  variable: '--font-inter',
+  variable: '--font-dm-sans',
+  weight: ['300', '400', '500', '600'],
+})
+
+const playfairDisplay = Playfair_Display({
+  subsets: ["latin"],
+  variable: '--font-playfair',
+  weight: ['400', '500', '600', '700'],
 })
 
 export const metadata: Metadata = {
@@ -26,7 +33,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#09090B',
+  themeColor: '#FAFAF8',
 }
 
 export default function RootLayout({
@@ -35,10 +42,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.variable} font-sans antialiased`}>
+    <html lang="en">
+      <body className={`${dmSans.variable} ${playfairDisplay.variable} font-sans antialiased`}>
         {children}
-        <Toaster richColors theme="dark" />
+        <Toaster richColors />
         <Analytics />
       </body>
     </html>
