@@ -1,7 +1,5 @@
 import Link from 'next/link'
 import { ArrowRight, Video, Users } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import type { Grade } from '@/lib/types/database'
 
 interface GradeCardProps {
@@ -11,45 +9,60 @@ interface GradeCardProps {
 export function GradeCard({ grade }: GradeCardProps) {
   return (
     <Link href={`/grades/${grade.slug}`}>
-      <Card className="lc-card-hover bg-card border-border/60 hover:border-primary/30 h-full cursor-pointer group">
-        <CardContent className="p-6">
-          <div
-            className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center text-2xl font-bold"
-            style={{ backgroundColor: `${grade.color}20`, color: grade.color }}
+      <div className="group bg-card rounded-2xl overflow-hidden lc-shadow lc-card-hover border border-border/60 cursor-pointer h-full flex flex-col">
+        {/* Coloured band — like the product image area in Boty */}
+        <div
+          className="h-28 flex items-center justify-center relative overflow-hidden"
+          style={{ backgroundColor: `${grade.color}18` }}
+        >
+          <span
+            className="font-serif text-5xl font-bold opacity-90"
+            style={{ color: grade.color }}
           >
             {grade.name.replace('Grade ', '')}
-          </div>
+          </span>
+          {/* Subtle pattern */}
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage: `radial-gradient(circle at 20% 80%, ${grade.color} 0%, transparent 50%), radial-gradient(circle at 80% 20%, ${grade.color} 0%, transparent 50%)`,
+            }}
+          />
+        </div>
 
-          <h3 className="font-semibold text-lg mb-1 group-hover:text-primary transition-colors">
+        {/* Content */}
+        <div className="p-5 flex flex-col flex-1">
+          <h3 className="font-serif font-semibold text-lg text-foreground mb-1 group-hover:text-primary lc-transition">
             {grade.name}
           </h3>
 
           {grade.description && (
-            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+            <p className="text-sm text-muted-foreground mb-4 leading-relaxed line-clamp-2">
               {grade.description}
             </p>
           )}
 
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            {(grade.videoCount ?? 0) > 0 && (
-              <span className="flex items-center gap-1">
-                <Video className="w-3 h-3" />
-                {grade.videoCount} videos
-              </span>
-            )}
-            {(grade.liveClassCount ?? 0) > 0 && (
-              <span className="flex items-center gap-1">
-                <Users className="w-3 h-3" />
-                {grade.liveClassCount} live
-              </span>
-            )}
+          <div className="mt-auto flex items-center justify-between">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {(grade.videoCount ?? 0) > 0 && (
+                <span className="flex items-center gap-1">
+                  <Video className="w-3 h-3" />
+                  {grade.videoCount}
+                </span>
+              )}
+              {(grade.liveClassCount ?? 0) > 0 && (
+                <span className="flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {grade.liveClassCount} live
+                </span>
+              )}
+            </div>
+            <span className="flex items-center gap-1 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 lc-transition">
+              Explore <ArrowRight className="w-3 h-3" />
+            </span>
           </div>
-
-          <div className="mt-4 flex items-center text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-            Explore <ArrowRight className="ml-1 w-3 h-3" />
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </Link>
   )
 }
