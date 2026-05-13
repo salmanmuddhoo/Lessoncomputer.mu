@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, Plus, Pencil, Trash2, Check, X, BookOpen } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Check, X, BookOpen, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -196,10 +196,15 @@ export default function AdminGradesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1 flex-wrap">
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`/admin/grades/${g.id}/chapters`}>
                             <BookOpen className="w-3.5 h-3.5 mr-1" /> Chapters
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/admin/grades/${g.id}/timetable`}>
+                            <Calendar className="w-3.5 h-3.5 mr-1" /> Timetable
                           </Link>
                         </Button>
                         <GradeDialog grade={g} onDone={load} />

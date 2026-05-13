@@ -52,15 +52,27 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(dest, request.url))
   }
 
-  // Check admin access
-  if (pathname.startsWith('/admin') && user) {
+  // Fetch profile once for role + active checks on protected routes
+  if ((pathname.startsWith('/admin') || pathname.startsWith('/dashboard')) && user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', user.id)
       .single()
 
-    if (profile?.role !== 'admin') {
+    // Block inactive students from the dashboard
+    if (
+      profile?.role === 'student' &&
+      profile?.is_active === false &&
+      pathname.startsWith('/dashboard')
+    ) {
+      const url = new URL('/login', request.url)
+      url.searchParams.set('error', 'account_suspended')
+      return NextResponse.redirect(url)
+    }
+
+    // Block non-admins from admin routes
+    if (pathname.startsWith('/admin') && profile?.role !== 'admin') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }
