@@ -72,7 +72,7 @@ export function Header({ user }: HeaderProps) {
           <div className="hidden md:flex items-center gap-2">
             {user ? (
               <Button asChild size="sm" className="bg-foreground text-background hover:bg-foreground/90 font-medium rounded-full px-5">
-                <Link href={user.role === 'admin' ? '/admin/dashboard' : '/dashboard'}>Dashboard</Link>
+                <Link href={user.role === 'admin' ? '/admin' : '/dashboard'}>Dashboard</Link>
               </Button>
             ) : (
               <>
