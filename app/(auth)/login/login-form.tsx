@@ -35,7 +35,7 @@ export function LoginForm() {
     setLoading(true)
     const supabase = createClient()
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
     })
@@ -46,7 +46,20 @@ export function LoginForm() {
       return
     }
 
-    router.push(redirectTo)
+    // If there's an explicit redirectTo param, honour it; otherwise route by role
+    if (searchParams.get('redirectTo')) {
+      router.push(redirectTo)
+      router.refresh()
+      return
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authData.user.id)
+      .single()
+
+    router.push(profile?.role === 'admin' ? '/admin' : '/dashboard')
     router.refresh()
   }
 
