@@ -124,7 +124,7 @@ export default function RegisterPage() {
             <Label htmlFor="password">Password</Label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input id="password" type="password" placeholder="At least 8 characters" className="pl-9" {...register('password')} />
+              <Input id="password" type="password" placeholder="At least 8 characters" autoComplete="new-password" className="pl-9" {...register('password')} />
             </div>
             {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
           </div>
@@ -133,7 +133,7 @@ export default function RegisterPage() {
             <Label htmlFor="confirmPassword">Confirm password</Label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input id="confirmPassword" type="password" placeholder="Repeat your password" className="pl-9" {...register('confirmPassword')} />
+              <Input id="confirmPassword" type="password" placeholder="Repeat your password" autoComplete="new-password" className="pl-9" {...register('confirmPassword')} />
             </div>
             {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
           </div>

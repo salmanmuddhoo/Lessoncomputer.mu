@@ -102,6 +102,7 @@ export function LoginForm() {
                 id="password"
                 type="password"
                 placeholder="••••••••"
+                autoComplete="current-password"
                 className="pl-9"
                 {...register('password')}
               />
