@@ -16,9 +16,8 @@ export default async function StudentDashboardPage() {
     { data: profile },
     { data: purchases },
     { data: upcomingClasses },
-    { data: freeVideos },
   ] = await Promise.all([
-    supabase.from('profiles').select('full_name').eq('id', user!.id).single(),
+    supabase.from('profiles').select('full_name, grade_id, grade:grades(id, name, slug, color)').eq('id', user!.id).single(),
     supabase
       .from('purchases')
       .select('*, video:videos(*, grade:grades(*))')
@@ -33,22 +32,49 @@ export default async function StudentDashboardPage() {
       .gte('scheduled_at', new Date().toISOString())
       .order('scheduled_at')
       .limit(3),
-    supabase
-      .from('videos')
-      .select('*, grade:grades(*)')
-      .eq('is_published', true)
-      .eq('is_free', true)
-      .order('created_at', { ascending: false })
-      .limit(4),
   ])
+
+  const myGrade = profile?.grade as { id: string; name: string; slug: string; color: string } | null
+
+  // If student has a grade set, show videos from that grade; otherwise show latest free videos
+  const videosQuery = myGrade
+    ? supabase
+        .from('videos')
+        .select('*, grade:grades(*)')
+        .eq('is_published', true)
+        .eq('grade_id', myGrade.id)
+        .order('created_at', { ascending: false })
+        .limit(4)
+    : supabase
+        .from('videos')
+        .select('*, grade:grades(*)')
+        .eq('is_published', true)
+        .eq('is_free', true)
+        .order('created_at', { ascending: false })
+        .limit(4)
+
+  const { data: suggestedVideos } = await videosQuery
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there'
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Welcome back, {firstName}!</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">Continue where you left off.</p>
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">Welcome back, {firstName}!</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {myGrade ? (
+              <>Showing content for <span className="font-medium text-foreground">{myGrade.name}</span></>
+            ) : (
+              'Continue where you left off.'
+            )}
+          </p>
+        </div>
+        {!myGrade && (
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/dashboard/account">Set your grade →</Link>
+          </Button>
+        )}
       </div>
 
       {/* Quick stats */}
@@ -70,8 +96,10 @@ export default async function StudentDashboardPage() {
               <BookOpen className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{freeVideos?.length ?? 0}+</p>
-              <p className="text-xs text-muted-foreground">Free videos</p>
+              <p className="text-2xl font-bold">{suggestedVideos?.length ?? 0}+</p>
+              <p className="text-xs text-muted-foreground">
+                {myGrade ? `${myGrade.name} videos` : 'Free videos'}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -128,12 +156,8 @@ export default async function StudentDashboardPage() {
                   {new Date(lc.scheduled_at).toLocaleTimeString('en-MU', { timeStyle: 'short' })}
                 </div>
                 {lc.meet_url && (
-                  <a
-                    href={lc.meet_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-block text-xs text-primary hover:underline font-medium"
-                  >
+                  <a href={lc.meet_url} target="_blank" rel="noopener noreferrer"
+                    className="mt-3 inline-block text-xs text-primary hover:underline font-medium">
                     Join session →
                   </a>
                 )}
@@ -143,22 +167,31 @@ export default async function StudentDashboardPage() {
         </section>
       )}
 
-      {/* Free Videos to Explore */}
+      {/* Suggested videos */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">Free Lessons to Explore</h2>
+          <h2 className="font-semibold">
+            {myGrade ? `${myGrade.name} Lessons` : 'Free Lessons to Explore'}
+          </h2>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/grades">Browse all <ArrowRight className="ml-1 w-3 h-3" /></Link>
+            <Link href={myGrade ? `/grades/${myGrade.slug}` : '/grades'}>
+              Browse all <ArrowRight className="ml-1 w-3 h-3" />
+            </Link>
           </Button>
         </div>
-        {freeVideos && freeVideos.length > 0 ? (
+        {suggestedVideos && suggestedVideos.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {freeVideos.map((v) => (
+            {suggestedVideos.map((v) => (
               <VideoCard key={v.id} video={v} />
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No free videos available yet.</p>
+          <div className="py-10 text-center rounded-xl border border-border/60">
+            <p className="text-sm text-muted-foreground mb-3">No videos available yet for your grade.</p>
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/grades">Browse all grades</Link>
+            </Button>
+          </div>
         )}
       </section>
     </div>
