@@ -54,7 +54,9 @@ export interface Profile {
   role: UserRole
   full_name: string | null
   avatar_url: string | null
+  grade_id: string | null
   created_at: string
+  grade?: Grade
 }
 
 export interface Grade {
