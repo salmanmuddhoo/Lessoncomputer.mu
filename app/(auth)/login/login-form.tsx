@@ -25,6 +25,7 @@ export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') ?? '/dashboard'
+  const errorParam = searchParams.get('error')
   const [loading, setLoading] = useState(false)
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
@@ -68,6 +69,11 @@ export function LoginForm() {
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
         <CardDescription>Sign in to your LessonComputer.mu account</CardDescription>
+        {errorParam === 'account_suspended' && (
+          <p className="mt-2 text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+            Your account has been suspended. Please contact support.
+          </p>
+        )}
       </CardHeader>
 
       <CardContent>
