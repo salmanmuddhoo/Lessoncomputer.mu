@@ -114,7 +114,7 @@ export function Header({ user }: HeaderProps) {
             <div className="border-t border-border my-3 pt-3 flex gap-2">
               {user ? (
                 <Button asChild size="sm" className="flex-1 rounded-full bg-foreground text-background hover:bg-foreground/90">
-                  <Link href={user.role === 'admin' ? '/admin/dashboard' : '/dashboard'} onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                  <Link href={user.role === 'admin' ? '/admin' : '/dashboard'} onClick={() => setMobileOpen(false)}>Dashboard</Link>
                 </Button>
               ) : (
                 <>
