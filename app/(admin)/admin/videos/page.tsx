@@ -195,14 +195,25 @@ export default function AdminVideosPage() {
                     if (!chVideos.length) return null
                     return (
                       <div key={ch.id}>
-                        <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30">
+                        <button
+                          onClick={() => toggleCollapseChapter(ch.id)}
+                          className="w-full flex items-center gap-2 px-4 py-2.5 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
+                        >
                           <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
-                          <span className="text-xs font-semibold">{ch.title}</span>
-                          <span className="text-xs text-muted-foreground ml-auto">
+                          <span className="text-xs font-semibold flex-1">{ch.title}</span>
+                          <span className="text-xs text-muted-foreground mr-2">
                             {chVideos.length} video{chVideos.length !== 1 ? 's' : ''}
                           </span>
-                        </div>
-                        <VideoTable videos={chVideos} onDelete={handleDelete} deleting={deleting} />
+                          {collapsedChapters.has(ch.id)
+                            ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            : <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          }
+                        </button>
+                        {!collapsedChapters.has(ch.id) && (
+                          <div className="pl-4">
+                            <VideoTable videos={chVideos} onDelete={handleDelete} deleting={deleting} />
+                          </div>
+                        )}
                       </div>
                     )
                   })}
