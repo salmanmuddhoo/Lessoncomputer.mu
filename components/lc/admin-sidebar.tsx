@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Video, Users, BookOpen,
-  LogOut, Settings, ChevronRight, Radio, Menu, X,
+  LogOut, Settings, ChevronRight, Radio, Menu, X, Package,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { createClient } from '@/lib/supabase/client'
@@ -17,7 +17,8 @@ const NAV_ITEMS = [
   { label: 'Videos',       href: '/admin/videos',       icon: Video },
   { label: 'Live Classes', href: '/admin/live-classes', icon: Radio },
   { label: 'Grades',       href: '/admin/grades',       icon: BookOpen },
-  { label: 'Students',     href: '/admin/students',     icon: Users },
+  { label: 'Students',       href: '/admin/students',       icon: Users },
+  { label: 'Subscriptions', href: '/admin/subscriptions', icon: Package },
 ]
 
 function NavContent({ onNav }: { onNav?: () => void }) {

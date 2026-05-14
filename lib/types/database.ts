@@ -42,6 +42,16 @@ export interface Database {
         Insert: Omit<Subscription, 'id' | 'created_at'>
         Update: Partial<Omit<Subscription, 'id' | 'created_at'>>
       }
+      subscription_packages: {
+        Row: SubscriptionPackage
+        Insert: Omit<SubscriptionPackage, 'id' | 'created_at'>
+        Update: Partial<Omit<SubscriptionPackage, 'id' | 'created_at'>>
+      }
+      subscription_package_chapters: {
+        Row: { package_id: string; chapter_id: string }
+        Insert: { package_id: string; chapter_id: string }
+        Update: { package_id?: string; chapter_id?: string }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -135,4 +145,19 @@ export interface Subscription {
   ends_at: string
   created_at: string
   grade?: Grade
+}
+
+export interface SubscriptionPackage {
+  id: string
+  name: string
+  description: string | null
+  grade_id: string
+  price: number
+  month: number
+  year: number
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  grade?: Grade
+  chapters?: Chapter[]
 }
