@@ -2,8 +2,9 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import Link from 'next/link'
-import { Users, Calendar, Clock } from 'lucide-react'
+import { Users, Clock } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Live Classes | LessonComputer.mu',
@@ -37,8 +38,7 @@ export default async function LiveClassesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {liveClasses.map((lc) => {
             const grade = lc.grade as { name: string; color: string; slug: string } | null
-            const scheduledDate = new Date(lc.scheduled_at)
-            const isPast = scheduledDate < new Date()
+            const isPast = new Date(lc.scheduled_at) < new Date()
 
             return (
               <div key={lc.id} className="p-5 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors flex flex-col gap-3">
@@ -63,33 +63,23 @@ export default async function LiveClassesPage() {
                   <p className="text-sm text-muted-foreground line-clamp-2">{lc.description}</p>
                 )}
 
-                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-auto pt-1">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {scheduledDate.toLocaleDateString('en-MU', { dateStyle: 'medium' })}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    {scheduledDate.toLocaleTimeString('en-MU', { timeStyle: 'short' })}
-                  </span>
-                  {lc.max_students && (
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5" />
-                      Max {lc.max_students}
-                    </span>
-                  )}
+                <div className="flex items-start gap-1.5 text-xs text-muted-foreground mt-auto pt-1">
+                  <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <LiveClassSchedule
+                    scheduledAt={lc.scheduled_at}
+                    isRecurring={(lc as any).is_recurring ?? false}
+                    recurrenceDayOfWeek={(lc as any).recurrence_day_of_week ?? null}
+                    endTime={(lc as any).end_time ?? null}
+                  />
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-border/40">
-                  <span className="font-semibold text-sm">
-                    {lc.price === 0 ? <span className="text-primary">Free</span> : `Rs ${lc.price}`}
-                  </span>
-                  {grade && (
+                {grade && (
+                  <div className="pt-2 border-t border-border/40">
                     <Button size="sm" variant="outline" asChild>
                       <Link href={`/grades/${grade.slug}`}>View Grade</Link>
                     </Button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )
           })}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ShoppingCart, CheckCircle2, Lock } from 'lucide-react'
+import { ShoppingCart, CheckCircle2, Lock, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +37,7 @@ interface Props {
 
 export function SubscribeSection({ packages, singlePackage = false, label }: Props) {
   const [open, setOpen] = useState(false)
+  const [isRecurring, setIsRecurring] = useState(true)
 
   // Current month is mandatory (pre-selected); previous months unchecked by default
   const [selected, setSelected] = useState<Set<string>>(
@@ -167,10 +168,25 @@ export function SubscribeSection({ packages, singlePackage = false, label }: Pro
             </div>
           )}
 
-          <DialogFooter className="flex-col items-stretch gap-2 sm:flex-col">
-            <p className="text-xs text-muted-foreground text-center">
-              Recurring monthly — future months are added automatically when your payment is received.
-            </p>
+          <DialogFooter className="flex-col items-stretch gap-3 sm:flex-col">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <Checkbox
+                id="recurring-toggle"
+                checked={isRecurring}
+                onCheckedChange={(v) => setIsRecurring(!!v)}
+              />
+              <div>
+                <span className="text-sm font-medium flex items-center gap-1.5">
+                  <RefreshCw className="w-3.5 h-3.5 text-primary" />
+                  Recurring payment
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  {isRecurring
+                    ? 'Auto-renews each month — future months added when payment is received'
+                    : 'One-off purchase — you will need to manually renew each month'}
+                </p>
+              </div>
+            </label>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
