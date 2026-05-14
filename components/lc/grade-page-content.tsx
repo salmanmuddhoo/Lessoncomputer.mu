@@ -136,8 +136,8 @@ export function GradePageContent({
                       asChild
                       className="bg-primary text-primary-foreground hover:bg-accent text-xs h-7 px-3"
                     >
-                      <Link href={isLoggedIn ? '/contact' : `/login?redirectTo=/grades/${gradeSlug}`}>
-                        {isLoggedIn ? 'Subscribe' : 'Log in to Subscribe'}
+                      <Link href={isLoggedIn ? '/dashboard/subscriptions' : `/login?redirectTo=/dashboard/subscriptions`}>
+                        Subscribe
                       </Link>
                     </Button>
                   )}
