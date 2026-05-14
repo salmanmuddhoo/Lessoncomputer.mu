@@ -43,7 +43,7 @@ export function VideoCard({ video, owned }: VideoCardProps) {
           )}
 
           {/* Lock */}
-          {!video.is_free && !owned && (
+          {!video.is_free && !owned && !video.is_demo && (
             <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-foreground/70 flex items-center justify-center">
               <Lock className="w-3.5 h-3.5 text-primary" />
             </div>

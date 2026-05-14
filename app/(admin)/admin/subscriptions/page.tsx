@@ -77,6 +77,7 @@ export default function AdminSubscriptionsPage() {
   const [packages, setPackages] = useState<Package[]>([])
   const [grades, setGrades] = useState<Grade[]>([])
   const [chapters, setChapters] = useState<Chapter[]>([])
+  const [takenChapterIds, setTakenChapterIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -137,14 +138,26 @@ export default function AdminSubscriptionsPage() {
 
   // Load chapters when grade changes in form
   useEffect(() => {
-    if (!form.grade_id) { setChapters([]); return }
-    supabase
-      .from('chapters')
-      .select('id,grade_id,title,order_index')
-      .eq('grade_id', form.grade_id)
-      .order('order_index')
-      .then(({ data }) => setChapters(data ?? []))
-  }, [form.grade_id])
+    if (!form.grade_id) { setChapters([]); setTakenChapterIds([]); return }
+    Promise.all([
+      supabase.from('chapters').select('id,grade_id,title,order_index').eq('grade_id', form.grade_id).order('order_index'),
+      supabase.from('subscription_packages')
+        .select('id, subscription_package_chapters(chapter_id)')
+        .eq('grade_id', form.grade_id)
+        .eq('is_active', true),
+    ]).then(([{ data: chData }, { data: pkgData }]) => {
+      setChapters(chData ?? [])
+      // Collect chapter IDs already used by OTHER packages
+      const taken: string[] = []
+      for (const pkg of pkgData ?? []) {
+        if (pkg.id === editingId) continue // skip current package being edited
+        for (const c of (pkg as any).subscription_package_chapters ?? []) {
+          taken.push(c.chapter_id)
+        }
+      }
+      setTakenChapterIds(taken)
+    })
+  }, [form.grade_id, editingId])
 
   function openCreate() {
     setEditingId(null)
@@ -448,20 +461,25 @@ export default function AdminSubscriptionsPage() {
                 <p className="text-xs text-muted-foreground">No chapters for this grade yet.</p>
               ) : (
                 <div className="rounded-lg border border-border/60 divide-y divide-border/40 max-h-48 overflow-y-auto">
-                  {chapters.map((ch) => (
-                    <label
-                      key={ch.id}
-                      className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/30 transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.chapter_ids.includes(ch.id)}
-                        onChange={() => toggleChapter(ch.id)}
-                        className="accent-primary"
-                      />
-                      <span className="text-sm">{ch.title}</span>
-                    </label>
-                  ))}
+                  {chapters.map((ch) => {
+                    const isTaken = takenChapterIds.includes(ch.id) && !form.chapter_ids.includes(ch.id)
+                    return (
+                      <label
+                        key={ch.id}
+                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/30 transition-colors ${isTaken ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.chapter_ids.includes(ch.id)}
+                          onChange={() => !isTaken && toggleChapter(ch.id)}
+                          disabled={isTaken}
+                          className="accent-primary"
+                        />
+                        <span className="text-sm flex-1">{ch.title}</span>
+                        {isTaken && <span className="text-xs text-muted-foreground">In use</span>}
+                      </label>
+                    )
+                  })}
                 </div>
               )}
             </div>

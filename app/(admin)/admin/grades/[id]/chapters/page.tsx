@@ -67,12 +67,13 @@ function ChapterDialog({
       toast.success('Chapter created')
     }
 
+    setLoading(false)
     setOpen(false)
     onDone()
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset() }}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { reset(); setLoading(false) } }}>
       <DialogTrigger asChild>
         {chapter ? (
           <Button variant="ghost" size="sm"><Pencil className="w-3.5 h-3.5 mr-1" /> Edit</Button>
