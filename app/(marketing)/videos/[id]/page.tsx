@@ -51,7 +51,7 @@ export default async function VideoPage({ params }: PageProps) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  let hasAccess = video.is_free
+  let hasAccess = video.is_free || video.is_demo
 
   // Check subscription access for paid videos with a chapter
   if (!hasAccess && user && video.chapter_id) {

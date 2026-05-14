@@ -54,7 +54,6 @@ interface Package {
 }
 
 interface FormState {
-  name: string
   description: string
   grade_id: string
   price: string
@@ -65,7 +64,6 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  name: '',
   description: '',
   grade_id: '',
   price: '0',
@@ -157,7 +155,6 @@ export default function AdminSubscriptionsPage() {
   function openEdit(pkg: Package) {
     setEditingId(pkg.id)
     setForm({
-      name: pkg.name,
       description: pkg.description ?? '',
       grade_id: pkg.grade_id,
       price: String(pkg.price),
@@ -179,13 +176,12 @@ export default function AdminSubscriptionsPage() {
   }
 
   async function handleSave() {
-    if (!form.name.trim()) { toast.error('Package name is required'); return }
     if (!form.grade_id) { toast.error('Please select a grade'); return }
     if (form.chapter_ids.length === 0) { toast.error('Select at least one chapter'); return }
 
     setSaving(true)
     const payload = {
-      name: form.name.trim(),
+      name: `${MONTHS[parseInt(form.month) - 1]} ${form.year}`,
       description: form.description.trim() || null,
       grade_id: form.grade_id,
       price: parseFloat(form.price) || 0,
@@ -374,15 +370,6 @@ export default function AdminSubscriptionsPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Package Name *</Label>
-              <Input
-                placeholder="e.g. Grade 9 — January 2025"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-
             <div className="space-y-2">
               <Label>Description</Label>
               <Textarea

@@ -29,6 +29,7 @@ const schema = z.object({
   slug: z.string().min(2, 'Slug required').regex(/^[a-z0-9-]+$/, 'Lowercase letters, numbers and hyphens only'),
   description: z.string().optional(),
   color: z.string().min(4, 'Color required'),
+  image_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   order_index: z.coerce.number().min(0),
   is_active: z.boolean(),
 })
@@ -46,6 +47,7 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
       slug: grade?.slug ?? '',
       description: grade?.description ?? '',
       color: grade?.color ?? '#FACC15',
+      image_url: grade?.image_url ?? '',
       order_index: grade?.order_index ?? 0,
       is_active: grade?.is_active ?? true,
     },
@@ -100,6 +102,11 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
           <div className="space-y-2">
             <Label>Description</Label>
             <Textarea placeholder="Short description..." rows={2} {...register('description')} />
+          </div>
+          <div className="space-y-2">
+            <Label>Grade Card Image URL</Label>
+            <Input placeholder="https://example.com/image.jpg" {...register('image_url')} />
+            {errors.image_url && <p className="text-xs text-destructive">{errors.image_url.message}</p>}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

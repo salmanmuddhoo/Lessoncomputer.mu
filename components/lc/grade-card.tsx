@@ -27,17 +27,23 @@ export function GradeCard({ grade }: GradeCardProps) {
           className="relative aspect-[4/3] flex flex-col items-center justify-center overflow-hidden"
           style={{ backgroundColor: `${grade.color}14` }}
         >
-          {/* Background circles for depth */}
-          <div className="absolute w-48 h-48 rounded-full opacity-10" style={{ background: grade.color, top: '-20%', right: '-10%' }} />
-          <div className="absolute w-32 h-32 rounded-full opacity-8"  style={{ background: grade.color, bottom: '-10%', left: '-5%' }} />
+          {grade.image_url ? (
+            <img src={grade.image_url} alt={grade.name} className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <>
+              {/* Background circles for depth */}
+              <div className="absolute w-48 h-48 rounded-full opacity-10" style={{ background: grade.color, top: '-20%', right: '-10%' }} />
+              <div className="absolute w-32 h-32 rounded-full opacity-8"  style={{ background: grade.color, bottom: '-10%', left: '-5%' }} />
 
-          {/* Grade number — the hero element */}
-          <span className="relative font-serif font-bold text-[5rem] leading-none" style={{ color: grade.color }}>
-            {grade.name.replace('Grade ', '')}
-          </span>
-          <span className="relative text-xs font-semibold tracking-[0.2em] uppercase mt-1" style={{ color: grade.color, opacity: 0.7 }}>
-            Grade
-          </span>
+              {/* Grade number — the hero element */}
+              <span className="relative font-serif font-bold text-[5rem] leading-none" style={{ color: grade.color }}>
+                {grade.name.replace('Grade ', '')}
+              </span>
+              <span className="relative text-xs font-semibold tracking-[0.2em] uppercase mt-1" style={{ color: grade.color, opacity: 0.7 }}>
+                Grade
+              </span>
+            </>
+          )}
         </div>
 
         {/* — Info area (Boty product info equivalent) — */}

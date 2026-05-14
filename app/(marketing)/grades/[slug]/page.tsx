@@ -164,7 +164,7 @@ export default async function GradePage({ params }: PageProps) {
         <section className="mb-12">
           <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
             {hasPackages ? (
-              <><Package className="w-5 h-5 text-primary" /> Subscription Packages</>
+              <><Package className="w-5 h-5 text-primary" /> Monthly Packages</>
             ) : (
               <><Video className="w-5 h-5 text-primary" /> Video Lessons</>
             )}

@@ -93,9 +93,43 @@ export function GradePageContent({
     chapterCount: p.chapterIds.length,
   }))
 
+  // Current (or next upcoming) unsubscribed package for price display
+  const currentUnsubscribedPkg =
+    unsubscribed.find((p) => p.year === currentYear && p.month === currentMonth) ??
+    unsubscribed.find((p) => isCurrentOrFuture(p))
+
   if (packages.length > 0) {
     return (
       <div className="space-y-6">
+        {/* ONE subscribe CTA — shown at top when user doesn't have a current subscription */}
+        {!hasCurrentSubscription && unsubscribed.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 rounded-xl border border-primary/20 bg-primary/5">
+            <div className="flex-1">
+              <p className="font-semibold">Get access to all content</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Current month is included. You can optionally add previous months too.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              {currentUnsubscribedPkg && (
+                <span className="text-lg font-bold text-primary">
+                  Rs {currentUnsubscribedPkg.price.toFixed(2)}<span className="text-sm font-normal text-muted-foreground">/mo</span>
+                </span>
+              )}
+              {isLoggedIn ? (
+                <SubscribeSection packages={dialogPackages} />
+              ) : (
+                <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
+                  <Link href="/login?redirectTo=/dashboard/subscriptions">
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    Subscribe
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         {packages.map((pkg) => {
           const isSubscribed = subscribedSet.has(pkg.id)
           const isCurrent = isCurrentOrFuture(pkg)
@@ -141,7 +175,6 @@ export function GradePageContent({
                 </div>
 
                 <div className="shrink-0 text-right flex flex-col items-end gap-2">
-                  <p className="text-lg font-bold text-primary">Rs {pkg.price.toFixed(2)}</p>
                   {isSubscribed ? (
                     <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Subscribed
@@ -223,28 +256,6 @@ export function GradePageContent({
             </div>
           )
         })}
-
-        {/* ONE subscribe CTA — only shown when user doesn't have a current subscription */}
-        {!hasCurrentSubscription && unsubscribed.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 rounded-xl border border-primary/20 bg-primary/5">
-            <div className="flex-1">
-              <p className="font-semibold">Get access to all content</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Current month is included. You can optionally add previous months too.
-              </p>
-            </div>
-            {isLoggedIn ? (
-              <SubscribeSection packages={dialogPackages} />
-            ) : (
-              <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
-                <Link href="/login?redirectTo=/dashboard/subscriptions">
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  Subscribe
-                </Link>
-              </Button>
-            )}
-          </div>
-        )}
 
         {/* Free / unchaptered videos always visible */}
         {unchapteredVideos.length > 0 && (

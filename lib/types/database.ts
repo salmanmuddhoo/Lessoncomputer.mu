@@ -75,6 +75,7 @@ export interface Grade {
   slug: string
   description: string | null
   color: string
+  image_url: string | null
   order_index: number
   is_active: boolean
   created_at: string
@@ -100,6 +101,7 @@ export interface Video {
   thumbnail_url: string | null
   price: number
   is_free: boolean
+  is_demo: boolean
   duration_minutes: number | null
   is_published: boolean
   created_by: string
