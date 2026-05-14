@@ -3,8 +3,9 @@ import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Package, CheckCircle2, Lock, RefreshCw } from 'lucide-react'
+import { Package, CheckCircle2, Lock, RefreshCw, ShoppingBag } from 'lucide-react'
 import type { Metadata } from 'next'
+import { SubscribeSection } from '@/components/lc/subscribe-dialog'
 
 export const metadata: Metadata = { title: 'My Subscriptions' }
 
@@ -41,7 +42,6 @@ export default async function StudentSubscriptionsPage() {
     )
   }
 
-  // All active packages for this grade
   const { data: allPackages } = await supabase
     .from('subscription_packages')
     .select('*, subscription_package_chapters(chapter_id, chapter:chapters(id, title, order_index))')
@@ -50,7 +50,6 @@ export default async function StudentSubscriptionsPage() {
     .order('year', { ascending: false })
     .order('month', { ascending: false })
 
-  // Student's active subscriptions
   const { data: mySubs } = await supabase
     .from('student_subscriptions')
     .select('package_id, is_recurring, purchased_at')
@@ -78,6 +77,23 @@ export default async function StudentSubscriptionsPage() {
       .filter(Boolean)
       .sort((a: any, b: any) => a.order_index - b.order_index)
   }
+
+  const hasActiveSubscription = subscribed.length > 0
+
+  // When already subscribed, only show previous unsubscribed packages as individual buy options
+  const previousAvailable = hasActiveSubscription
+    ? available.filter((p: any) => !isCurrentOrFuture(p))
+    : []
+
+  // Dialog packages for the single subscribe button (all available when no subscription)
+  const dialogPackages = available.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    month: p.month,
+    year: p.year,
+    chapterCount: getChapters(p).length,
+  }))
 
   return (
     <div>
@@ -144,21 +160,21 @@ export default async function StudentSubscriptionsPage() {
         </section>
       )}
 
-      {/* Available packages */}
-      {available.length > 0 && (
-        <section>
+      {/* No subscription yet: show all packages + ONE subscribe button */}
+      {!hasActiveSubscription && available.length > 0 && (
+        <section className="mb-10">
           <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
             <Package className="w-4 h-4 text-muted-foreground" />
             Available Packages
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
             {available.map((pkg: any) => {
               const chapters = getChapters(pkg)
-              const current = isCurrentOrFuture(pkg)
+              const isCurrent = isCurrentOrFuture(pkg)
               return (
                 <div
                   key={pkg.id}
-                  className="rounded-xl border border-border/60 bg-card flex flex-col overflow-hidden hover:border-primary/30 transition-colors"
+                  className="rounded-xl border border-border/60 bg-card flex flex-col overflow-hidden"
                 >
                   <div className="p-5 flex-1">
                     <div className="flex items-start justify-between gap-2 mb-2">
@@ -167,8 +183,11 @@ export default async function StudentSubscriptionsPage() {
                         <Badge variant="outline" className="text-xs">
                           {MONTHS[pkg.month - 1]} {pkg.year}
                         </Badge>
-                        {current && (
-                          <Badge className="text-xs bg-primary/10 text-primary border-primary/20" variant="outline">
+                        {isCurrent && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-primary/10 text-primary border-primary/20"
+                          >
                             Current
                           </Badge>
                         )}
@@ -188,19 +207,85 @@ export default async function StudentSubscriptionsPage() {
                       ))}
                     </div>
                   </div>
-                  <div className="px-5 py-4 border-t border-border/60 flex items-center justify-between">
+                  <div className="px-5 py-3 border-t border-border/60">
                     <span className="text-lg font-bold text-primary">Rs {Number(pkg.price).toFixed(2)}</span>
-                    <Button size="sm" asChild className="bg-primary text-primary-foreground hover:bg-accent">
-                      <Link href="/contact">Subscribe</Link>
-                    </Button>
                   </div>
                 </div>
               )
             })}
           </div>
-          <p className="text-xs text-muted-foreground mt-4">
-            To subscribe, click Subscribe and contact us via the form. Your access will be activated once payment is confirmed.
+
+          {/* ONE subscribe button for all packages */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 rounded-xl border border-primary/20 bg-primary/5">
+            <div className="flex-1">
+              <p className="font-semibold">Ready to get started?</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Select the packages you want — current month is pre-selected,
+                and you can optionally add previous months too.
+              </p>
+            </div>
+            <SubscribeSection packages={dialogPackages} />
+          </div>
+        </section>
+      )}
+
+      {/* Already subscribed: show only previous unsubscribed months */}
+      {hasActiveSubscription && previousAvailable.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+            Previous Months Available
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Catch up on content from previous months you haven&apos;t subscribed to yet.
           </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {previousAvailable.map((pkg: any) => {
+              const chapters = getChapters(pkg)
+              return (
+                <div
+                  key={pkg.id}
+                  className="rounded-xl border border-border/60 bg-card flex flex-col overflow-hidden hover:border-primary/30 transition-colors"
+                >
+                  <div className="p-5 flex-1">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="font-semibold leading-snug">{pkg.name}</h3>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {MONTHS[pkg.month - 1]} {pkg.year}
+                      </Badge>
+                    </div>
+                    {pkg.description && (
+                      <p className="text-sm text-muted-foreground mb-3">{pkg.description}</p>
+                    )}
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                      {chapters.length} chapter{chapters.length !== 1 ? 's' : ''} included:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {chapters.map((ch: any) => (
+                        <Badge key={ch.id} variant="secondary" className="text-xs">
+                          <Lock className="w-2.5 h-2.5 mr-1" />{ch.title}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="px-5 py-3 border-t border-border/60 flex items-center justify-between">
+                    <span className="text-lg font-bold text-primary">Rs {Number(pkg.price).toFixed(2)}</span>
+                    <SubscribeSection
+                      packages={[{
+                        id: pkg.id,
+                        name: pkg.name,
+                        price: pkg.price,
+                        month: pkg.month,
+                        year: pkg.year,
+                        chapterCount: chapters.length,
+                      }]}
+                      singlePackage
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </section>
       )}
 

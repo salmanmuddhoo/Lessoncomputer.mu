@@ -160,7 +160,7 @@ export default async function GradePage({ params }: PageProps) {
         </div>
       </header>
 
-      {(totalVideos > 0 || (chapters?.length ?? 0) > 0) && (
+      {(totalVideos > 0 || (chapters?.length ?? 0) > 0 || packages.length > 0) && (
         <section className="mb-12">
           <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
             {hasPackages ? (
