@@ -23,27 +23,37 @@ import {
 import { toast } from 'sonner'
 import type { LiveClass } from '@/lib/types/database'
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
 const schema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().optional(),
   grade_id: z.string().min(1, 'Please select a grade'),
+  package_id: z.string().optional(),
   scheduled_at: z.string().min(1, 'Please set a date and time'),
   meet_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   streamable_replay_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
-  price: z.coerce.number().min(0, 'Price must be 0 or more'),
-  is_subscription_only: z.boolean(),
   max_students: z.coerce.number().min(0).optional(),
   is_published: z.boolean(),
 })
 
 type FormData = z.infer<typeof schema>
 
+interface PackageOption {
+  id: string
+  name: string
+  grade_id: string
+  month: number
+  year: number
+}
+
 interface LiveClassFormProps {
   grades: { id: string; name: string; color: string }[]
+  packages: PackageOption[]
   liveClass?: LiveClass
 }
 
-export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
+export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -55,15 +65,17 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
       title: liveClass?.title ?? '',
       description: liveClass?.description ?? '',
       grade_id: liveClass?.grade_id ?? '',
+      package_id: liveClass?.package_id ?? '',
       scheduled_at: liveClass?.scheduled_at ? new Date(liveClass.scheduled_at).toISOString().slice(0, 16) : '',
       meet_url: liveClass?.meet_url ?? '',
       streamable_replay_url: liveClass?.streamable_replay_url ?? '',
-      price: liveClass?.price ?? 0,
-      is_subscription_only: liveClass?.is_subscription_only ?? false,
       max_students: liveClass?.max_students ?? undefined,
       is_published: liveClass?.is_published ?? false,
     },
   })
+
+  const selectedGradeId = watch('grade_id')
+  const packagesForGrade = packages.filter((p) => p.grade_id === selectedGradeId)
 
   async function onSubmit(data: FormData) {
     setLoading(true)
@@ -73,11 +85,12 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
       title: data.title,
       description: data.description || null,
       grade_id: data.grade_id,
+      package_id: data.package_id || null,
       scheduled_at: new Date(data.scheduled_at).toISOString(),
       meet_url: data.meet_url || null,
       streamable_replay_url: data.streamable_replay_url || null,
-      price: data.price,
-      is_subscription_only: data.is_subscription_only,
+      price: 0,
+      is_subscription_only: !!data.package_id,
       max_students: data.max_students || null,
       is_published: data.is_published,
     }
@@ -125,7 +138,13 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Grade *</Label>
-            <Select defaultValue={liveClass?.grade_id} onValueChange={(v) => setValue('grade_id', v)}>
+            <Select
+              defaultValue={liveClass?.grade_id}
+              onValueChange={(v) => {
+                setValue('grade_id', v)
+                setValue('package_id', '')
+              }}
+            >
               <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
               <SelectContent>
                 {grades.map((g) => (
@@ -144,6 +163,34 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
         </div>
 
         <div className="space-y-2">
+          <Label>Subscription Package (optional)</Label>
+          <Select
+            value={watch('package_id') || '__none__'}
+            onValueChange={(v) => setValue('package_id', v === '__none__' ? '' : v)}
+            disabled={!selectedGradeId}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={
+                !selectedGradeId ? 'Select a grade first' :
+                packagesForGrade.length === 0 ? 'No packages for this grade' :
+                'Link to a subscription package'
+              } />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No package (free / standalone)</SelectItem>
+              {packagesForGrade.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name} — {MONTHS[p.month - 1]} {p.year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Linking to a package marks this class as subscription-only for that package.
+          </p>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="meet_url">Meeting URL (Google Meet / Zoom / etc.)</Label>
           <Input id="meet_url" type="url" placeholder="https://meet.google.com/..." {...register('meet_url')} />
           {errors.meet_url && <p className="text-xs text-destructive">{errors.meet_url.message}</p>}
@@ -155,28 +202,14 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
           <p className="text-xs text-muted-foreground">Add after the session ends so students can rewatch.</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="price">Price (Rs)</Label>
-            <Input id="price" type="number" min="0" placeholder="0 for free" {...register('price')} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="max_students">Max students (optional)</Label>
-            <Input id="max_students" type="number" min="0" placeholder="Unlimited" {...register('max_students')} />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="max_students">Max students (optional)</Label>
+          <Input id="max_students" type="number" min="0" placeholder="Unlimited" {...register('max_students')} />
         </div>
       </div>
 
       <Card className="border-border/60">
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>Subscription only</Label>
-              <p className="text-xs text-muted-foreground">Only allow subscribers to join</p>
-            </div>
-            <Switch checked={watch('is_subscription_only')} onCheckedChange={(v) => setValue('is_subscription_only', v)} />
-          </div>
+        <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div>
               <Label>Published</Label>
