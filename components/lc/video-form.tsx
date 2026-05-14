@@ -27,10 +27,10 @@ import type { Video, Chapter } from '@/lib/types/database'
  */
 export function extractStreamableId(input: string): string | null {
   // Try src attribute in embed HTML first
-  const srcMatch = input.match(/src=["']https?:\/\/streamable\.com\/e\/([a-z0-9]+)/i)
+  const srcMatch = input.match(/src=["']https?:\/\/streamable\.com\/e\/([a-z0-9]{2,})/i)
   if (srcMatch) return srcMatch[1]
   // Try plain URL (with or without /e/ prefix)
-  const urlMatch = input.match(/streamable\.com\/(?:e\/)?([a-z0-9]+)/i)
+  const urlMatch = input.match(/streamable\.com\/(?:e\/)?([a-z0-9]{2,})/i)
   return urlMatch ? urlMatch[1] : null
 }
 
@@ -177,20 +177,19 @@ export function VideoForm({ grades, video }: VideoFormProps) {
           )}
 
           {streamableId && (
-            <div className="mt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs text-muted-foreground">Detected ID:</span>
-                <code className="text-xs bg-muted px-2 py-0.5 rounded">{streamableId}</code>
+            <div className="mt-4 flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-green-700 dark:text-green-400">Video detected</p>
+                <code className="text-xs text-muted-foreground">{streamableId}</code>
               </div>
-              <p className="text-xs text-muted-foreground mb-2">Preview:</p>
-              <div className="aspect-video rounded-lg overflow-hidden border border-border/60">
-                <iframe
-                  src={`https://streamable.com/e/${streamableId}`}
-                  frameBorder="0"
-                  allowFullScreen
-                  className="w-full h-full"
-                />
-              </div>
+              <a
+                href={`https://streamable.com/${streamableId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline shrink-0"
+              >
+                Verify on Streamable ↗
+              </a>
             </div>
           )}
         </CardContent>
