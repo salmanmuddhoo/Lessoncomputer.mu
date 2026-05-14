@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { VideoCard } from '@/components/lc/video-card'
+import { SubscribeSection } from '@/components/lc/subscribe-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   ChevronDown, ChevronUp, FolderOpen, Video,
-  Package, Lock, CheckCircle2,
+  Package, Lock, CheckCircle2, ShoppingCart,
 } from 'lucide-react'
 
 const MONTHS = [
@@ -76,12 +77,29 @@ export function GradePageContent({
     return pkg.year > currentYear || (pkg.year === currentYear && pkg.month >= currentMonth)
   }
 
+  // Subscription state
+  const hasCurrentSubscription = packages.some(
+    (p) => subscribedSet.has(p.id) && isCurrentOrFuture(p)
+  )
+  const unsubscribed = packages.filter((p) => !subscribedSet.has(p.id))
+
+  // Build dialog package list (all unsubscribed)
+  const dialogPackages = unsubscribed.map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    month: p.month,
+    year: p.year,
+    chapterCount: p.chapterIds.length,
+  }))
+
   if (packages.length > 0) {
     return (
       <div className="space-y-6">
         {packages.map((pkg) => {
           const isSubscribed = subscribedSet.has(pkg.id)
           const isCurrent = isCurrentOrFuture(pkg)
+          const isPreviousUnsubscribed = isLoggedIn && hasCurrentSubscription && !isSubscribed && !isCurrent
           const pkgChapters = chapters
             .filter((ch) => pkg.chapterIds.includes(ch.id))
             .sort((a, b) => a.order_index - b.order_index)
@@ -94,9 +112,7 @@ export function GradePageContent({
             <div
               key={pkg.id}
               className={`rounded-2xl border overflow-hidden transition-colors ${
-                isSubscribed
-                  ? 'border-primary/40 bg-card'
-                  : 'border-border/60 bg-card'
+                isSubscribed ? 'border-primary/40 bg-card' : 'border-border/60 bg-card'
               }`}
             >
               {/* Package header */}
@@ -130,17 +146,20 @@ export function GradePageContent({
                     <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Subscribed
                     </span>
-                  ) : (
-                    <Button
-                      size="sm"
-                      asChild
-                      className="bg-primary text-primary-foreground hover:bg-accent text-xs h-7 px-3"
-                    >
-                      <Link href={isLoggedIn ? '/dashboard/subscriptions' : `/login?redirectTo=/dashboard/subscriptions`}>
-                        Subscribe
-                      </Link>
-                    </Button>
-                  )}
+                  ) : isPreviousUnsubscribed ? (
+                    /* Already subscribed to current month — show Buy for this previous month */
+                    <SubscribeSection
+                      packages={[{
+                        id: pkg.id,
+                        name: pkg.name,
+                        price: pkg.price,
+                        month: pkg.month,
+                        year: pkg.year,
+                        chapterCount: pkg.chapterIds.length,
+                      }]}
+                      singlePackage
+                    />
+                  ) : null}
                 </div>
               </div>
 
@@ -204,6 +223,28 @@ export function GradePageContent({
             </div>
           )
         })}
+
+        {/* ONE subscribe CTA — only shown when user doesn't have a current subscription */}
+        {!hasCurrentSubscription && unsubscribed.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 rounded-xl border border-primary/20 bg-primary/5">
+            <div className="flex-1">
+              <p className="font-semibold">Get access to all content</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Current month is included. You can optionally add previous months too.
+              </p>
+            </div>
+            {isLoggedIn ? (
+              <SubscribeSection packages={dialogPackages} />
+            ) : (
+              <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
+                <Link href="/login?redirectTo=/dashboard/subscriptions">
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  Subscribe
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Free / unchaptered videos always visible */}
         {unchapteredVideos.length > 0 && (
