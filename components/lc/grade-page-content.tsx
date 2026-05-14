@@ -105,10 +105,7 @@ export function GradePageContent({
         {!hasCurrentSubscription && unsubscribed.length > 0 && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 rounded-xl border border-primary/20 bg-primary/5">
             <div className="flex-1">
-              <p className="font-semibold">Get access to all content</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Current month is included. You can optionally add previous months too.
-              </p>
+              <p className="font-semibold">Get access to our live classes and videos</p>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               {currentUnsubscribedPkg && (

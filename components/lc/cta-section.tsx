@@ -34,7 +34,7 @@ export function CTASection() {
               size="lg"
               variant="outline"
               asChild
-              className="border-background/25 text-background hover:bg-background/8 hover:border-background/50 rounded-full px-9 h-12 text-[15px]"
+              className="bg-transparent border-background/25 text-background hover:bg-background/10 hover:border-background/50 rounded-full px-9 h-12 text-[15px]"
             >
               <Link href="/pricing">View Pricing</Link>
             </Button>

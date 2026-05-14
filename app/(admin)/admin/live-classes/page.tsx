@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { Plus, Pencil, Calendar, Package } from 'lucide-react'
 
 export const metadata = { title: 'Manage Live Classes' }
@@ -74,12 +75,15 @@ export default async function AdminLiveClassesPage() {
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(c.scheduled_at).toLocaleDateString('en-MU', { dateStyle: 'medium' })}
-                          {' '}
-                          {new Date(c.scheduled_at).toLocaleTimeString('en-MU', { timeStyle: 'short' })}
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
+                        <span className="flex items-start gap-1">
+                          <Calendar className="w-3 h-3 mt-0.5 shrink-0" />
+                          <LiveClassSchedule
+                            scheduledAt={c.scheduled_at}
+                            isRecurring={(c as any).is_recurring ?? false}
+                            recurrenceDayOfWeek={(c as any).recurrence_day_of_week ?? null}
+                            endTime={(c as any).end_time ?? null}
+                          />
                         </span>
                       </td>
                       <td className="px-4 py-3">

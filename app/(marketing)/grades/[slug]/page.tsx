@@ -2,19 +2,33 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { GradePageContent } from '@/components/lc/grade-page-content'
+import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { Badge } from '@/components/ui/badge'
 import { BookOpen, Video, Users, Package, Clock } from 'lucide-react'
 
-const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-
-function formatTime(timeStr: string): string {
-  const [h, m] = timeStr.split(':').map(Number)
-  const d = new Date(); d.setHours(h, m, 0)
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-}
-
 interface PageProps {
   params: Promise<{ slug: string }>
+}
+
+function LiveClassWidget({ liveClass }: { liveClass: any }) {
+  return (
+    <div className="p-4 rounded-xl border border-primary/20 bg-primary/5">
+      <div className="flex items-center gap-2 mb-2">
+        <Users className="w-4 h-4 text-primary shrink-0" />
+        <span className="text-xs font-semibold text-primary uppercase tracking-wide">Live Class</span>
+      </div>
+      <h3 className="font-semibold text-sm mb-2 leading-snug">{liveClass.title}</h3>
+      <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+        <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <LiveClassSchedule
+          scheduledAt={liveClass.scheduled_at}
+          isRecurring={liveClass.is_recurring ?? false}
+          recurrenceDayOfWeek={liveClass.recurrence_day_of_week ?? null}
+          endTime={liveClass.end_time ?? null}
+        />
+      </div>
+    </div>
+  )
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -49,6 +63,7 @@ export default async function GradePage({ params }: PageProps) {
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+
 
   const { data: grade } = await supabase
     .from('grades')
@@ -172,34 +187,10 @@ export default async function GradePage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Live class widget */}
+        {/* Live class widget — desktop only (mobile shown below packages) */}
         {liveClasses && liveClasses.length > 0 && (
-          <div className="w-full md:w-72 shrink-0">
-            {liveClasses.map((lc) => (
-              <div
-                key={lc.id}
-                className="p-4 rounded-xl border border-primary/20 bg-primary/5"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-4 h-4 text-primary shrink-0" />
-                  <span className="text-xs font-semibold text-primary uppercase tracking-wide">Live Class</span>
-                </div>
-                <h3 className="font-semibold text-sm mb-2 leading-snug">{lc.title}</h3>
-                <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
-                  <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                  <span>
-                    {(lc as any).is_recurring && (lc as any).recurrence_day_of_week != null
-                      ? `Every ${DAYS[(lc as any).recurrence_day_of_week]} from ${
-                          new Date(lc.scheduled_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                        }${(lc as any).end_time ? ` to ${formatTime((lc as any).end_time)}` : ''}`
-                      : `${new Date(lc.scheduled_at).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })} · ${
-                          new Date(lc.scheduled_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                        }${(lc as any).end_time ? ` – ${formatTime((lc as any).end_time)}` : ''}`
-                    }
-                  </span>
-                </div>
-              </div>
-            ))}
+          <div className="hidden md:block w-72 shrink-0">
+            <LiveClassWidget liveClass={liveClasses[0]} />
           </div>
         )}
       </header>
@@ -223,6 +214,12 @@ export default async function GradePage({ params }: PageProps) {
             subscribedPackageIds={subscribedPackageIds}
             isLoggedIn={!!user}
           />
+          {/* Live class widget — mobile only, shown below packages */}
+          {liveClasses && liveClasses.length > 0 && (
+            <div className="md:hidden mt-6">
+              <LiveClassWidget liveClass={liveClasses[0]} />
+            </div>
+          )}
         </section>
       )}
 
