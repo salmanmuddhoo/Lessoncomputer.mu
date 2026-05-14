@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 
 export function CTASection() {
   return (
-    <section className="bg-foreground py-20 md:py-24">
+    <section className="relative overflow-hidden bg-foreground py-20 md:py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-2xl mx-auto text-center">
           {/* Yellow glow */}
