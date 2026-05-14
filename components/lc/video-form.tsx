@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -17,19 +18,17 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import type { Video, Chapter } from '@/lib/types/database'
+import type { Video } from '@/lib/types/database'
 
 /**
  * Extracts the Streamable video ID from:
- *  - Full embed HTML: <div>...<iframe src="https://streamable.com/e/abc123?"...
+ *  - Full embed HTML: <iframe src="https://streamable.com/e/abc123"...
  *  - Direct URL:  https://streamable.com/abc123
  *  - Embed URL:   https://streamable.com/e/abc123
  */
 export function extractStreamableId(input: string): string | null {
-  // Try src attribute in embed HTML first
   const srcMatch = input.match(/src=["']https?:\/\/streamable\.com\/e\/([a-z0-9]{2,})/i)
   if (srcMatch) return srcMatch[1]
-  // Try plain URL (with or without /e/ prefix)
   const urlMatch = input.match(/streamable\.com\/(?:e\/)?([a-z0-9]{2,})/i)
   return urlMatch ? urlMatch[1] : null
 }
@@ -39,35 +38,43 @@ function normalizeStreamableUrl(input: string): string {
   return id ? `https://streamable.com/e/${id}` : input
 }
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
 const schema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().optional(),
-  grade_id: z.string().min(1, 'Please select a grade'),
+  package_id: z.string().min(1, 'Please select a subscription package'),
   chapter_id: z.string().optional(),
   streamable_embed: z.string().min(1, 'Please paste the Streamable embed code or URL').refine(
     (v) => extractStreamableId(v) !== null,
     'No Streamable video found. Paste the full embed code or a streamable.com URL.'
   ),
   thumbnail_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
-  price: z.coerce.number().min(0),
-  is_free: z.boolean(),
   duration_minutes: z.coerce.number().min(0).optional(),
   is_published: z.boolean(),
 })
 
 type FormData = z.infer<typeof schema>
 
-interface VideoFormProps {
-  grades: { id: string; name: string; color: string }[]
-  video?: Video
+export interface PackageOption {
+  id: string
+  name: string
+  grade_id: string
+  month: number
+  year: number
+  chapters: { id: string; title: string; order_index: number }[]
 }
 
-export function VideoForm({ grades, video }: VideoFormProps) {
+interface VideoFormProps {
+  packages: PackageOption[]
+  video?: Video
+  initialPackageId?: string
+}
+
+export function VideoForm({ packages, video, initialPackageId = '' }: VideoFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [chapters, setChapters] = useState<Chapter[]>([])
-  const [loadingChapters, setLoadingChapters] = useState(false)
   const isEditing = !!video
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
@@ -75,55 +82,45 @@ export function VideoForm({ grades, video }: VideoFormProps) {
     defaultValues: {
       title: video?.title ?? '',
       description: video?.description ?? '',
-      grade_id: video?.grade_id ?? '',
+      package_id: initialPackageId,
       chapter_id: video?.chapter_id ?? undefined,
       streamable_embed: video?.streamable_url ?? '',
       thumbnail_url: video?.thumbnail_url ?? '',
-      price: video?.price ?? 0,
-      is_free: video?.is_free ?? true,
       duration_minutes: video?.duration_minutes ?? undefined,
       is_published: video?.is_published ?? false,
     },
   })
 
-  const isFree = watch('is_free')
   const embedInput = watch('streamable_embed')
-  const selectedGradeId = watch('grade_id')
+  const selectedPackageId = watch('package_id')
   const streamableId = embedInput ? extractStreamableId(embedInput) : null
 
-  // Load chapters whenever selected grade changes
+  const selectedPackage = packages.find((p) => p.id === selectedPackageId)
+  const chaptersForPackage = selectedPackage
+    ? [...selectedPackage.chapters].sort((a, b) => a.order_index - b.order_index)
+    : []
+
   useEffect(() => {
-    if (!selectedGradeId) { setChapters([]); return }
-    setLoadingChapters(true)
-    const supabase = createClient()
-    supabase
-      .from('chapters')
-      .select('*')
-      .eq('grade_id', selectedGradeId)
-      .order('order_index')
-      .then(({ data }) => {
-        setChapters(data ?? [])
-        setLoadingChapters(false)
-        const currentChapterId = watch('chapter_id')
-        if (currentChapterId && !(data ?? []).find((c) => c.id === currentChapterId)) {
-          setValue('chapter_id', undefined)
-        }
-      })
-  }, [selectedGradeId])
+    const currentChapter = watch('chapter_id')
+    if (currentChapter && !chaptersForPackage.find((c) => c.id === currentChapter)) {
+      setValue('chapter_id', undefined)
+    }
+  }, [selectedPackageId])
 
   async function onSubmit(data: FormData) {
     setLoading(true)
     const supabase = createClient()
 
+    const pkg = packages.find((p) => p.id === data.package_id)
     const payload = {
       title: data.title,
       description: data.description || null,
-      grade_id: data.grade_id,
+      grade_id: pkg?.grade_id ?? '',
       chapter_id: data.chapter_id || null,
       streamable_url: normalizeStreamableUrl(data.streamable_embed),
       thumbnail_url: data.thumbnail_url || null,
-      price: data.is_free ? 0 : data.price,
-      is_free: data.is_free,
+      price: 0,
+      is_free: false,
       duration_minutes: data.duration_minutes || null,
       is_published: data.is_published,
     }
@@ -208,19 +205,26 @@ export function VideoForm({ grades, video }: VideoFormProps) {
           <Textarea id="description" placeholder="What will students learn?" rows={3} {...register('description')} />
         </div>
 
-        {/* Grade + Chapter row */}
+        {/* Package + Chapter row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Grade *</Label>
-            <Select defaultValue={video?.grade_id} onValueChange={(v) => setValue('grade_id', v)}>
-              <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+            <Label>Subscription Package *</Label>
+            <Select
+              defaultValue={initialPackageId || undefined}
+              onValueChange={(v) => setValue('package_id', v)}
+            >
+              <SelectTrigger><SelectValue placeholder="Select package" /></SelectTrigger>
               <SelectContent>
-                {grades.map((g) => (
-                  <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                {packages.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} — {MONTHS[p.month - 1]} {p.year}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.grade_id && <p className="text-xs text-destructive">{errors.grade_id.message}</p>}
+            {errors.package_id && (
+              <p className="text-xs text-destructive">{errors.package_id.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -228,31 +232,22 @@ export function VideoForm({ grades, video }: VideoFormProps) {
             <Select
               value={watch('chapter_id') ?? '__none__'}
               onValueChange={(v) => setValue('chapter_id', v === '__none__' ? undefined : v)}
-              disabled={!selectedGradeId || loadingChapters}
+              disabled={!selectedPackageId || chaptersForPackage.length === 0}
             >
               <SelectTrigger>
                 <SelectValue placeholder={
-                  !selectedGradeId ? 'Select a grade first' :
-                  loadingChapters ? 'Loading…' :
-                  chapters.length === 0 ? 'No chapters yet' :
+                  !selectedPackageId ? 'Select a package first' :
+                  chaptersForPackage.length === 0 ? 'No chapters in this package' :
                   'Optional — select chapter'
                 } />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">No chapter</SelectItem>
-                {chapters.map((ch) => (
+                {chaptersForPackage.map((ch) => (
                   <SelectItem key={ch.id} value={ch.id}>{ch.title}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {selectedGradeId && chapters.length === 0 && !loadingChapters && (
-              <p className="text-xs text-muted-foreground">
-                No chapters yet.{' '}
-                <a href={`/admin/grades/${selectedGradeId}/chapters`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  Add chapters
-                </a>
-              </p>
-            )}
           </div>
         </div>
 
@@ -267,27 +262,6 @@ export function VideoForm({ grades, video }: VideoFormProps) {
           </div>
         </div>
       </div>
-
-      {/* ── Pricing ── */}
-      <Card className="border-border/60">
-        <CardContent className="p-5 space-y-4">
-          <h3 className="font-semibold">Pricing</h3>
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>Free video</Label>
-              <p className="text-xs text-muted-foreground">Students can watch without purchasing</p>
-            </div>
-            <Switch checked={isFree} onCheckedChange={(v) => setValue('is_free', v)} />
-          </div>
-          {!isFree && (
-            <div className="space-y-2">
-              <Label htmlFor="price">Price (Rs)</Label>
-              <Input id="price" type="number" min="0" step="0.01" placeholder="e.g. 150" {...register('price')} />
-              {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* ── Publish ── */}
       <Card className="border-border/60">

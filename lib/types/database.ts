@@ -113,6 +113,7 @@ export interface LiveClass {
   title: string
   description: string | null
   grade_id: string
+  package_id: string | null
   streamable_replay_url: string | null
   meet_url: string | null
   scheduled_at: string
