@@ -1,10 +1,9 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { VideoCard } from '@/components/lc/video-card'
+import { GradePageContent } from '@/components/lc/grade-page-content'
 import { Badge } from '@/components/ui/badge'
-import { BookOpen, Video, Users, FolderOpen } from 'lucide-react'
-import type { Chapter } from '@/lib/types/database'
+import { BookOpen, Video, Users, Package } from 'lucide-react'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -30,17 +29,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    openGraph: {
-      title,
-      description,
-      type: 'website',
-      siteName: 'LessonComputer.mu',
-    },
-    twitter: {
-      card: 'summary',
-      title,
-      description,
-    },
+    openGraph: { title, description, type: 'website', siteName: 'LessonComputer.mu' },
+    twitter: { card: 'summary', title, description },
   }
 }
 
@@ -57,7 +47,12 @@ export default async function GradePage({ params }: PageProps) {
 
   if (!grade) notFound()
 
-  const [{ data: videos }, { data: liveClasses }, { data: chapters }] = await Promise.all([
+  const [
+    { data: videos },
+    { data: liveClasses },
+    { data: chapters },
+    { data: rawPackages },
+  ] = await Promise.all([
     supabase
       .from('videos')
       .select('*, grade:grades(*), chapter:chapters(*)')
@@ -75,26 +70,41 @@ export default async function GradePage({ params }: PageProps) {
       .select('*')
       .eq('grade_id', grade.id)
       .order('order_index'),
+    supabase
+      .from('subscription_packages')
+      .select('id, name, description, price, month, year, subscription_package_chapters(chapter_id)')
+      .eq('grade_id', grade.id)
+      .eq('is_active', true)
+      .order('year', { ascending: false })
+      .order('month', { ascending: false }),
   ])
 
-  // Group videos by chapter
-  const chapterMap = new Map<string, typeof videos>()
+  // Build chapter → videos map
+  const videosByChapter: Record<string, typeof videos> = {}
   const unchapteredVideos: typeof videos = []
 
-  if (videos) {
-    for (const v of videos) {
-      if (v.chapter_id) {
-        const list = chapterMap.get(v.chapter_id) ?? []
-        list.push(v)
-        chapterMap.set(v.chapter_id, list)
-      } else {
-        unchapteredVideos.push(v)
-      }
+  for (const v of videos ?? []) {
+    if (v.chapter_id) {
+      videosByChapter[v.chapter_id] ??= []
+      videosByChapter[v.chapter_id]!.push(v)
+    } else {
+      unchapteredVideos.push(v)
     }
   }
 
-  const hasChapters = (chapters?.length ?? 0) > 0
+  // Normalise packages
+  const packages = (rawPackages ?? []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: p.price,
+    month: p.month,
+    year: p.year,
+    chapterIds: (p.subscription_package_chapters ?? []).map((c: any) => c.chapter_id),
+  }))
+
   const totalVideos = videos?.length ?? 0
+  const hasPackages = packages.length > 0
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
@@ -120,10 +130,16 @@ export default async function GradePage({ params }: PageProps) {
             <Video className="w-3 h-3" />
             {totalVideos} {totalVideos === 1 ? 'video' : 'videos'}
           </Badge>
-          {hasChapters && (
+          {(chapters?.length ?? 0) > 0 && (
             <Badge variant="secondary" className="gap-1">
               <BookOpen className="w-3 h-3" />
               {chapters!.length} {chapters!.length === 1 ? 'chapter' : 'chapters'}
+            </Badge>
+          )}
+          {hasPackages && (
+            <Badge variant="secondary" className="gap-1">
+              <Package className="w-3 h-3" />
+              {packages.length} subscription {packages.length === 1 ? 'package' : 'packages'}
             </Badge>
           )}
           <Badge variant="secondary" className="gap-1">
@@ -133,73 +149,27 @@ export default async function GradePage({ params }: PageProps) {
         </div>
       </header>
 
-      {/* Videos section */}
-      {totalVideos > 0 && (
+      {/* Main content — packages → chapters → videos, or flat chapters */}
+      {(totalVideos > 0 || (chapters?.length ?? 0) > 0) && (
         <section className="mb-12">
           <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
-            <Video className="w-5 h-5 text-primary" />
-            Video Lessons
+            {hasPackages ? (
+              <><Package className="w-5 h-5 text-primary" /> Subscription Packages</>
+            ) : (
+              <><Video className="w-5 h-5 text-primary" /> Video Lessons</>
+            )}
           </h2>
-
-          {hasChapters ? (
-            /* ── Grouped by chapter ── */
-            <div className="space-y-10">
-              {chapters!.map((ch: Chapter) => {
-                const chVideos = chapterMap.get(ch.id) ?? []
-                return (
-                  <div key={ch.id}>
-                    <div className="flex items-center gap-2 mb-4">
-                      <FolderOpen className="w-4 h-4 text-primary shrink-0" />
-                      <h3 className="font-semibold text-base">{ch.title}</h3>
-                      <span className="text-xs text-muted-foreground ml-auto shrink-0">
-                        {chVideos.length} {chVideos.length === 1 ? 'video' : 'videos'}
-                      </span>
-                    </div>
-                    {ch.description && (
-                      <p className="text-sm text-muted-foreground mb-3 -mt-2">{ch.description}</p>
-                    )}
-                    {chVideos.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {chVideos.map((v) => (
-                          <VideoCard key={v.id} video={v} />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-border/40 border-dashed py-8 text-center">
-                        <p className="text-sm text-muted-foreground">No videos in this chapter yet.</p>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {/* Videos without a chapter */}
-              {unchapteredVideos.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Video className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <h3 className="font-semibold text-base text-muted-foreground">Other Videos</h3>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {unchapteredVideos.map((v) => (
-                      <VideoCard key={v.id} video={v} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* ── Flat list (no chapters) ── */
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {videos!.map((v) => (
-                <VideoCard key={v.id} video={v} />
-              ))}
-            </div>
-          )}
+          <GradePageContent
+            packages={packages}
+            chapters={chapters ?? []}
+            videosByChapter={videosByChapter as any}
+            unchapteredVideos={unchapteredVideos as any}
+            gradeColor={grade.color}
+          />
         </section>
       )}
 
-      {/* Live Classes section */}
+      {/* Live Classes */}
       {liveClasses && liveClasses.length > 0 && (
         <section className="mb-10">
           <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
@@ -226,11 +196,7 @@ export default async function GradePage({ params }: PageProps) {
                     {new Date(lc.scheduled_at).toLocaleTimeString('en-MU', { timeStyle: 'short' })}
                   </span>
                   <span className="font-semibold">
-                    {lc.price === 0 ? (
-                      <span className="text-primary">Free</span>
-                    ) : (
-                      `Rs ${lc.price}`
-                    )}
+                    {lc.price === 0 ? <span className="text-primary">Free</span> : `Rs ${lc.price}`}
                   </span>
                 </div>
               </div>
@@ -239,7 +205,7 @@ export default async function GradePage({ params }: PageProps) {
         </section>
       )}
 
-      {totalVideos === 0 && !liveClasses?.length && (
+      {totalVideos === 0 && !liveClasses?.length && (chapters?.length ?? 0) === 0 && (
         <div className="py-24 text-center">
           <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-muted-foreground">No content available for this grade yet. Check back soon!</p>
