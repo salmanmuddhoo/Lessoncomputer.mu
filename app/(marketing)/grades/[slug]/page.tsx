@@ -145,8 +145,7 @@ export default async function GradePage({ params }: PageProps) {
             /* ── Grouped by chapter ── */
             <div className="space-y-10">
               {chapters!.map((ch: Chapter) => {
-                const chVideos = chapterMap.get(ch.id)
-                if (!chVideos?.length) return null
+                const chVideos = chapterMap.get(ch.id) ?? []
                 return (
                   <div key={ch.id}>
                     <div className="flex items-center gap-2 mb-4">
@@ -159,11 +158,17 @@ export default async function GradePage({ params }: PageProps) {
                     {ch.description && (
                       <p className="text-sm text-muted-foreground mb-3 -mt-2">{ch.description}</p>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {chVideos.map((v) => (
-                        <VideoCard key={v.id} video={v} />
-                      ))}
-                    </div>
+                    {chVideos.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {chVideos.map((v) => (
+                          <VideoCard key={v.id} video={v} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-border/40 border-dashed py-8 text-center">
+                        <p className="text-sm text-muted-foreground">No videos in this chapter yet.</p>
+                      </div>
+                    )}
                   </div>
                 )
               })}

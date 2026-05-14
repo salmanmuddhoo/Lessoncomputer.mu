@@ -18,7 +18,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import type { Metadata } from 'next'
 
 const MONTHS = [
   'January','February','March','April','May','June',
