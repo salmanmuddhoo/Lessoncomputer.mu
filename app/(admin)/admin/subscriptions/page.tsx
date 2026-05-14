@@ -92,8 +92,8 @@ export default function AdminSubscriptionsPage() {
       supabase
         .from('subscription_packages')
         .select('*, grade:grades(id,name,color), subscription_package_chapters(chapter_id)')
-        .order('year', { ascending: false })
-        .order('month', { ascending: false }),
+        .order('year', { ascending: true })
+        .order('month', { ascending: true }),
       supabase.from('grades').select('id,name,color').eq('is_active', true).order('order_index'),
     ])
 

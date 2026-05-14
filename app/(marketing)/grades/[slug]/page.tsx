@@ -3,7 +3,15 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { GradePageContent } from '@/components/lc/grade-page-content'
 import { Badge } from '@/components/ui/badge'
-import { BookOpen, Video, Users, Package } from 'lucide-react'
+import { BookOpen, Video, Users, Package, Clock } from 'lucide-react'
+
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+function formatTime(timeStr: string): string {
+  const [h, m] = timeStr.split(':').map(Number)
+  const d = new Date(); d.setHours(h, m, 0)
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -126,44 +134,74 @@ export default async function GradePage({ params }: PageProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
-      <header className="mb-8">
-        <div className="flex items-center gap-3 mb-3">
-          <div
-            className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0"
-            style={{ backgroundColor: `${grade.color}20`, color: grade.color }}
-          >
-            {grade.name.replace('Grade ', '')}
+      <header className="mb-8 flex flex-col md:flex-row md:items-start gap-6">
+        {/* Grade info */}
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-3">
+            <div
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0"
+              style={{ backgroundColor: `${grade.color}20`, color: grade.color }}
+            >
+              {grade.name.replace('Grade ', '')}
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold leading-tight">{grade.name}</h1>
+              {grade.description && (
+                <p className="text-sm text-muted-foreground mt-0.5">{grade.description}</p>
+              )}
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold leading-tight">{grade.name}</h1>
-            {grade.description && (
-              <p className="text-sm text-muted-foreground mt-0.5">{grade.description}</p>
+
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary" className="gap-1">
+              <Video className="w-3 h-3" />
+              {totalVideos} {totalVideos === 1 ? 'video' : 'videos'}
+            </Badge>
+            {(chapters?.length ?? 0) > 0 && (
+              <Badge variant="secondary" className="gap-1">
+                <BookOpen className="w-3 h-3" />
+                {chapters!.length} {chapters!.length === 1 ? 'chapter' : 'chapters'}
+              </Badge>
+            )}
+            {hasPackages && (
+              <Badge variant="secondary" className="gap-1">
+                <Package className="w-3 h-3" />
+                {packages.length} subscription {packages.length === 1 ? 'package' : 'packages'}
+              </Badge>
             )}
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary" className="gap-1">
-            <Video className="w-3 h-3" />
-            {totalVideos} {totalVideos === 1 ? 'video' : 'videos'}
-          </Badge>
-          {(chapters?.length ?? 0) > 0 && (
-            <Badge variant="secondary" className="gap-1">
-              <BookOpen className="w-3 h-3" />
-              {chapters!.length} {chapters!.length === 1 ? 'chapter' : 'chapters'}
-            </Badge>
-          )}
-          {hasPackages && (
-            <Badge variant="secondary" className="gap-1">
-              <Package className="w-3 h-3" />
-              {packages.length} subscription {packages.length === 1 ? 'package' : 'packages'}
-            </Badge>
-          )}
-          <Badge variant="secondary" className="gap-1">
-            <Users className="w-3 h-3" />
-            {liveClasses?.length ?? 0} live {(liveClasses?.length ?? 0) === 1 ? 'class' : 'classes'}
-          </Badge>
-        </div>
+        {/* Live class widget */}
+        {liveClasses && liveClasses.length > 0 && (
+          <div className="w-full md:w-72 shrink-0">
+            {liveClasses.map((lc) => (
+              <div
+                key={lc.id}
+                className="p-4 rounded-xl border border-primary/20 bg-primary/5"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-4 h-4 text-primary shrink-0" />
+                  <span className="text-xs font-semibold text-primary uppercase tracking-wide">Live Class</span>
+                </div>
+                <h3 className="font-semibold text-sm mb-2 leading-snug">{lc.title}</h3>
+                <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+                  <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    {(lc as any).is_recurring && (lc as any).recurrence_day_of_week != null
+                      ? `Every ${DAYS[(lc as any).recurrence_day_of_week]} from ${
+                          new Date(lc.scheduled_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                        }${(lc as any).end_time ? ` to ${formatTime((lc as any).end_time)}` : ''}`
+                      : `${new Date(lc.scheduled_at).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })} · ${
+                          new Date(lc.scheduled_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                        }${(lc as any).end_time ? ` – ${formatTime((lc as any).end_time)}` : ''}`
+                    }
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </header>
 
       {(totalVideos > 0 || (chapters?.length ?? 0) > 0 || packages.length > 0) && (
@@ -188,42 +226,7 @@ export default async function GradePage({ params }: PageProps) {
         </section>
       )}
 
-      {liveClasses && liveClasses.length > 0 && (
-        <section className="mb-10">
-          <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            Upcoming Live Classes
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {liveClasses.map((lc) => (
-              <div
-                key={lc.id}
-                className="p-5 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors"
-              >
-                <Badge className="mb-3 bg-primary/10 text-primary border-primary/20" variant="outline">
-                  Live Class
-                </Badge>
-                <h3 className="font-medium mb-1">{lc.title}</h3>
-                {lc.description && (
-                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{lc.description}</p>
-                )}
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {new Date(lc.scheduled_at).toLocaleDateString('en-MU', { dateStyle: 'medium' })}
-                    {' '}
-                    {new Date(lc.scheduled_at).toLocaleTimeString('en-MU', { timeStyle: 'short' })}
-                  </span>
-                  <span className="font-semibold">
-                    {lc.price === 0 ? <span className="text-primary">Free</span> : `Rs ${lc.price}`}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {totalVideos === 0 && !liveClasses?.length && (chapters?.length ?? 0) === 0 && (
+      {totalVideos === 0 && (chapters?.length ?? 0) === 0 && packages.length === 0 && (
         <div className="py-24 text-center">
           <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-muted-foreground">No content available for this grade yet. Check back soon!</p>

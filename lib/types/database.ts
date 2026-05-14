@@ -123,6 +123,9 @@ export interface LiveClass {
   is_subscription_only: boolean
   max_students: number | null
   is_published: boolean
+  is_recurring: boolean
+  recurrence_day_of_week: number | null
+  end_time: string | null
   created_by: string
   created_at: string
   grade?: Grade

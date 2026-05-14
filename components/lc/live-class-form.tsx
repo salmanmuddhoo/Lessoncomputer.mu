@@ -24,16 +24,18 @@ import { toast } from 'sonner'
 import type { LiveClass } from '@/lib/types/database'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
 const schema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().optional(),
   grade_id: z.string().min(1, 'Please select a grade'),
-  package_id: z.string().optional(),
+  package_id: z.string().min(1, 'Please assign a subscription package'),
   scheduled_at: z.string().min(1, 'Please set a date and time'),
   meet_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
-  streamable_replay_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
-  max_students: z.coerce.number().min(0).optional(),
+  is_recurring: z.boolean(),
+  recurrence_day_of_week: z.coerce.number().min(0).max(6).optional(),
+  end_time: z.string().optional(),
   is_published: z.boolean(),
 })
 
@@ -53,6 +55,11 @@ interface LiveClassFormProps {
   liveClass?: LiveClass
 }
 
+function toLocalDatetimeString(isoString: string): string {
+  const d = new Date(isoString)
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
 export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -66,15 +73,17 @@ export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProp
       description: liveClass?.description ?? '',
       grade_id: liveClass?.grade_id ?? '',
       package_id: liveClass?.package_id ?? '',
-      scheduled_at: liveClass?.scheduled_at ? new Date(liveClass.scheduled_at).toISOString().slice(0, 16) : '',
+      scheduled_at: liveClass?.scheduled_at ? toLocalDatetimeString(liveClass.scheduled_at) : '',
       meet_url: liveClass?.meet_url ?? '',
-      streamable_replay_url: liveClass?.streamable_replay_url ?? '',
-      max_students: liveClass?.max_students ?? undefined,
+      is_recurring: liveClass?.is_recurring ?? false,
+      recurrence_day_of_week: liveClass?.recurrence_day_of_week ?? undefined,
+      end_time: liveClass?.end_time?.slice(0, 5) ?? '',
       is_published: liveClass?.is_published ?? false,
     },
   })
 
   const selectedGradeId = watch('grade_id')
+  const isRecurring = watch('is_recurring')
   const packagesForGrade = packages.filter((p) => p.grade_id === selectedGradeId)
 
   async function onSubmit(data: FormData) {
@@ -88,10 +97,13 @@ export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProp
       package_id: data.package_id || null,
       scheduled_at: new Date(data.scheduled_at).toISOString(),
       meet_url: data.meet_url || null,
-      streamable_replay_url: data.streamable_replay_url || null,
+      streamable_replay_url: null,
       price: 0,
-      is_subscription_only: !!data.package_id,
-      max_students: data.max_students || null,
+      is_subscription_only: true,
+      max_students: null,
+      is_recurring: data.is_recurring,
+      recurrence_day_of_week: data.is_recurring ? (data.recurrence_day_of_week ?? null) : null,
+      end_time: data.is_recurring && data.end_time ? data.end_time : null,
       is_published: data.is_published,
     }
 
@@ -156,38 +168,29 @@ export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProp
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="scheduled_at">Date & Time *</Label>
-            <Input id="scheduled_at" type="datetime-local" {...register('scheduled_at')} />
-            {errors.scheduled_at && <p className="text-xs text-destructive">{errors.scheduled_at.message}</p>}
+            <Label>Subscription Package *</Label>
+            <Select
+              value={watch('package_id') || ''}
+              onValueChange={(v) => setValue('package_id', v)}
+              disabled={!selectedGradeId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={
+                  !selectedGradeId ? 'Select a grade first' :
+                  packagesForGrade.length === 0 ? 'No packages for this grade' :
+                  'Select package'
+                } />
+              </SelectTrigger>
+              <SelectContent>
+                {packagesForGrade.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} — {MONTHS[p.month - 1]} {p.year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.package_id && <p className="text-xs text-destructive">{errors.package_id.message}</p>}
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Subscription Package (optional)</Label>
-          <Select
-            value={watch('package_id') || '__none__'}
-            onValueChange={(v) => setValue('package_id', v === '__none__' ? '' : v)}
-            disabled={!selectedGradeId}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={
-                !selectedGradeId ? 'Select a grade first' :
-                packagesForGrade.length === 0 ? 'No packages for this grade' :
-                'Link to a subscription package'
-              } />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">No package (free / standalone)</SelectItem>
-              {packagesForGrade.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name} — {MONTHS[p.month - 1]} {p.year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Linking to a package marks this class as subscription-only for that package.
-          </p>
         </div>
 
         <div className="space-y-2">
@@ -195,18 +198,54 @@ export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProp
           <Input id="meet_url" type="url" placeholder="https://meet.google.com/..." {...register('meet_url')} />
           {errors.meet_url && <p className="text-xs text-destructive">{errors.meet_url.message}</p>}
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="streamable_replay_url">Replay URL (Streamable — optional)</Label>
-          <Input id="streamable_replay_url" type="url" placeholder="https://streamable.com/..." {...register('streamable_replay_url')} />
-          <p className="text-xs text-muted-foreground">Add after the session ends so students can rewatch.</p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="max_students">Max students (optional)</Label>
-          <Input id="max_students" type="number" min="0" placeholder="Unlimited" {...register('max_students')} />
-        </div>
       </div>
+
+      {/* Recurring toggle */}
+      <Card className="border-border/60">
+        <CardContent className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Recurring class</Label>
+              <p className="text-xs text-muted-foreground">Repeats on the same day each week</p>
+            </div>
+            <Switch checked={isRecurring} onCheckedChange={(v) => setValue('is_recurring', v)} />
+          </div>
+
+          {isRecurring ? (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Day of week *</Label>
+                <Select
+                  value={watch('recurrence_day_of_week') !== undefined ? String(watch('recurrence_day_of_week')) : ''}
+                  onValueChange={(v) => setValue('recurrence_day_of_week', parseInt(v))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger>
+                  <SelectContent>
+                    {DAYS.map((d, i) => (
+                      <SelectItem key={i} value={String(i)}>{d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="scheduled_at">Start time *</Label>
+                <Input id="scheduled_at" type="datetime-local" {...register('scheduled_at')} />
+                {errors.scheduled_at && <p className="text-xs text-destructive">{errors.scheduled_at.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end_time">End time *</Label>
+                <Input id="end_time" type="time" {...register('end_time')} />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="scheduled_at">Date & Time *</Label>
+              <Input id="scheduled_at" type="datetime-local" {...register('scheduled_at')} />
+              {errors.scheduled_at && <p className="text-xs text-destructive">{errors.scheduled_at.message}</p>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="border-border/60">
         <CardContent className="p-5">
