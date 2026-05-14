@@ -81,15 +81,17 @@ export function GradePageContent({
   )
   const unsubscribed = packages.filter((p) => !subscribedSet.has(p.id))
 
-  // Build dialog package list (all unsubscribed)
-  const dialogPackages = unsubscribed.map((p) => ({
-    id: p.id,
-    name: p.name,
-    price: p.price,
-    month: p.month,
-    year: p.year,
-    chapterCount: p.chapterIds.length,
-  }))
+  // Build dialog package list (unsubscribed, current + previous months only — no future)
+  const dialogPackages = unsubscribed
+    .filter((p) => !(p.year > currentYear || (p.year === currentYear && p.month > currentMonth)))
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      month: p.month,
+      year: p.year,
+      chapterCount: p.chapterIds.length,
+    }))
 
   // Current (or next upcoming) unsubscribed package for price display
   const currentUnsubscribedPkg =
@@ -130,8 +132,8 @@ export function GradePageContent({
 
         {packages.map((pkg) => {
           const isSubscribed = subscribedSet.has(pkg.id)
-          const isCurrent = isCurrentOrFuture(pkg)
-          const isPreviousUnsubscribed = isLoggedIn && hasCurrentSubscription && !isSubscribed && !isCurrent
+          const isCurrent = pkg.year === currentYear && pkg.month === currentMonth
+          const isPreviousUnsubscribed = isLoggedIn && hasCurrentSubscription && !isSubscribed && !isCurrent && !isCurrentOrFuture(pkg)
           const pkgChapters = chapters
             .filter((ch) => pkg.chapterIds.includes(ch.id))
             .sort((a, b) => a.order_index - b.order_index)
