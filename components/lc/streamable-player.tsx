@@ -6,7 +6,7 @@ interface StreamablePlayerProps {
 }
 
 function extractStreamableId(url: string): string | null {
-  const match = url.match(/streamable\.com\/(?:e\/)?([a-z0-9]+)/i)
+  const match = url.match(/streamable\.com\/(?:e\/)?([a-z0-9]{2,})/i)
   return match ? match[1] : null
 }
 
@@ -24,12 +24,11 @@ export function StreamablePlayer({ url, title }: StreamablePlayerProps) {
   return (
     <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border/40 lc-glow">
       <iframe
-        src={`https://streamable.com/e/${videoId}`}
+        src={`https://streamable.com/e/${videoId}?autoplay=0`}
         title={title ?? 'Video lesson'}
-        frameBorder="0"
-        allow="fullscreen"
-        allowFullScreen
+        allow="autoplay; fullscreen; picture-in-picture"
         className="w-full h-full"
+        style={{ border: 'none' }}
       />
     </div>
   )
