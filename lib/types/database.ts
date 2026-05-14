@@ -161,3 +161,15 @@ export interface SubscriptionPackage {
   grade?: Grade
   chapters?: Chapter[]
 }
+
+export interface StudentSubscription {
+  id: string
+  student_id: string
+  package_id: string
+  is_recurring: boolean
+  status: 'active' | 'cancelled'
+  purchased_at: string
+  created_by: string | null
+  created_at: string
+  package?: SubscriptionPackage
+}

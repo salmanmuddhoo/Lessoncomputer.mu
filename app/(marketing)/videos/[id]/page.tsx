@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { StreamablePlayer } from '@/components/lc/streamable-player'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Clock, ArrowLeft, Lock, ShoppingCart, BookOpen } from 'lucide-react'
+import { Clock, ArrowLeft, Lock, BookOpen, Package } from 'lucide-react'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -31,17 +31,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    openGraph: {
-      title,
-      description,
-      type: 'video.other',
-      siteName: 'LessonComputer.mu',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-    },
+    openGraph: { title, description, type: 'video.other', siteName: 'LessonComputer.mu' },
+    twitter: { card: 'summary_large_image', title, description },
   }
 }
 
@@ -62,15 +53,27 @@ export default async function VideoPage({ params }: PageProps) {
 
   let hasAccess = video.is_free
 
-  if (!hasAccess && user) {
-    const { data: purchase } = await supabase
-      .from('purchases')
+  // Check subscription access for paid videos with a chapter
+  if (!hasAccess && user && video.chapter_id) {
+    // Find packages containing this chapter that the student is subscribed to
+    const { data: sub } = await supabase
+      .from('student_subscriptions')
       .select('id')
       .eq('student_id', user.id)
-      .eq('video_id', video.id)
-      .eq('status', 'completed')
+      .eq('status', 'active')
+      .in(
+        'package_id',
+        // sub-select: packages that include this chapter
+        (
+          await supabase
+            .from('subscription_package_chapters')
+            .select('package_id')
+            .eq('chapter_id', video.chapter_id)
+        ).data?.map((r: any) => r.package_id) ?? []
+      )
       .maybeSingle()
-    hasAccess = !!purchase
+
+    hasAccess = !!sub
   }
 
   const grade = video.grade as { name: string; color: string; slug: string } | null
@@ -78,7 +81,7 @@ export default async function VideoPage({ params }: PageProps) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      {/* Breadcrumb / back */}
+      {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-5 flex-wrap">
         {grade ? (
           <>
@@ -105,20 +108,26 @@ export default async function VideoPage({ params }: PageProps) {
       {hasAccess ? (
         <StreamablePlayer url={video.streamable_url} title={video.title} />
       ) : (
-        <div className="aspect-video rounded-xl bg-secondary/50 border border-border/60 flex flex-col items-center justify-center gap-4 px-4">
+        <div className="aspect-video rounded-xl bg-secondary/50 border border-border/60 flex flex-col items-center justify-center gap-4 px-6 text-center">
           <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
             <Lock className="w-7 h-7 text-primary" />
           </div>
-          <div className="text-center">
-            <h3 className="font-semibold mb-1">This video requires purchase</h3>
+          <div>
+            <h3 className="font-semibold mb-1">Subscription required</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Purchase this video for Rs {video.price} to watch it.
+              {chapter
+                ? `Subscribe to a package that includes "${chapter.title}" to watch this video.`
+                : 'Subscribe to a package for this grade to watch this video.'}
             </p>
             {user ? (
-              <Button className="bg-primary text-primary-foreground hover:bg-accent">
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                Buy for Rs {video.price}
-              </Button>
+              grade && (
+                <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
+                  <Link href={`/grades/${grade.slug}`}>
+                    <Package className="w-4 h-4 mr-2" />
+                    View Subscription Packages
+                  </Link>
+                </Button>
+              )
             ) : (
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button variant="outline" asChild>
@@ -137,10 +146,8 @@ export default async function VideoPage({ params }: PageProps) {
       <div className="mt-6">
         <div className="flex items-start justify-between gap-4 mb-3">
           <h1 className="text-lg sm:text-xl font-bold flex-1 leading-snug">{video.title}</h1>
-          {video.is_free ? (
+          {video.is_free && (
             <Badge className="bg-primary/10 text-primary border-primary/20 shrink-0" variant="outline">Free</Badge>
-          ) : (
-            <span className="font-semibold shrink-0 text-sm">Rs {video.price}</span>
           )}
         </div>
 

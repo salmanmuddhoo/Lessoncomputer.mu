@@ -1,11 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, Users, Trash2, UserX, UserCheck, Search } from 'lucide-react'
+import { Loader2, Users, Trash2, UserX, UserCheck, Search, Package, RefreshCw, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -25,12 +30,38 @@ interface Grade {
   color: string
 }
 
+interface SubscriptionPackage {
+  id: string
+  name: string
+  month: number
+  year: number
+  price: number
+  grade_id: string
+}
+
+interface StudentSub {
+  id: string
+  package_id: string
+  is_recurring: boolean
+  purchased_at: string
+}
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
 export default function AdminStudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
   const [grades, setGrades] = useState<Grade[]>([])
   const [gradeFilter, setGradeFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+
+  // Subscription dialog state
+  const [subStudent, setSubStudent] = useState<Student | null>(null)
+  const [subPackages, setSubPackages] = useState<SubscriptionPackage[]>([])
+  const [studentSubs, setStudentSubs] = useState<StudentSub[]>([])
+  const [subLoading, setSubLoading] = useState(false)
+  const [addingPkg, setAddingPkg] = useState('')
+  const [addRecurring, setAddRecurring] = useState(false)
 
   async function load() {
     const supabase = createClient()
@@ -68,6 +99,58 @@ export default function AdminStudentsPage() {
     if (error) { toast.error(error.message); return }
     toast.success('Student deleted')
     load()
+  }
+
+  async function openSubDialog(student: Student) {
+    setSubStudent(student)
+    setSubLoading(true)
+    const supabase = createClient()
+    const [{ data: pkgData }, { data: subData }] = await Promise.all([
+      supabase
+        .from('subscription_packages')
+        .select('id, name, month, year, price, grade_id')
+        .eq('is_active', true)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false }),
+      supabase
+        .from('student_subscriptions')
+        .select('id, package_id, is_recurring, purchased_at')
+        .eq('student_id', student.id)
+        .eq('status', 'active'),
+    ])
+    // Only show packages matching student's grade (or all if no grade)
+    const gradeId = student.grade?.id
+    setSubPackages((pkgData ?? []).filter((p) => !gradeId || p.grade_id === gradeId) as SubscriptionPackage[])
+    setStudentSubs((subData ?? []) as StudentSub[])
+    setSubLoading(false)
+  }
+
+  async function addSubscription() {
+    if (!subStudent || !addingPkg) return
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase.from('student_subscriptions').upsert({
+      student_id: subStudent.id,
+      package_id: addingPkg,
+      is_recurring: addRecurring,
+      status: 'active',
+      created_by: user?.id,
+    }, { onConflict: 'student_id,package_id' })
+    if (error) { toast.error(error.message); return }
+    toast.success('Subscription granted')
+    setAddingPkg('')
+    openSubDialog(subStudent)
+  }
+
+  async function cancelSubscription(subId: string) {
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('student_subscriptions')
+      .update({ status: 'cancelled' })
+      .eq('id', subId)
+    if (error) { toast.error(error.message); return }
+    toast.success('Subscription cancelled')
+    if (subStudent) openSubDialog(subStudent)
   }
 
   const filtered = students
@@ -179,6 +262,14 @@ export default function AdminStudentsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => openSubDialog(s)}
+                            title="Manage subscriptions"
+                          >
+                            <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => toggleActive(s)}
                             title={s.is_active ? 'Deactivate' : 'Activate'}
                           >
@@ -211,6 +302,109 @@ export default function AdminStudentsPage() {
           )}
         </div>
       )}
+
+      {/* Subscription management dialog */}
+      <Dialog open={!!subStudent} onOpenChange={(open) => { if (!open) setSubStudent(null) }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Subscriptions — {subStudent?.full_name ?? 'Student'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {subLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-5 py-2">
+              {/* Current subscriptions */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Active Subscriptions
+                </p>
+                {studentSubs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No active subscriptions.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {studentSubs.map((sub) => {
+                      const pkg = subPackages.find((p) => p.id === sub.package_id)
+                      return (
+                        <div key={sub.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-border/60 bg-muted/20">
+                          <div>
+                            <p className="text-sm font-medium">{pkg?.name ?? sub.package_id}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {pkg && (
+                                <span className="text-xs text-muted-foreground">
+                                  {MONTHS[pkg.month - 1]} {pkg.year}
+                                </span>
+                              )}
+                              {sub.is_recurring && (
+                                <span className="flex items-center gap-0.5 text-xs text-primary">
+                                  <RefreshCw className="w-2.5 h-2.5" /> Recurring
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10 shrink-0"
+                            onClick={() => cancelSubscription(sub.id)}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Add new subscription */}
+              <div className="border-t border-border/40 pt-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Grant Access to Package
+                </p>
+                <div className="space-y-3">
+                  <Select value={addingPkg} onValueChange={setAddingPkg}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a package…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subPackages
+                        .filter((p) => !studentSubs.some((s) => s.package_id === p.id))
+                        .map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name} — {MONTHS[p.month - 1]} {p.year} (Rs {p.price})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Recurring</Label>
+                      <p className="text-xs text-muted-foreground">Student pays monthly</p>
+                    </div>
+                    <Switch checked={addRecurring} onCheckedChange={setAddRecurring} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSubStudent(null)}>Close</Button>
+            <Button
+              onClick={addSubscription}
+              disabled={!addingPkg}
+              className="bg-primary text-primary-foreground hover:bg-accent"
+            >
+              Grant Access
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

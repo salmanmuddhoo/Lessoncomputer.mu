@@ -47,6 +47,8 @@ export default async function GradePage({ params }: PageProps) {
 
   if (!grade) notFound()
 
+  const { data: { user } } = await supabase.auth.getUser()
+
   const [
     { data: videos },
     { data: liveClasses },
@@ -79,9 +81,20 @@ export default async function GradePage({ params }: PageProps) {
       .order('month', { ascending: false }),
   ])
 
+  // Student's subscribed package IDs
+  let subscribedPackageIds: string[] = []
+  if (user) {
+    const { data: subs } = await supabase
+      .from('student_subscriptions')
+      .select('package_id')
+      .eq('student_id', user.id)
+      .eq('status', 'active')
+    subscribedPackageIds = (subs ?? []).map((s: any) => s.package_id)
+  }
+
   // Build chapter → videos map
-  const videosByChapter: Record<string, typeof videos> = {}
-  const unchapteredVideos: typeof videos = []
+  const videosByChapter: Record<string, any[]> = {}
+  const unchapteredVideos: any[] = []
 
   for (const v of videos ?? []) {
     if (v.chapter_id) {
@@ -92,7 +105,6 @@ export default async function GradePage({ params }: PageProps) {
     }
   }
 
-  // Normalise packages
   const packages = (rawPackages ?? []).map((p: any) => ({
     id: p.id,
     name: p.name,
@@ -108,7 +120,6 @@ export default async function GradePage({ params }: PageProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
-      {/* Grade header */}
       <header className="mb-8">
         <div className="flex items-center gap-3 mb-3">
           <div
@@ -149,7 +160,6 @@ export default async function GradePage({ params }: PageProps) {
         </div>
       </header>
 
-      {/* Main content — packages → chapters → videos, or flat chapters */}
       {(totalVideos > 0 || (chapters?.length ?? 0) > 0) && (
         <section className="mb-12">
           <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
@@ -162,14 +172,16 @@ export default async function GradePage({ params }: PageProps) {
           <GradePageContent
             packages={packages}
             chapters={chapters ?? []}
-            videosByChapter={videosByChapter as any}
-            unchapteredVideos={unchapteredVideos as any}
+            videosByChapter={videosByChapter}
+            unchapteredVideos={unchapteredVideos}
             gradeColor={grade.color}
+            gradeSlug={grade.slug}
+            subscribedPackageIds={subscribedPackageIds}
+            isLoggedIn={!!user}
           />
         </section>
       )}
 
-      {/* Live Classes */}
       {liveClasses && liveClasses.length > 0 && (
         <section className="mb-10">
           <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
