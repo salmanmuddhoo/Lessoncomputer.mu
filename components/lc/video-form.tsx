@@ -52,6 +52,7 @@ const schema = z.object({
   thumbnail_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   duration_minutes: z.coerce.number().min(0).optional(),
   is_published: z.boolean(),
+  is_demo: z.boolean(),
 })
 
 type FormData = z.infer<typeof schema>
@@ -88,6 +89,7 @@ export function VideoForm({ packages, video, initialPackageId = '' }: VideoFormP
       thumbnail_url: video?.thumbnail_url ?? '',
       duration_minutes: video?.duration_minutes ?? undefined,
       is_published: video?.is_published ?? false,
+      is_demo: video?.is_demo ?? false,
     },
   })
 
@@ -121,6 +123,7 @@ export function VideoForm({ packages, video, initialPackageId = '' }: VideoFormP
       thumbnail_url: data.thumbnail_url || null,
       price: 0,
       is_free: false,
+      is_demo: data.is_demo,
       duration_minutes: data.duration_minutes || null,
       is_published: data.is_published,
     }
@@ -265,13 +268,20 @@ export function VideoForm({ packages, video, initialPackageId = '' }: VideoFormP
 
       {/* ── Publish ── */}
       <Card className="border-border/60">
-        <CardContent className="p-5">
+        <CardContent className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <Label>Published</Label>
               <p className="text-xs text-muted-foreground">Make this video visible to students</p>
             </div>
             <Switch checked={watch('is_published')} onCheckedChange={(v) => setValue('is_published', v)} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Demo video</Label>
+              <p className="text-xs text-muted-foreground">Freely watchable without login or subscription</p>
+            </div>
+            <Switch checked={watch('is_demo')} onCheckedChange={(v) => setValue('is_demo', v)} />
           </div>
         </CardContent>
       </Card>

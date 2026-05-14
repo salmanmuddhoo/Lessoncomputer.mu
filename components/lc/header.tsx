@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Menu, X, ChevronDown, BookOpen, GraduationCap } from 'lucide-react'
+import { Menu, X, ChevronDown, LogOut } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { Button } from '@/components/ui/button'
+import { createClient } from '@/lib/supabase/client'
 
 const GRADES = [
   { name: 'Grade 7',       slug: 'grade-7' },
@@ -22,6 +23,12 @@ interface HeaderProps {
 export function Header({ user }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [gradesOpen, setGradesOpen] = useState(false)
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
 
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
@@ -71,9 +78,14 @@ export function Header({ user }: HeaderProps) {
           {/* Desktop auth — right side */}
           <div className="hidden md:flex items-center gap-2">
             {user ? (
-              <Button asChild size="sm" className="bg-foreground text-background hover:bg-foreground/90 font-medium rounded-full px-5">
-                <Link href={user.role === 'admin' ? '/admin' : '/dashboard'}>Dashboard</Link>
-              </Button>
+              <>
+                <Button asChild size="sm" className="bg-foreground text-background hover:bg-foreground/90 font-medium rounded-full px-5">
+                  <Link href={user.role === 'admin' ? '/admin' : '/dashboard'}>Dashboard</Link>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-foreground">
+                  <LogOut className="w-4 h-4 mr-1" /> Log out
+                </Button>
+              </>
             ) : (
               <>
                 <Link href="/login" className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground lc-transition">
@@ -113,9 +125,14 @@ export function Header({ user }: HeaderProps) {
             ))}
             <div className="border-t border-border my-3 pt-3 flex gap-2">
               {user ? (
-                <Button asChild size="sm" className="flex-1 rounded-full bg-foreground text-background hover:bg-foreground/90">
-                  <Link href={user.role === 'admin' ? '/admin' : '/dashboard'} onClick={() => setMobileOpen(false)}>Dashboard</Link>
-                </Button>
+                <>
+                  <Button asChild size="sm" className="flex-1 rounded-full bg-foreground text-background hover:bg-foreground/90">
+                    <Link href={user.role === 'admin' ? '/admin' : '/dashboard'} onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleSignOut} className="rounded-full">
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                </>
               ) : (
                 <>
                   <Button variant="outline" size="sm" asChild className="flex-1 rounded-full">
