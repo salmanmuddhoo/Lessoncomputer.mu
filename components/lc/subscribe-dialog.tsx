@@ -31,6 +31,17 @@ function isCurrentOrFuture(pkg: DialogPackage) {
   return pkg.year > cy || (pkg.year === cy && pkg.month >= cm)
 }
 
+function isCurrentMonth(pkg: DialogPackage) {
+  const now = new Date()
+  return pkg.year === now.getFullYear() && pkg.month === now.getMonth() + 1
+}
+
+function isFutureMonth(pkg: DialogPackage) {
+  const now = new Date()
+  const cy = now.getFullYear(); const cm = now.getMonth() + 1
+  return pkg.year > cy || (pkg.year === cy && pkg.month > cm)
+}
+
 interface Props {
   packages: DialogPackage[]
   /** When true, renders a simple "Buy" confirm dialog for one package */
@@ -42,17 +53,32 @@ interface Props {
 export function SubscribeSection({ packages, singlePackage = false, label }: Props) {
   const [open, setOpen] = useState(false)
 
-  // In multi-select mode: current/future are mandatory (always checked), previous are optional
+  // In multi-select mode: all pre-selected (current + all future), recurring on by default
   const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(packages.filter(isCurrentOrFuture).map((p) => p.id))
+    () => new Set(packages.map((p) => p.id))
   )
+  const [isRecurring, setIsRecurring] = useState(true)
 
   function toggle(id: string) {
     const pkg = packages.find((p) => p.id === id)
-    if (!pkg || isCurrentOrFuture(pkg)) return // mandatory — can't uncheck
+    if (!pkg || isCurrentMonth(pkg)) return // current month mandatory
+    if (isFutureMonth(pkg) && isRecurring) return // future locked when recurring
     setSelected((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function handleRecurringChange(checked: boolean) {
+    setIsRecurring(checked)
+    setSelected((prev) => {
+      const next = new Set(prev)
+      packages.forEach((p) => {
+        if (isFutureMonth(p)) {
+          checked ? next.add(p.id) : next.delete(p.id)
+        }
+      })
       return next
     })
   }
@@ -112,15 +138,29 @@ export function SubscribeSection({ packages, singlePackage = false, label }: Pro
               <p className="text-xs text-muted-foreground pb-1">
                 Current month is required. Previous months are optional add-ons.
               </p>
+              {packages.some(isFutureMonth) && (
+                <label className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-muted/20 cursor-pointer mb-1">
+                  <Checkbox
+                    checked={isRecurring}
+                    onCheckedChange={(v) => handleRecurringChange(!!v)}
+                  />
+                  <div>
+                    <p className="text-sm font-medium">Recurring monthly subscription</p>
+                    <p className="text-xs text-muted-foreground">Automatically includes future months</p>
+                  </div>
+                </label>
+              )}
               {packages.map((pkg) => {
-                const mandatory = isCurrentOrFuture(pkg)
+                const mandatory = isCurrentMonth(pkg)
+                const lockedByRecurring = isFutureMonth(pkg) && isRecurring
+                const disabled = mandatory || lockedByRecurring
                 const checked = selected.has(pkg.id)
                 return (
                   <label
                     key={pkg.id}
                     htmlFor={`pkg-${pkg.id}`}
                     className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
-                      mandatory
+                      disabled
                         ? 'border-primary/30 bg-primary/5 cursor-default'
                         : 'border-border/60 hover:bg-muted/20 cursor-pointer'
                     }`}
@@ -129,7 +169,7 @@ export function SubscribeSection({ packages, singlePackage = false, label }: Pro
                       id={`pkg-${pkg.id}`}
                       checked={checked}
                       onCheckedChange={() => toggle(pkg.id)}
-                      disabled={mandatory}
+                      disabled={disabled}
                       className="mt-0.5 shrink-0"
                     />
                     <div className="flex-1 min-w-0">

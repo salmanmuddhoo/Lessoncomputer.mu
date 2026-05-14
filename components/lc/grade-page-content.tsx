@@ -4,11 +4,13 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { VideoCard } from '@/components/lc/video-card'
 import { SubscribeSection } from '@/components/lc/subscribe-dialog'
+import { StreamablePlayer } from '@/components/lc/streamable-player'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   ChevronDown, ChevronUp, FolderOpen, Video,
-  Package, Lock, CheckCircle2, ShoppingCart,
+  Package, Lock, CheckCircle2, ShoppingCart, Play,
 } from 'lucide-react'
 
 interface Chapter {
@@ -57,6 +59,7 @@ export function GradePageContent({
   isLoggedIn,
 }: Props) {
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
+  const [demoModal, setDemoModal] = useState<{ videos: VideoRow[]; activeIdx: number } | null>(null)
 
   function toggleChapter(key: string) {
     setOpenChapters((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -196,14 +199,13 @@ export function GradePageContent({
                   const chVideos = videosByChapter[ch.id] ?? []
                   const demoVideos = chVideos.filter((v) => v.is_demo)
                   const canAccess = isSubscribed
-                  const canExpand = canAccess || demoVideos.length > 0
 
                   return (
                     <div key={ch.id}>
                       <button
-                        onClick={() => canExpand && toggleChapter(key)}
+                        onClick={() => canAccess && toggleChapter(key)}
                         className={`w-full flex items-center gap-3 px-5 py-3.5 text-left transition-colors ${
-                          canExpand ? 'hover:bg-muted/30 cursor-pointer' : 'cursor-default opacity-70'
+                          canAccess ? 'hover:bg-muted/30 cursor-pointer' : 'cursor-default'
                         }`}
                       >
                         {canAccess
@@ -211,27 +213,32 @@ export function GradePageContent({
                           : <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
                         }
                         <span className="flex-1 font-medium text-sm">{ch.title}</span>
-                        <span className="text-xs text-muted-foreground mr-2">
+                        <span className="text-xs text-muted-foreground">
                           {chVideos.length} video{chVideos.length !== 1 ? 's' : ''}
-                          {!canAccess && demoVideos.length > 0 && (
-                            <span className="ml-1 text-primary">· {demoVideos.length} free</span>
-                          )}
                         </span>
-                        {canExpand && (
+                        {canAccess ? (
                           isOpen
                             ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
                             : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-                        )}
+                        ) : demoVideos.length > 0 ? (
+                          <span
+                            role="button"
+                            onClick={(e) => { e.stopPropagation(); setDemoModal({ videos: demoVideos, activeIdx: 0 }) }}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-full px-2.5 py-1 transition-colors shrink-0"
+                          >
+                            <Play className="w-3 h-3 fill-primary" /> Play Demo
+                          </span>
+                        ) : null}
                       </button>
 
-                      {canExpand && isOpen && (
+                      {canAccess && isOpen && (
                         <div className="px-5 pb-5 pt-2 bg-muted/10">
                           {ch.description && (
                             <p className="text-sm text-muted-foreground mb-3">{ch.description}</p>
                           )}
-                          {(canAccess ? chVideos : demoVideos).length > 0 ? (
+                          {chVideos.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                              {(canAccess ? chVideos : demoVideos).map((v) => <VideoCard key={v.id} video={v} />)}
+                              {chVideos.map((v) => <VideoCard key={v.id} video={v} />)}
                             </div>
                           ) : (
                             <div className="rounded-xl border border-dashed border-border/60 py-8 text-center">
@@ -253,6 +260,38 @@ export function GradePageContent({
             </div>
           )
         })}
+
+        {/* Demo video modal */}
+        {demoModal && (
+          <Dialog open onOpenChange={() => setDemoModal(null)}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{demoModal.videos[demoModal.activeIdx]?.title ?? 'Demo Video'}</DialogTitle>
+              </DialogHeader>
+              <StreamablePlayer
+                url={demoModal.videos[demoModal.activeIdx]?.streamable_url ?? ''}
+                title={demoModal.videos[demoModal.activeIdx]?.title}
+              />
+              {demoModal.videos.length > 1 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {demoModal.videos.map((v, i) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setDemoModal({ ...demoModal, activeIdx: i })}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        i === demoModal.activeIdx
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'border-border hover:border-primary/40'
+                      }`}
+                    >
+                      {v.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+        )}
 
         {/* Free / unchaptered videos always visible */}
         {unchapteredVideos.length > 0 && (
