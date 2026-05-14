@@ -23,7 +23,7 @@ export default async function MarketingLayout({
   return (
     <>
       <Header user={user ? { email: user.email, role: profile?.role } : null} />
-      <main>{children}</main>
+      <main className="pt-[72px]">{children}</main>
       <Footer />
     </>
   )

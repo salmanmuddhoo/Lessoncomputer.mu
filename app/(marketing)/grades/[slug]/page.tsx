@@ -38,6 +38,10 @@ export default async function GradePage({ params }: PageProps) {
   const { slug } = await params
   const supabase = await createClient()
 
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+
   const { data: grade } = await supabase
     .from('grades')
     .select('*')
@@ -66,6 +70,8 @@ export default async function GradePage({ params }: PageProps) {
       .select('*, grade:grades(*)')
       .eq('grade_id', grade.id)
       .eq('is_published', true)
+      .gte('scheduled_at', monthStart)
+      .lt('scheduled_at', monthEnd)
       .order('scheduled_at', { ascending: true }),
     supabase
       .from('chapters')
@@ -77,8 +83,8 @@ export default async function GradePage({ params }: PageProps) {
       .select('id, name, description, price, month, year, subscription_package_chapters(chapter_id)')
       .eq('grade_id', grade.id)
       .eq('is_active', true)
-      .order('year', { ascending: false })
-      .order('month', { ascending: false }),
+      .order('year', { ascending: true })
+      .order('month', { ascending: true }),
   ])
 
   // Student's subscribed package IDs

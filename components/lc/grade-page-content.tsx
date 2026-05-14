@@ -11,11 +11,6 @@ import {
   Package, Lock, CheckCircle2, ShoppingCart,
 } from 'lucide-react'
 
-const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
-]
-
 interface Chapter {
   id: string
   title: string
@@ -157,9 +152,6 @@ export function GradePageContent({
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <Package className="w-4 h-4 text-primary shrink-0" />
                     <h3 className="font-bold text-base">{pkg.name}</h3>
-                    <Badge variant="outline" className="text-xs shrink-0">
-                      {MONTHS[pkg.month - 1]} {pkg.year}
-                    </Badge>
                     {isCurrent && (
                       <Badge className="text-xs bg-primary/10 text-primary border-primary/20 shrink-0" variant="outline">
                         Current
@@ -202,14 +194,16 @@ export function GradePageContent({
                   const key = `${pkg.id}-${ch.id}`
                   const isOpen = openChapters[key] ?? false
                   const chVideos = videosByChapter[ch.id] ?? []
+                  const demoVideos = chVideos.filter((v) => v.is_demo)
                   const canAccess = isSubscribed
+                  const canExpand = canAccess || demoVideos.length > 0
 
                   return (
                     <div key={ch.id}>
                       <button
-                        onClick={() => canAccess && toggleChapter(key)}
+                        onClick={() => canExpand && toggleChapter(key)}
                         className={`w-full flex items-center gap-3 px-5 py-3.5 text-left transition-colors ${
-                          canAccess ? 'hover:bg-muted/30 cursor-pointer' : 'cursor-default opacity-70'
+                          canExpand ? 'hover:bg-muted/30 cursor-pointer' : 'cursor-default opacity-70'
                         }`}
                       >
                         {canAccess
@@ -219,22 +213,25 @@ export function GradePageContent({
                         <span className="flex-1 font-medium text-sm">{ch.title}</span>
                         <span className="text-xs text-muted-foreground mr-2">
                           {chVideos.length} video{chVideos.length !== 1 ? 's' : ''}
+                          {!canAccess && demoVideos.length > 0 && (
+                            <span className="ml-1 text-primary">· {demoVideos.length} free</span>
+                          )}
                         </span>
-                        {canAccess && (
+                        {canExpand && (
                           isOpen
                             ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
                             : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
                         )}
                       </button>
 
-                      {canAccess && isOpen && (
+                      {canExpand && isOpen && (
                         <div className="px-5 pb-5 pt-2 bg-muted/10">
                           {ch.description && (
                             <p className="text-sm text-muted-foreground mb-3">{ch.description}</p>
                           )}
-                          {chVideos.length > 0 ? (
+                          {(canAccess ? chVideos : demoVideos).length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                              {chVideos.map((v) => <VideoCard key={v.id} video={v} />)}
+                              {(canAccess ? chVideos : demoVideos).map((v) => <VideoCard key={v.id} video={v} />)}
                             </div>
                           ) : (
                             <div className="rounded-xl border border-dashed border-border/60 py-8 text-center">
