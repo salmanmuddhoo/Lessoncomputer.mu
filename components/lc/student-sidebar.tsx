@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Video, Users, BookOpen, LogOut,
-  ChevronRight, User, Menu, X, Calendar,
+  ChevronRight, User, Menu, X, Calendar, Package,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { createClient } from '@/lib/supabase/client'
@@ -16,8 +16,9 @@ const NAV_ITEMS = [
   { label: 'Dashboard',   href: '/dashboard',              icon: LayoutDashboard, exact: true },
   { label: 'My Videos',   href: '/dashboard/my-videos',    icon: Video },
   { label: 'Live Classes',href: '/dashboard/live-classes', icon: Users },
-  { label: 'Timetable',   href: '/dashboard/timetable',   icon: Calendar },
-  { label: 'Browse',      href: '/grades',                 icon: BookOpen },
+  { label: 'Timetable',      href: '/dashboard/timetable',       icon: Calendar },
+  { label: 'Subscriptions', href: '/dashboard/subscriptions',  icon: Package },
+  { label: 'Browse',        href: '/grades',                   icon: BookOpen },
   { label: 'My Account',  href: '/dashboard/account',      icon: User },
 ]
 
