@@ -25,6 +25,13 @@ export const metadata: Metadata = {
   description: 'The leading online learning platform in Mauritius. Watch video lessons and join live classes organised by grade.',
   keywords: ['online learning', 'Mauritius', 'education', 'live classes', 'video lessons', 'grades'],
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://lessoncomputer.mu'),
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-icon.png',
+  },
   openGraph: {
     title: 'LessonComputer.mu',
     description: 'The leading online learning platform in Mauritius.',
