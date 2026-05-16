@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { VideoCard } from '@/components/lc/video-card'
-import { SubscribeSection } from '@/components/lc/subscribe-dialog'
+import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 import { StreamablePlayer } from '@/components/lc/streamable-player'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -42,8 +42,6 @@ interface SubscriptionPackage {
   name: string
   description: string | null
   price: number
-  month: number
-  year: number
   chapterIds: string[]
 }
 
@@ -55,8 +53,11 @@ interface Props {
   unchapteredVideos: VideoRow[]
   gradeColor: string
   gradeSlug: string
-  subscribedPackageIds: string[]
+  subscribedVideoPackageIds: string[]
   isLoggedIn: boolean
+  gradeName: string
+  liveSubscriptionEnabled: boolean
+  liveSubscriptionPrice: number
 }
 
 export function GradePageContent({
@@ -67,8 +68,11 @@ export function GradePageContent({
   unchapteredVideos,
   gradeColor,
   gradeSlug,
-  subscribedPackageIds,
+  subscribedVideoPackageIds,
   isLoggedIn,
+  gradeName,
+  liveSubscriptionEnabled,
+  liveSubscriptionPrice,
 }: Props) {
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
   const [demoModal, setDemoModal] = useState<{ videos: VideoRow[]; activeIdx: number } | null>(null)
@@ -77,72 +81,20 @@ export function GradePageContent({
     setOpenChapters((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  const subscribedSet = new Set(subscribedPackageIds)
+  const subscribedSet = new Set(subscribedVideoPackageIds)
 
-  const now = new Date()
-  const currentMonth = now.getMonth() + 1
-  const currentYear = now.getFullYear()
-
-  function isCurrentOrFuture(pkg: SubscriptionPackage) {
-    return pkg.year > currentYear || (pkg.year === currentYear && pkg.month >= currentMonth)
-  }
-
-  // Subscription state
-  const hasCurrentSubscription = packages.some(
-    (p) => subscribedSet.has(p.id) && isCurrentOrFuture(p)
-  )
-  const unsubscribed = packages.filter((p) => !subscribedSet.has(p.id))
-
-  // Build dialog package list (unsubscribed, current + previous months only — no future)
-  const dialogPackages = unsubscribed
-    .filter((p) => !(p.year > currentYear || (p.year === currentYear && p.month > currentMonth)))
-    .map((p) => ({
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      month: p.month,
-      year: p.year,
-      chapterCount: p.chapterIds.length,
-    }))
-
-  // Current (or next upcoming) unsubscribed package for price display
-  const currentUnsubscribedPkg =
-    unsubscribed.find((p) => p.year === currentYear && p.month === currentMonth) ??
-    unsubscribed.find((p) => isCurrentOrFuture(p))
+  const dialogPackageList = packages.map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    chapterCount: p.chapterIds.length,
+  }))
 
   if (packages.length > 0) {
     return (
       <div className="space-y-6">
-        {/* ONE subscribe CTA — shown at top when user doesn't have a current subscription */}
-        {!hasCurrentSubscription && unsubscribed.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 rounded-xl border border-primary/20 bg-primary/5">
-            <div className="flex-1">
-              <p className="font-semibold">Get access to our live classes and videos</p>
-            </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              {currentUnsubscribedPkg && (
-                <span className="text-lg font-bold text-primary">
-                  Rs {currentUnsubscribedPkg.price.toFixed(2)}<span className="text-sm font-normal text-muted-foreground">/mo</span>
-                </span>
-              )}
-              {isLoggedIn ? (
-                <SubscribeSection packages={dialogPackages} />
-              ) : (
-                <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
-                  <Link href="/login?redirectTo=/dashboard/subscriptions">
-                    <ShoppingCart className="w-4 h-4 mr-2" />
-                    Subscribe
-                  </Link>
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
         {packages.map((pkg) => {
           const isSubscribed = subscribedSet.has(pkg.id)
-          const isCurrent = pkg.year === currentYear && pkg.month === currentMonth
-          const isPreviousUnsubscribed = isLoggedIn && hasCurrentSubscription && !isSubscribed && !isCurrent && !isCurrentOrFuture(pkg)
           const pkgChapters = chapters
             .filter((ch) => pkg.chapterIds.includes(ch.id))
             .sort((a, b) => a.order_index - b.order_index)
@@ -161,7 +113,6 @@ export function GradePageContent({
                 isSubscribed ? 'border-primary/40 bg-card' : 'border-border/60 bg-card'
               }`}
             >
-              {/* Package header */}
               <div className={`px-5 py-4 border-b border-border/60 flex items-start justify-between gap-4 ${
                 isSubscribed ? 'bg-primary/5' : ''
               }`}>
@@ -169,11 +120,6 @@ export function GradePageContent({
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <Package className="w-4 h-4 text-primary shrink-0" />
                     <h3 className="font-bold text-base">{pkg.name}</h3>
-                    {isCurrent && (
-                      <Badge className="text-xs bg-primary/10 text-primary border-primary/20 shrink-0" variant="outline">
-                        Current
-                      </Badge>
-                    )}
                   </div>
                   {pkg.description && (
                     <p className="text-sm text-muted-foreground mt-0.5">{pkg.description}</p>
@@ -182,32 +128,38 @@ export function GradePageContent({
                     {pkgChapters.length} chapter{pkgChapters.length !== 1 ? 's' : ''}
                     {' · '}{totalVideos} video{totalVideos !== 1 ? 's' : ''}
                     {totalDocs > 0 ? ` · ${totalDocs} doc${totalDocs !== 1 ? 's' : ''}` : ''}
+                    {' · '}Rs {pkg.price.toFixed(2)}
                   </p>
                 </div>
 
                 <div className="shrink-0 text-right flex flex-col items-end gap-2">
                   {isSubscribed ? (
                     <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Subscribed
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Purchased
                     </span>
-                  ) : isPreviousUnsubscribed ? (
-                    /* Already subscribed to current month — show Buy for this previous month */
-                    <SubscribeSection
-                      packages={[{
-                        id: pkg.id,
-                        name: pkg.name,
-                        price: pkg.price,
-                        month: pkg.month,
-                        year: pkg.year,
-                        chapterCount: pkg.chapterIds.length,
-                      }]}
-                      singlePackage
+                  ) : isLoggedIn ? (
+                    <BuySubscribeDialog
+                      videoPackages={dialogPackageList}
+                      mandatoryPackageId={pkg.id}
+                      gradeName={gradeName}
+                      liveSubscriptionPrice={liveSubscriptionPrice}
+                      liveSubscriptionEnabled={liveSubscriptionEnabled}
+                      defaultMode="video"
+                      triggerLabel="Buy"
+                      triggerSize="sm"
+                      isLoggedIn={isLoggedIn}
                     />
-                  ) : null}
+                  ) : (
+                    <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
+                      <Link href="/login?redirectTo=/dashboard/subscriptions">
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Buy
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </div>
 
-              {/* Chapters */}
               <div className="divide-y divide-border/40">
                 {pkgChapters.map((ch) => {
                   const key = `${pkg.id}-${ch.id}`
@@ -302,7 +254,6 @@ export function GradePageContent({
           )
         })}
 
-        {/* Demo video modal */}
         {demoModal && (
           <Dialog open onOpenChange={() => setDemoModal(null)}>
             <DialogContent className="max-w-2xl">
@@ -334,7 +285,6 @@ export function GradePageContent({
           </Dialog>
         )}
 
-        {/* Free / unchaptered videos always visible */}
         {unchapteredVideos.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -350,7 +300,6 @@ export function GradePageContent({
     )
   }
 
-  // No packages — plain chapter accordion
   return (
     <div className="space-y-4">
       {chapters.map((ch) => {
