@@ -32,6 +32,8 @@ const schema = z.object({
   image_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   order_index: z.coerce.number().min(0),
   is_active: z.boolean(),
+  live_subscription_price: z.coerce.number().min(0),
+  live_subscription_enabled: z.boolean(),
 })
 
 type FormData = z.infer<typeof schema>
@@ -50,6 +52,8 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
       image_url: grade?.image_url ?? '',
       order_index: grade?.order_index ?? 0,
       is_active: grade?.is_active ?? true,
+      live_subscription_price: (grade as any)?.live_subscription_price ?? 0,
+      live_subscription_enabled: (grade as any)?.live_subscription_enabled ?? false,
     },
   })
 
@@ -125,6 +129,24 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
             <Label>Active</Label>
             <Switch checked={watch('is_active')} onCheckedChange={(v) => setValue('is_active', v)} />
           </div>
+
+          <div className="pt-2">
+            <p className="text-sm font-semibold mb-3">Live Class Subscription</p>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Live Subscription Price (Rs)</Label>
+                <Input type="number" min="0" step="0.01" placeholder="0" {...register('live_subscription_price')} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Live Subscription Enabled</Label>
+                <Switch
+                  checked={watch('live_subscription_enabled')}
+                  onCheckedChange={(v) => setValue('live_subscription_enabled', v)}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex gap-2 pt-2">
             <Button type="submit" disabled={loading} className="flex-1 bg-primary text-primary-foreground hover:bg-accent">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
