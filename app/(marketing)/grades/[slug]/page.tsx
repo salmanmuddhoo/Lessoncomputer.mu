@@ -55,12 +55,16 @@ export default async function GradePage({ params }: PageProps) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  const currentMonth = now.getMonth() + 1
+  const currentYear = now.getFullYear()
+
   const [
     { data: videos },
     { data: liveClasses },
     { data: chapters },
     { data: rawPackages },
     { data: documents },
+    { data: currentLivePackage },
   ] = await Promise.all([
     supabase
       .from('videos')
@@ -94,6 +98,15 @@ export default async function GradePage({ params }: PageProps) {
       .eq('grade_id', grade.id)
       .eq('is_published', true)
       .order('created_at', { ascending: false }),
+    supabase
+      .from('subscription_packages')
+      .select('id, name, price, month, year')
+      .eq('grade_id', grade.id)
+      .eq('package_type', 'live_month')
+      .eq('month', currentMonth)
+      .eq('year', currentYear)
+      .eq('is_active', true)
+      .maybeSingle(),
   ])
 
   let subscribedVideoPackageIds: string[] = []
@@ -110,7 +123,7 @@ export default async function GradePage({ params }: PageProps) {
       if (s.subscription_type === 'video' && s.package_id) {
         subscribedVideoPackageIds.push(s.package_id)
       }
-      if (s.subscription_type === 'live' && s.grade_id === grade.id) {
+      if (s.subscription_type === 'live' && s.package_id && currentLivePackage && s.package_id === currentLivePackage.id) {
         isLiveSubscribed = true
       }
     }
@@ -149,6 +162,9 @@ export default async function GradePage({ params }: PageProps) {
   const hasPackages = packages.length > 0
   const liveSubscriptionEnabled = (grade as any).live_subscription_enabled ?? false
   const liveSubscriptionPrice = (grade as any).live_subscription_price ?? 0
+
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  const liveMonthLabel = currentLivePackage ? `${MONTHS[currentLivePackage.month - 1]} ${currentLivePackage.year}` : `${MONTHS[currentMonth - 1]} ${currentYear}`
 
   const dialogPackageList = packages.map((p) => ({
     id: p.id,
@@ -201,7 +217,7 @@ export default async function GradePage({ params }: PageProps) {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <Radio className="w-4 h-4 text-primary shrink-0" />
-              <span className="text-xs font-semibold text-primary uppercase tracking-wide">Live Classes</span>
+              <span className="text-xs font-semibold text-primary uppercase tracking-wide">Live Classes — {liveMonthLabel}</span>
             </div>
             {liveClasses && liveClasses.length > 0 ? (
               <>
@@ -217,7 +233,10 @@ export default async function GradePage({ params }: PageProps) {
                 </div>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">Live classes available for {grade.name}</p>
+              <p className="text-sm text-muted-foreground">Live classes for {liveMonthLabel}</p>
+            )}
+            {!currentLivePackage && (
+              <p className="text-xs text-muted-foreground mt-1">Schedule not yet published for this month.</p>
             )}
           </div>
 
@@ -229,12 +248,16 @@ export default async function GradePage({ params }: PageProps) {
               <Badge className="gap-1 bg-primary/10 text-primary border-primary/20" variant="outline">
                 <Radio className="w-3 h-3" /> Subscribed
               </Badge>
+            ) : !currentLivePackage ? (
+              <Badge variant="secondary" className="text-xs">Coming soon</Badge>
             ) : user ? (
               <BuySubscribeDialog
                 videoPackages={dialogPackageList}
                 gradeName={grade.name}
                 liveSubscriptionPrice={liveSubscriptionPrice}
                 liveSubscriptionEnabled={liveSubscriptionEnabled}
+                liveMonthPackageId={currentLivePackage.id}
+                liveMonthLabel={liveMonthLabel}
                 defaultMode="live"
                 triggerLabel="Subscribe"
                 isLoggedIn={!!user}
