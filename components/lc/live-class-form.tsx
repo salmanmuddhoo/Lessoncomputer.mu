@@ -23,13 +23,19 @@ import {
 import { toast } from 'sonner'
 import type { LiveClass } from '@/lib/types/database'
 
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+const currentYear = new Date().getFullYear()
+const YEARS = [currentYear - 1, currentYear, currentYear + 1]
 
 const schema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().optional(),
   grade_id: z.string().min(1, 'Please select a grade'),
-  scheduled_at: z.string().min(1, 'Please set a date and time'),
+  month: z.coerce.number().min(1).max(12),
+  year: z.coerce.number().min(2024).max(2030),
+  class_time: z.string().min(1, 'Please set a start time'),
   meet_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   is_recurring: z.boolean(),
   recurrence_day_of_week: z.coerce.number().min(0).max(6).optional(),
@@ -44,9 +50,15 @@ interface LiveClassFormProps {
   liveClass?: LiveClass
 }
 
-function toLocalDatetimeString(isoString: string): string {
+function parseLocalMonth(isoString: string): number {
+  return new Date(isoString).getMonth() + 1
+}
+function parseLocalYear(isoString: string): number {
+  return new Date(isoString).getFullYear()
+}
+function parseLocalTime(isoString: string): string {
   const d = new Date(isoString)
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
@@ -61,9 +73,11 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
       title: liveClass?.title ?? '',
       description: liveClass?.description ?? '',
       grade_id: liveClass?.grade_id ?? '',
-      scheduled_at: liveClass?.scheduled_at ? toLocalDatetimeString(liveClass.scheduled_at) : '',
+      month: liveClass?.scheduled_at ? parseLocalMonth(liveClass.scheduled_at) : new Date().getMonth() + 1,
+      year: liveClass?.scheduled_at ? parseLocalYear(liveClass.scheduled_at) : currentYear,
+      class_time: liveClass?.scheduled_at ? parseLocalTime(liveClass.scheduled_at) : '17:00',
       meet_url: liveClass?.meet_url ?? '',
-      is_recurring: liveClass?.is_recurring ?? false,
+      is_recurring: liveClass?.is_recurring ?? true,
       recurrence_day_of_week: liveClass?.recurrence_day_of_week ?? undefined,
       end_time: liveClass?.end_time?.slice(0, 5) ?? '',
       is_published: liveClass?.is_published ?? false,
@@ -76,12 +90,15 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
     setLoading(true)
     const supabase = createClient()
 
+    const [hours, minutes] = data.class_time.split(':').map(Number)
+    const scheduled_at = new Date(data.year, data.month - 1, 1, hours, minutes).toISOString()
+
     const payload = {
       title: data.title,
       description: data.description || null,
       grade_id: data.grade_id,
       package_id: null,
-      scheduled_at: new Date(data.scheduled_at).toISOString(),
+      scheduled_at,
       meet_url: data.meet_url || null,
       streamable_replay_url: null,
       price: 0,
@@ -149,6 +166,44 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
           {errors.grade_id && <p className="text-xs text-destructive">{errors.grade_id.message}</p>}
         </div>
 
+        {/* Month / Year / Time */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Month *</Label>
+            <Select
+              value={String(watch('month'))}
+              onValueChange={(v) => setValue('month', Number(v))}
+            >
+              <SelectTrigger><SelectValue placeholder="Month" /></SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((m, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.month && <p className="text-xs text-destructive">{errors.month.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label>Year *</Label>
+            <Select
+              value={String(watch('year'))}
+              onValueChange={(v) => setValue('year', Number(v))}
+            >
+              <SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger>
+              <SelectContent>
+                {YEARS.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="class_time">Start time *</Label>
+            <Input id="class_time" type="time" {...register('class_time')} />
+            {errors.class_time && <p className="text-xs text-destructive">{errors.class_time.message}</p>}
+          </div>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="meet_url">Meeting URL (Google Meet / Zoom / etc.)</Label>
           <Input id="meet_url" type="url" placeholder="https://meet.google.com/..." {...register('meet_url')} />
@@ -162,13 +217,13 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
           <div className="flex items-center justify-between">
             <div>
               <Label>Recurring class</Label>
-              <p className="text-xs text-muted-foreground">Repeats on the same day each week</p>
+              <p className="text-xs text-muted-foreground">Repeats on the same day each week within this month</p>
             </div>
             <Switch checked={isRecurring} onCheckedChange={(v) => setValue('is_recurring', v)} />
           </div>
 
-          {isRecurring ? (
-            <div className="grid grid-cols-3 gap-3">
+          {isRecurring && (
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Day of week *</Label>
                 <Select
@@ -184,20 +239,9 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="scheduled_at">Start time *</Label>
-                <Input id="scheduled_at" type="datetime-local" {...register('scheduled_at')} />
-                {errors.scheduled_at && <p className="text-xs text-destructive">{errors.scheduled_at.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="end_time">End time *</Label>
+                <Label htmlFor="end_time">End time</Label>
                 <Input id="end_time" type="time" {...register('end_time')} />
               </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="scheduled_at">Date & Time *</Label>
-              <Input id="scheduled_at" type="datetime-local" {...register('scheduled_at')} />
-              {errors.scheduled_at && <p className="text-xs text-destructive">{errors.scheduled_at.message}</p>}
             </div>
           )}
         </CardContent>
