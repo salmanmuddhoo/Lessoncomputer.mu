@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   ChevronDown, ChevronUp, FolderOpen, Video,
   Package, Lock, CheckCircle2, ShoppingCart, Play,
+  FileText, Download,
 } from 'lucide-react'
 
 interface Chapter {
@@ -27,6 +28,15 @@ interface VideoRow {
   [key: string]: any
 }
 
+interface DocumentRow {
+  id: string
+  title: string
+  description: string | null
+  chapter_id: string | null
+  file_url: string
+  file_name: string | null
+}
+
 interface SubscriptionPackage {
   id: string
   name: string
@@ -41,6 +51,7 @@ interface Props {
   packages: SubscriptionPackage[]
   chapters: Chapter[]
   videosByChapter: Record<string, VideoRow[]>
+  documentsByChapter: Record<string, DocumentRow[]>
   unchapteredVideos: VideoRow[]
   gradeColor: string
   gradeSlug: string
@@ -52,6 +63,7 @@ export function GradePageContent({
   packages,
   chapters,
   videosByChapter,
+  documentsByChapter,
   unchapteredVideos,
   gradeColor,
   gradeSlug,
@@ -138,6 +150,9 @@ export function GradePageContent({
           const totalVideos = pkgChapters.reduce(
             (sum, ch) => sum + (videosByChapter[ch.id]?.length ?? 0), 0
           )
+          const totalDocs = pkgChapters.reduce(
+            (sum, ch) => sum + (documentsByChapter[ch.id]?.length ?? 0), 0
+          )
 
           return (
             <div
@@ -164,7 +179,9 @@ export function GradePageContent({
                     <p className="text-sm text-muted-foreground mt-0.5">{pkg.description}</p>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">
-                    {pkgChapters.length} chapter{pkgChapters.length !== 1 ? 's' : ''} · {totalVideos} video{totalVideos !== 1 ? 's' : ''}
+                    {pkgChapters.length} chapter{pkgChapters.length !== 1 ? 's' : ''}
+                    {' · '}{totalVideos} video{totalVideos !== 1 ? 's' : ''}
+                    {totalDocs > 0 ? ` · ${totalDocs} doc${totalDocs !== 1 ? 's' : ''}` : ''}
                   </p>
                 </div>
 
@@ -196,8 +213,10 @@ export function GradePageContent({
                   const key = `${pkg.id}-${ch.id}`
                   const isOpen = openChapters[key] ?? false
                   const chVideos = videosByChapter[ch.id] ?? []
+                  const chDocs = documentsByChapter[ch.id] ?? []
                   const demoVideos = chVideos.filter((v) => v.is_demo)
                   const canAccess = isSubscribed
+                  const itemCount = chVideos.length + chDocs.length
 
                   return (
                     <div key={ch.id}>
@@ -213,7 +232,7 @@ export function GradePageContent({
                         }
                         <span className="flex-1 font-medium text-sm">{ch.title}</span>
                         <span className="text-xs text-muted-foreground">
-                          {chVideos.length} video{chVideos.length !== 1 ? 's' : ''}
+                          {itemCount} item{itemCount !== 1 ? 's' : ''}
                         </span>
                         {canAccess ? (
                           isOpen
@@ -235,13 +254,36 @@ export function GradePageContent({
                           {ch.description && (
                             <p className="text-sm text-muted-foreground mb-3">{ch.description}</p>
                           )}
-                          {chVideos.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                          {chVideos.length > 0 && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
                               {chVideos.map((v) => <VideoCard key={v.id} video={v} />)}
                             </div>
-                          ) : (
+                          )}
+                          {chDocs.length > 0 && (
+                            <div className="space-y-2">
+                              {chDocs.map((doc) => (
+                                <a
+                                  key={doc.id}
+                                  href={doc.file_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-card hover:bg-muted/30 transition-colors group"
+                                >
+                                  <FileText className="w-5 h-5 text-primary shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm truncate">{doc.title}</p>
+                                    {doc.description && (
+                                      <p className="text-xs text-muted-foreground truncate">{doc.description}</p>
+                                    )}
+                                  </div>
+                                  <Download className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                          {chVideos.length === 0 && chDocs.length === 0 && (
                             <div className="rounded-xl border border-dashed border-border/60 py-8 text-center">
-                              <p className="text-sm text-muted-foreground">No videos in this chapter yet.</p>
+                              <p className="text-sm text-muted-foreground">No content in this chapter yet.</p>
                             </div>
                           )}
                         </div>

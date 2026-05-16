@@ -81,6 +81,7 @@ export default async function GradePage({ params }: PageProps) {
     { data: liveClasses },
     { data: chapters },
     { data: rawPackages },
+    { data: documents },
   ] = await Promise.all([
     supabase
       .from('videos')
@@ -108,6 +109,12 @@ export default async function GradePage({ params }: PageProps) {
       .eq('is_active', true)
       .order('year', { ascending: true })
       .order('month', { ascending: true }),
+    supabase
+      .from('documents')
+      .select('id, title, description, chapter_id, file_url, file_name')
+      .eq('grade_id', grade.id)
+      .eq('is_published', true)
+      .order('created_at', { ascending: false }),
   ])
 
   // Student's subscribed package IDs
@@ -143,6 +150,15 @@ export default async function GradePage({ params }: PageProps) {
     year: p.year,
     chapterIds: (p.subscription_package_chapters ?? []).map((c: any) => c.chapter_id),
   }))
+
+  // Build chapter → documents map
+  const documentsByChapter: Record<string, any[]> = {}
+  for (const d of documents ?? []) {
+    if (d.chapter_id) {
+      documentsByChapter[d.chapter_id] ??= []
+      documentsByChapter[d.chapter_id]!.push(d)
+    }
+  }
 
   const totalVideos = videos?.length ?? 0
   const hasPackages = packages.length > 0
@@ -208,6 +224,7 @@ export default async function GradePage({ params }: PageProps) {
             packages={packages}
             chapters={chapters ?? []}
             videosByChapter={videosByChapter}
+            documentsByChapter={documentsByChapter}
             unchapteredVideos={unchapteredVideos}
             gradeColor={grade.color}
             gradeSlug={grade.slug}

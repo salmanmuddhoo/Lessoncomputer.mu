@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { VideoForm } from '@/components/lc/video-form'
+import { DocumentForm } from '@/components/lc/document-form'
 import type { PackageOption } from '@/components/lc/video-form'
 
-export const metadata = { title: 'Add New Video' }
+export const metadata = { title: 'Add Document' }
 
-export default async function NewVideoPage() {
+export default async function NewDocumentPage() {
   const supabase = await createClient()
 
   const [{ data: rawPackages }, { data: gradesData }] = await Promise.all([
@@ -33,10 +33,10 @@ export default async function NewVideoPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">Add New Video</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">Select a subscription package and paste a Streamable URL.</p>
+        <h1 className="text-2xl font-bold">Add Document</h1>
+        <p className="text-muted-foreground text-sm mt-0.5">Upload a PDF and assign it to a subscription package.</p>
       </div>
-      <VideoForm packages={packages} grades={grades} />
+      <DocumentForm grades={grades} packages={packages} />
     </div>
   )
 }
