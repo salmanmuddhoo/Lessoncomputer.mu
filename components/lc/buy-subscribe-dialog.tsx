@@ -23,6 +23,8 @@ interface Props {
   gradeName: string
   liveSubscriptionPrice: number
   liveSubscriptionEnabled: boolean
+  liveMonthPackageId?: string
+  liveMonthLabel?: string
   defaultMode?: 'video' | 'live'
   triggerLabel?: string
   triggerSize?: 'sm' | 'default'
@@ -35,6 +37,8 @@ export function BuySubscribeDialog({
   gradeName,
   liveSubscriptionPrice,
   liveSubscriptionEnabled,
+  liveMonthPackageId,
+  liveMonthLabel,
   defaultMode = 'video',
   triggerLabel,
   triggerSize = 'default',
@@ -186,6 +190,9 @@ export function BuySubscribeDialog({
             <div className="py-2 space-y-4">
               <div className="p-4 rounded-lg border border-border/60 bg-muted/20">
                 <p className="font-semibold">{gradeName}</p>
+                {liveMonthLabel && (
+                  <p className="text-sm text-primary font-medium mt-0.5">{liveMonthLabel} Live Classes</p>
+                )}
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-2xl font-bold text-primary">
                     Rs {liveSubscriptionPrice.toFixed(2)}
@@ -193,7 +200,7 @@ export function BuySubscribeDialog({
                   <span className="text-sm text-muted-foreground">/month</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Get access to all live classes and subscriber-exclusive content.
+                  Get access to all live classes and subscriber-exclusive content for {liveMonthLabel ?? 'this month'}.
                 </p>
               </div>
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -220,7 +227,11 @@ export function BuySubscribeDialog({
           <DialogFooter className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
-              <Link href="/contact">
+              <Link href={
+                mode === 'live' && liveMonthPackageId
+                  ? `/contact?type=live&package=${liveMonthPackageId}&month=${encodeURIComponent(liveMonthLabel ?? '')}`
+                  : '/contact'
+              }>
                 <CheckCircle2 className="w-4 h-4 mr-2" />
                 {mode === 'video' ? 'Contact to Buy' : 'Contact to Subscribe'}
               </Link>
