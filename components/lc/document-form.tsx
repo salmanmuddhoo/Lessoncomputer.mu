@@ -25,6 +25,8 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const schema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
+  file_url: z.string().url('Please enter a valid URL').min(1, 'Document URL is required'),
+  file_name: z.string().optional(),
   is_published: z.boolean(),
 })
 
@@ -44,17 +46,18 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
   const [deleting, setDeleting] = useState(false)
   const isEditing = !!document
 
-  const defaultGradeId = initialGradeId || grades[0]?.id || ''
+  const defaultGradeId = initialGradeId || document?.grade_id || grades[0]?.id || ''
   const [gradeId, setGradeId] = useState(defaultGradeId)
   const [packageId, setPackageId] = useState(initialPackageId)
   const [chapterId, setChapterId] = useState(document?.chapter_id ?? '')
-  const [file, setFile] = useState<File | null>(null)
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       title: document?.title ?? '',
       description: document?.description ?? '',
+      file_url: document?.file_url ?? '',
+      file_name: document?.file_name ?? '',
       is_published: document?.is_published ?? false,
     },
   })
@@ -72,30 +75,13 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
     const pkg = packages.find((p) => p.id === packageId)
     const resolvedGradeId = pkg?.grade_id ?? gradeId
 
-    let fileUrl = document?.file_url ?? ''
-    let fileName = document?.file_name ?? ''
-
-    if (file) {
-      const path = `${resolvedGradeId}/${Date.now()}-${file.name}`
-      const { error: uploadError } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
-      if (uploadError) { toast.error(uploadError.message); setLoading(false); return }
-      fileUrl = supabase.storage.from('documents').getPublicUrl(path).data.publicUrl
-      fileName = file.name
-    }
-
-    if (!fileUrl) {
-      toast.error('Please upload a PDF file')
-      setLoading(false)
-      return
-    }
-
     const payload = {
       title: data.title,
       description: data.description || null,
       grade_id: resolvedGradeId,
       chapter_id: chapterId || null,
-      file_url: fileUrl,
-      file_name: fileName,
+      file_url: data.file_url,
+      file_name: data.file_name || null,
       is_published: data.is_published,
     }
 
@@ -118,13 +104,6 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
     if (!document || !confirm('Delete this document permanently?')) return
     setDeleting(true)
     const supabase = createClient()
-    if (document.file_url) {
-      const url = new URL(document.file_url)
-      const parts = url.pathname.split('/documents/')
-      if (parts[1]) {
-        await supabase.storage.from('documents').remove([parts[1]])
-      }
-    }
     const { error } = await supabase.from('documents').delete().eq('id', document.id)
     if (error) { toast.error(error.message); setDeleting(false); return }
     toast.success('Document deleted')
@@ -138,13 +117,25 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="title">Title *</Label>
-          <Input id="title" placeholder="e.g. Chapter 1 Notes" {...register('title')} />
+          <Input id="title" placeholder="e.g. Chapter 1 Summary Notes" {...register('title')} />
           {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
           <Textarea id="description" placeholder="What does this document cover?" rows={3} {...register('description')} />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="file_url">Document URL *</Label>
+          <Input id="file_url" type="url" placeholder="https://drive.google.com/…" {...register('file_url')} />
+          <p className="text-xs text-muted-foreground">Paste a link to the PDF (Google Drive, Dropbox, etc.)</p>
+          {errors.file_url && <p className="text-xs text-destructive">{errors.file_url.message}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="file_name">Display filename (optional)</Label>
+          <Input id="file_name" placeholder="e.g. chapter1-notes.pdf" {...register('file_name')} />
         </div>
 
         <div className="space-y-2">
@@ -168,15 +159,22 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Package</Label>
+            <Label>Subscription Package</Label>
             <Select
               value={packageId || undefined}
               onValueChange={(v) => {
                 setPackageId(v)
                 setChapterId('')
               }}
+              disabled={!gradeId || packagesForGrade.length === 0}
             >
-              <SelectTrigger><SelectValue placeholder="Select package" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder={
+                  !gradeId ? 'Select a grade first' :
+                  packagesForGrade.length === 0 ? 'No packages for this grade' :
+                  'Select package'
+                } />
+              </SelectTrigger>
               <SelectContent>
                 {packagesForGrade.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
@@ -209,19 +207,6 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
               </SelectContent>
             </Select>
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="file">PDF File {isEditing ? '(leave empty to keep current)' : '*'}</Label>
-          {isEditing && document.file_name && (
-            <p className="text-xs text-muted-foreground">Current file: {document.file_name}</p>
-          )}
-          <Input
-            id="file"
-            type="file"
-            accept="application/pdf"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
         </div>
       </div>
 
