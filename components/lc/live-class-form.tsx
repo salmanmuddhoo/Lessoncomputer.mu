@@ -23,14 +23,12 @@ import {
 import { toast } from 'sonner'
 import type { LiveClass } from '@/lib/types/database'
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
 const schema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().optional(),
   grade_id: z.string().min(1, 'Please select a grade'),
-  package_id: z.string().min(1, 'Please assign a subscription package'),
   scheduled_at: z.string().min(1, 'Please set a date and time'),
   meet_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   is_recurring: z.boolean(),
@@ -41,17 +39,8 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
-interface PackageOption {
-  id: string
-  name: string
-  grade_id: string
-  month: number
-  year: number
-}
-
 interface LiveClassFormProps {
   grades: { id: string; name: string; color: string }[]
-  packages: PackageOption[]
   liveClass?: LiveClass
 }
 
@@ -60,7 +49,7 @@ function toLocalDatetimeString(isoString: string): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 }
 
-export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProps) {
+export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -72,7 +61,6 @@ export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProp
       title: liveClass?.title ?? '',
       description: liveClass?.description ?? '',
       grade_id: liveClass?.grade_id ?? '',
-      package_id: liveClass?.package_id ?? '',
       scheduled_at: liveClass?.scheduled_at ? toLocalDatetimeString(liveClass.scheduled_at) : '',
       meet_url: liveClass?.meet_url ?? '',
       is_recurring: liveClass?.is_recurring ?? false,
@@ -82,9 +70,7 @@ export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProp
     },
   })
 
-  const selectedGradeId = watch('grade_id')
   const isRecurring = watch('is_recurring')
-  const packagesForGrade = packages.filter((p) => p.grade_id === selectedGradeId)
 
   async function onSubmit(data: FormData) {
     setLoading(true)
@@ -94,7 +80,7 @@ export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProp
       title: data.title,
       description: data.description || null,
       grade_id: data.grade_id,
-      package_id: data.package_id || null,
+      package_id: null,
       scheduled_at: new Date(data.scheduled_at).toISOString(),
       meet_url: data.meet_url || null,
       streamable_replay_url: null,
@@ -147,50 +133,20 @@ export function LiveClassForm({ grades, packages, liveClass }: LiveClassFormProp
           <Textarea id="description" placeholder="What will be covered in this class?" rows={3} {...register('description')} />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Grade *</Label>
-            <Select
-              defaultValue={liveClass?.grade_id}
-              onValueChange={(v) => {
-                setValue('grade_id', v)
-                setValue('package_id', '')
-              }}
-            >
-              <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
-              <SelectContent>
-                {grades.map((g) => (
-                  <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.grade_id && <p className="text-xs text-destructive">{errors.grade_id.message}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label>Subscription Package *</Label>
-            <Select
-              value={watch('package_id') || ''}
-              onValueChange={(v) => setValue('package_id', v)}
-              disabled={!selectedGradeId}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={
-                  !selectedGradeId ? 'Select a grade first' :
-                  packagesForGrade.length === 0 ? 'No packages for this grade' :
-                  'Select package'
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {packagesForGrade.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} — {MONTHS[p.month - 1]} {p.year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.package_id && <p className="text-xs text-destructive">{errors.package_id.message}</p>}
-          </div>
+        <div className="space-y-2">
+          <Label>Grade *</Label>
+          <Select
+            defaultValue={liveClass?.grade_id}
+            onValueChange={(v) => setValue('grade_id', v)}
+          >
+            <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+            <SelectContent>
+              {grades.map((g) => (
+                <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.grade_id && <p className="text-xs text-destructive">{errors.grade_id.message}</p>}
         </div>
 
         <div className="space-y-2">

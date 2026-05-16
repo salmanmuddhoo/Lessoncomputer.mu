@@ -235,9 +235,6 @@ export default async function GradePage({ params }: PageProps) {
             ) : (
               <p className="text-sm text-muted-foreground">Live classes for {liveMonthLabel}</p>
             )}
-            {!currentLivePackage && (
-              <p className="text-xs text-muted-foreground mt-1">Schedule not yet published for this month.</p>
-            )}
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -248,20 +245,28 @@ export default async function GradePage({ params }: PageProps) {
               <Badge className="gap-1 bg-primary/10 text-primary border-primary/20" variant="outline">
                 <Radio className="w-3 h-3" /> Subscribed
               </Badge>
-            ) : !currentLivePackage ? (
-              <Badge variant="secondary" className="text-xs">Coming soon</Badge>
             ) : user ? (
-              <BuySubscribeDialog
-                videoPackages={dialogPackageList}
-                gradeName={grade.name}
-                liveSubscriptionPrice={liveSubscriptionPrice}
-                liveSubscriptionEnabled={liveSubscriptionEnabled}
-                liveMonthPackageId={currentLivePackage.id}
-                liveMonthLabel={liveMonthLabel}
-                defaultMode="live"
-                triggerLabel="Subscribe"
-                isLoggedIn={!!user}
-              />
+              currentLivePackage ? (
+                <BuySubscribeDialog
+                  videoPackages={dialogPackageList}
+                  gradeName={grade.name}
+                  liveSubscriptionPrice={liveSubscriptionPrice}
+                  liveSubscriptionEnabled={liveSubscriptionEnabled}
+                  liveMonthPackageId={currentLivePackage.id}
+                  liveMonthLabel={liveMonthLabel}
+                  defaultMode="live"
+                  triggerLabel="Subscribe"
+                  isLoggedIn={!!user}
+                />
+              ) : (
+                <a
+                  href={`/contact?type=live&grade=${grade.slug}&month=${encodeURIComponent(liveMonthLabel)}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-accent text-sm font-medium transition-colors"
+                >
+                  <Radio className="w-4 h-4" />
+                  Subscribe
+                </a>
+              )
             ) : (
               <a
                 href="/login?redirectTo=/dashboard/subscriptions"
