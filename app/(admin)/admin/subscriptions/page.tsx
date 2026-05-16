@@ -19,14 +19,6 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 
-const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
-]
-
-const CURRENT_YEAR = new Date().getFullYear()
-const YEARS = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1]
-
 interface Grade {
   id: string
   name: string
@@ -40,41 +32,40 @@ interface Chapter {
   order_index: number
 }
 
-interface Package {
+interface VideoPackage {
   id: string
   name: string
   description: string | null
   grade_id: string
   price: number
-  month: number
-  year: number
+  expires_days: number | null
   is_active: boolean
   grade: Grade | null
   chapters: Chapter[]
 }
 
 interface FormState {
+  name: string
   description: string
   grade_id: string
   price: string
-  month: string
-  year: string
+  expires_days: string
   is_active: boolean
   chapter_ids: string[]
 }
 
 const EMPTY_FORM: FormState = {
+  name: '',
   description: '',
   grade_id: '',
   price: '0',
-  month: String(new Date().getMonth() + 1),
-  year: String(CURRENT_YEAR),
+  expires_days: '',
   is_active: true,
   chapter_ids: [],
 }
 
 export default function AdminSubscriptionsPage() {
-  const [packages, setPackages] = useState<Package[]>([])
+  const [packages, setPackages] = useState<VideoPackage[]>([])
   const [grades, setGrades] = useState<Grade[]>([])
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [takenChapterIds, setTakenChapterIds] = useState<string[]>([])
@@ -92,12 +83,11 @@ export default function AdminSubscriptionsPage() {
       supabase
         .from('subscription_packages')
         .select('*, grade:grades(id,name,color), subscription_package_chapters(chapter_id)')
-        .order('year', { ascending: true })
-        .order('month', { ascending: true }),
+        .or('package_type.eq.video,package_type.is.null')
+        .order('name', { ascending: true }),
       supabase.from('grades').select('id,name,color').eq('is_active', true).order('order_index'),
     ])
 
-    // Resolve chapter details for each package
     const allChapterIds = [
       ...new Set((pkgs ?? []).flatMap((p: any) =>
         (p.subscription_package_chapters ?? []).map((c: any) => c.chapter_id)
@@ -113,14 +103,13 @@ export default function AdminSubscriptionsPage() {
       for (const c of chData ?? []) chapterMap[c.id] = c
     }
 
-    const mapped: Package[] = (pkgs ?? []).map((p: any) => ({
+    const mapped: VideoPackage[] = (pkgs ?? []).map((p: any) => ({
       id: p.id,
       name: p.name,
       description: p.description,
       grade_id: p.grade_id,
       price: p.price,
-      month: p.month,
-      year: p.year,
+      expires_days: p.expires_days ?? null,
       is_active: p.is_active,
       grade: p.grade ?? null,
       chapters: (p.subscription_package_chapters ?? [])
@@ -136,7 +125,6 @@ export default function AdminSubscriptionsPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Load chapters when grade changes in form
   useEffect(() => {
     if (!form.grade_id) { setChapters([]); setTakenChapterIds([]); return }
     Promise.all([
@@ -144,13 +132,13 @@ export default function AdminSubscriptionsPage() {
       supabase.from('subscription_packages')
         .select('id, subscription_package_chapters(chapter_id)')
         .eq('grade_id', form.grade_id)
-        .eq('is_active', true),
+        .eq('is_active', true)
+        .or('package_type.eq.video,package_type.is.null'),
     ]).then(([{ data: chData }, { data: pkgData }]) => {
       setChapters(chData ?? [])
-      // Collect chapter IDs already used by OTHER packages
       const taken: string[] = []
       for (const pkg of pkgData ?? []) {
-        if (pkg.id === editingId) continue // skip current package being edited
+        if (pkg.id === editingId) continue
         for (const c of (pkg as any).subscription_package_chapters ?? []) {
           taken.push(c.chapter_id)
         }
@@ -165,14 +153,14 @@ export default function AdminSubscriptionsPage() {
     setDialogOpen(true)
   }
 
-  function openEdit(pkg: Package) {
+  function openEdit(pkg: VideoPackage) {
     setEditingId(pkg.id)
     setForm({
+      name: pkg.name,
       description: pkg.description ?? '',
       grade_id: pkg.grade_id,
       price: String(pkg.price),
-      month: String(pkg.month),
-      year: String(pkg.year),
+      expires_days: pkg.expires_days != null ? String(pkg.expires_days) : '',
       is_active: pkg.is_active,
       chapter_ids: pkg.chapters.map((c) => c.id),
     })
@@ -189,18 +177,19 @@ export default function AdminSubscriptionsPage() {
   }
 
   async function handleSave() {
+    if (!form.name.trim()) { toast.error('Please enter a package name'); return }
     if (!form.grade_id) { toast.error('Please select a grade'); return }
     if (form.chapter_ids.length === 0) { toast.error('Select at least one chapter'); return }
 
     setSaving(true)
     const payload = {
-      name: `${MONTHS[parseInt(form.month) - 1]} ${form.year}`,
+      name: form.name.trim(),
       description: form.description.trim() || null,
       grade_id: form.grade_id,
       price: parseFloat(form.price) || 0,
-      month: parseInt(form.month),
-      year: parseInt(form.year),
+      expires_days: form.expires_days.trim() ? parseInt(form.expires_days) : null,
       is_active: form.is_active,
+      package_type: 'video',
     }
 
     let pkgId = editingId
@@ -222,7 +211,6 @@ export default function AdminSubscriptionsPage() {
       pkgId = data.id
     }
 
-    // Sync chapters: delete existing then insert new
     await supabase.from('subscription_package_chapters').delete().eq('package_id', pkgId!)
     if (form.chapter_ids.length > 0) {
       const { error } = await supabase
@@ -237,7 +225,7 @@ export default function AdminSubscriptionsPage() {
     load()
   }
 
-  async function handleDelete(pkg: Package) {
+  async function handleDelete(pkg: VideoPackage) {
     if (!confirm(`Delete "${pkg.name}" permanently?`)) return
     const { error } = await supabase
       .from('subscription_packages')
@@ -248,7 +236,7 @@ export default function AdminSubscriptionsPage() {
     load()
   }
 
-  async function toggleActive(pkg: Package) {
+  async function toggleActive(pkg: VideoPackage) {
     const { error } = await supabase
       .from('subscription_packages')
       .update({ is_active: !pkg.is_active })
@@ -262,9 +250,9 @@ export default function AdminSubscriptionsPage() {
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Subscription Packages</h1>
+          <h1 className="text-2xl font-bold">Video Packages</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Bundle chapters into monthly subscriptions for students
+            Buy-once content bundles for students
           </p>
         </div>
         <Button onClick={openCreate} className="bg-primary text-primary-foreground hover:bg-accent">
@@ -280,14 +268,13 @@ export default function AdminSubscriptionsPage() {
       ) : packages.length === 0 ? (
         <div className="py-20 text-center rounded-xl border border-border/60">
           <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">No subscription packages yet.</p>
+          <p className="text-muted-foreground">No video packages yet.</p>
           <p className="text-sm text-muted-foreground mt-1">Create your first package to get started.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {packages.map((pkg) => (
             <div key={pkg.id} className="rounded-xl border border-border/60 bg-card overflow-hidden">
-              {/* Header row */}
               <div className="flex items-center gap-3 px-5 py-4">
                 <button
                   onClick={() => setExpanded(expanded === pkg.id ? null : pkg.id)}
@@ -306,11 +293,11 @@ export default function AdminSubscriptionsPage() {
                           {pkg.grade.name}
                         </span>
                       )}
-                      <span className="text-xs text-muted-foreground">
-                        {MONTHS[pkg.month - 1]} {pkg.year}
-                      </span>
                       <span className="text-xs font-medium text-primary">
                         Rs {pkg.price.toFixed(2)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {pkg.expires_days != null ? `${pkg.expires_days} days access` : 'Lifetime access'}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {pkg.chapters.length} chapter{pkg.chapters.length !== 1 ? 's' : ''}
@@ -339,7 +326,6 @@ export default function AdminSubscriptionsPage() {
                 </div>
               </div>
 
-              {/* Expanded detail */}
               {expanded === pkg.id && (
                 <div className="border-t border-border/60 px-5 py-4 bg-muted/20 space-y-3">
                   {pkg.description && (
@@ -375,19 +361,27 @@ export default function AdminSubscriptionsPage() {
         </div>
       )}
 
-      {/* Create / Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit Package' : 'New Subscription Package'}</DialogTitle>
+            <DialogTitle>{editingId ? 'Edit Video Package' : 'New Video Package'}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input
+                placeholder="e.g. Grade 7 Algebra"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label>Description</Label>
               <Textarea
                 rows={2}
-                placeholder="What's included in this subscription?"
+                placeholder="What's included in this package?"
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               />
@@ -421,38 +415,17 @@ export default function AdminSubscriptionsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Month *</Label>
-                <Select
-                  value={form.month}
-                  onValueChange={(v) => setForm((f) => ({ ...f, month: v }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MONTHS.map((m, i) => (
-                      <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Year *</Label>
-                <Select
-                  value={form.year}
-                  onValueChange={(v) => setForm((f) => ({ ...f, year: v }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {YEARS.map((y) => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Access duration (days)</Label>
+              <Input
+                type="number"
+                min="1"
+                placeholder="Leave empty for lifetime access"
+                value={form.expires_days}
+                onChange={(e) => setForm((f) => ({ ...f, expires_days: e.target.value }))}
+              />
             </div>
 
-            {/* Chapter picker */}
             <div className="space-y-2">
               <Label>Chapters * {form.grade_id ? '' : '(select a grade first)'}</Label>
               {!form.grade_id ? (
