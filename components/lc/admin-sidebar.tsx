@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { label: 'Dashboard',    href: '/admin',              icon: LayoutDashboard, exact: true },
-  { label: 'Videos',       href: '/admin/videos',       icon: Video },
+  { label: 'Tuition',       href: '/admin/videos',       icon: Video },
   { label: 'Live Classes', href: '/admin/live-classes', icon: Radio },
   { label: 'Grades',       href: '/admin/grades',       icon: BookOpen },
   { label: 'Students',       href: '/admin/students',       icon: Users },

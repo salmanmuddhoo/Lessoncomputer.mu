@@ -68,15 +68,20 @@ export interface PackageOption {
 
 interface VideoFormProps {
   packages: PackageOption[]
+  grades: { id: string; name: string; color: string }[]
   video?: Video
   initialPackageId?: string
+  initialGradeId?: string
 }
 
-export function VideoForm({ packages, video, initialPackageId = '' }: VideoFormProps) {
+export function VideoForm({ packages, grades, video, initialPackageId = '', initialGradeId = '' }: VideoFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const isEditing = !!video
+
+  const defaultGradeId = initialGradeId || grades[0]?.id || ''
+  const [gradeId, setGradeId] = useState(defaultGradeId)
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -97,6 +102,7 @@ export function VideoForm({ packages, video, initialPackageId = '' }: VideoFormP
   const selectedPackageId = watch('package_id')
   const streamableId = embedInput ? extractStreamableId(embedInput) : null
 
+  const packagesForGrade = packages.filter((p) => p.grade_id === gradeId)
   const selectedPackage = packages.find((p) => p.id === selectedPackageId)
   const chaptersForPackage = selectedPackage
     ? [...selectedPackage.chapters].sort((a, b) => a.order_index - b.order_index)
@@ -208,17 +214,37 @@ export function VideoForm({ packages, video, initialPackageId = '' }: VideoFormP
           <Textarea id="description" placeholder="What will students learn?" rows={3} {...register('description')} />
         </div>
 
+        {/* Grade selector */}
+        <div className="space-y-2">
+          <Label>Grade *</Label>
+          <Select
+            value={gradeId}
+            onValueChange={(v) => {
+              setGradeId(v)
+              setValue('package_id', '')
+              setValue('chapter_id', undefined)
+            }}
+          >
+            <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+            <SelectContent>
+              {grades.map((g) => (
+                <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Package + Chapter row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Subscription Package *</Label>
             <Select
-              defaultValue={initialPackageId || undefined}
+              value={selectedPackageId || undefined}
               onValueChange={(v) => setValue('package_id', v)}
             >
               <SelectTrigger><SelectValue placeholder="Select package" /></SelectTrigger>
               <SelectContent>
-                {packages.map((p) => (
+                {packagesForGrade.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name} — {MONTHS[p.month - 1]} {p.year}
                   </SelectItem>

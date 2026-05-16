@@ -168,6 +168,21 @@ export interface SubscriptionPackage {
   chapters?: Chapter[]
 }
 
+export interface Document {
+  id: string
+  title: string
+  description: string | null
+  grade_id: string
+  chapter_id: string | null
+  file_url: string
+  file_name: string | null
+  is_published: boolean
+  created_by: string
+  created_at: string
+  grade?: Grade
+  chapter?: Chapter
+}
+
 export interface StudentSubscription {
   id: string
   student_id: string
