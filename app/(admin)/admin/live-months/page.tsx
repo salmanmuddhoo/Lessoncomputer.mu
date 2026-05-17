@@ -128,7 +128,7 @@ export default function AdminLiveMonthsPage() {
     // Load all content for chapters assigned to any month this year
     const allChapterIds = allMonths.flatMap((p) => p.chapterIds)
     if (allChapterIds.length > 0) {
-      const [{ data: vids }, { data: docs }] = await Promise.all([
+      const [{ data: vids, error: vErr }, { data: docs, error: dErr }] = await Promise.all([
         supabase.from('videos')
           .select('id,title,chapter_id,streamable_url_live,is_published_for_live,is_published,duration_minutes,updated_at')
           .in('chapter_id', allChapterIds)
@@ -138,8 +138,29 @@ export default function AdminLiveMonthsPage() {
           .in('chapter_id', allChapterIds)
           .order('created_at', { ascending: false }),
       ])
-      const videos = (vids ?? []) as VideoItem[]
-      const documents = (docs ?? []) as DocItem[]
+
+      // If extended columns don't exist yet (migration not applied), fall back to base columns
+      const [{ data: vidsBase }, { data: docsBase }] = vErr || dErr ? await Promise.all([
+        supabase.from('videos')
+          .select('id,title,chapter_id,is_published,duration_minutes')
+          .in('chapter_id', allChapterIds)
+          .order('created_at', { ascending: false }),
+        supabase.from('documents')
+          .select('id,title,chapter_id,is_published,file_name')
+          .in('chapter_id', allChapterIds)
+          .order('created_at', { ascending: false }),
+      ]) : [{ data: null }, { data: null }]
+
+      const videos = ((vErr ? vidsBase : vids) ?? []).map((v: any) => ({
+        ...v,
+        streamable_url_live: v.streamable_url_live ?? null,
+        is_published_for_live: v.is_published_for_live ?? false,
+        updated_at: v.updated_at ?? new Date().toISOString(),
+      })) as VideoItem[]
+      const documents = ((dErr ? docsBase : docs) ?? []).map((d: any) => ({
+        ...d,
+        is_published_for_live: d.is_published_for_live ?? false,
+      })) as DocItem[]
       setAllVideos(videos)
       setAllDocs(documents)
 
@@ -181,9 +202,22 @@ export default function AdminLiveMonthsPage() {
   }, [videoEdits, docEdits, allVideos, allDocs])
 
   function toggleMonth(m: number) {
+    const pkg = monthPackages.find((p) => p.month === m)
     setOpenMonths((prev) => {
       const next = new Set(prev)
-      next.has(m) ? next.delete(m) : next.add(m)
+      const opening = !next.has(m)
+      opening ? next.add(m) : next.delete(m)
+      // Auto-expand / collapse all chapters for this month
+      if (pkg) {
+        setOpenChapters((prevCh) => {
+          const nextCh = new Set(prevCh)
+          for (const cid of pkg.chapterIds) {
+            const key = `${m}-${cid}`
+            opening ? nextCh.add(key) : nextCh.delete(key)
+          }
+          return nextCh
+        })
+      }
       return next
     })
   }
