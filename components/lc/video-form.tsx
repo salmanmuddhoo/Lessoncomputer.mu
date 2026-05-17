@@ -81,16 +81,6 @@ export function VideoForm({ packages, grades, video, initialPackageId = '', init
   const defaultGradeId = initialGradeId || grades[0]?.id || ''
   const [gradeId, setGradeId] = useState(defaultGradeId)
 
-  // Determine initial video/live package IDs from the video's chapter
-  function getInitialPkgId(type: 'video' | 'live') {
-    if (!video?.chapter_id) return ''
-    const match = packages.find((p) => {
-      const isLive = p.package_type === 'live_month'
-      return type === 'live' ? isLive : !isLive
-    } && p.chapters.some((ch) => ch.id === video.chapter_id))
-    return match?.id ?? ''
-  }
-
   const [videoPackageId, setVideoPackageId] = useState(() => {
     if (!video?.chapter_id) return initialPackageId && packages.find(p => p.id === initialPackageId && p.package_type !== 'live_month') ? initialPackageId : ''
     const match = packages.find(p => p.package_type !== 'live_month' && p.chapters.some(ch => ch.id === video.chapter_id))
