@@ -20,6 +20,7 @@ interface VideoPackageItem {
 interface Props {
   videoPackages: VideoPackageItem[]
   mandatoryPackageId?: string
+  subscribedPackageIds?: string[]
   gradeName: string
   liveSubscriptionPrice: number
   liveSubscriptionEnabled: boolean
@@ -34,6 +35,7 @@ interface Props {
 export function BuySubscribeDialog({
   videoPackages,
   mandatoryPackageId,
+  subscribedPackageIds = [],
   gradeName,
   liveSubscriptionPrice,
   liveSubscriptionEnabled,
@@ -44,6 +46,7 @@ export function BuySubscribeDialog({
   triggerSize = 'default',
   isLoggedIn,
 }: Props) {
+  const subscribedSet = new Set(subscribedPackageIds)
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'video' | 'live'>(defaultMode)
   const [isRecurring, setIsRecurring] = useState(true)
@@ -130,7 +133,32 @@ export function BuySubscribeDialog({
                   </p>
                   {videoPackages.map((pkg) => {
                     const mandatory = pkg.id === mandatoryPackageId
+                    const alreadyOwned = subscribedSet.has(pkg.id)
                     const checked = selected.has(pkg.id)
+                    if (alreadyOwned) {
+                      return (
+                        <div
+                          key={pkg.id}
+                          className="flex items-start gap-3 p-3 rounded-lg border border-border/40 bg-muted/20 opacity-60 cursor-not-allowed"
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-sm">{pkg.name}</span>
+                              <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20 shrink-0 gap-1">
+                                Already Purchased
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-3 mt-0.5">
+                              <span className="text-sm font-semibold text-primary">Rs {pkg.price.toFixed(2)}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {pkg.chapterCount} chapter{pkg.chapterCount !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
                     return (
                       <label
                         key={pkg.id}
@@ -229,7 +257,7 @@ export function BuySubscribeDialog({
             <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
               <Link href={
                 mode === 'live' && liveMonthPackageId
-                  ? `/contact?type=live&package=${liveMonthPackageId}&month=${encodeURIComponent(liveMonthLabel ?? '')}`
+                  ? `/contact?type=live&package=${liveMonthPackageId}&month=${encodeURIComponent(liveMonthLabel ?? '')}&recurring=${isRecurring ? '1' : '0'}`
                   : '/contact'
               }>
                 <CheckCircle2 className="w-4 h-4 mr-2" />
