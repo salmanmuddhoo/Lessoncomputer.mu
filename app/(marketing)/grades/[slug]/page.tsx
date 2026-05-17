@@ -268,7 +268,7 @@ export default async function GradePage({ params }: PageProps) {
               />
             ) : (
               <a
-                href="/login?redirectTo=/dashboard/subscriptions"
+                href={`/login?redirectTo=/grades/${grade.slug}`}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-accent text-sm font-medium transition-colors"
               >
                 <Radio className="w-4 h-4" />

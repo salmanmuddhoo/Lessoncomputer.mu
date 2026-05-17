@@ -200,7 +200,7 @@ export function GradePageContent({
                     />
                   ) : (
                     <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
-                      <Link href="/login?redirectTo=/dashboard/subscriptions">
+                      <Link href={`/login?redirectTo=/grades/${gradeSlug}`}>
                         <ShoppingCart className="w-4 h-4 mr-2" />
                         Buy
                       </Link>
