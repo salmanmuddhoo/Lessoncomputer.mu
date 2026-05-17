@@ -37,24 +37,22 @@ export default async function MyVideoPackagesPage() {
     )
   }
 
-  // All video packages for the grade
+  // All packages for the grade — no package_type filter (resilient if migration 015 not yet applied)
   const { data: allVideoPackages } = await supabase
     .from('subscription_packages')
-    .select('id, name, description, price, expires_days, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index))')
+    .select('id, name, description, price, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index))')
     .eq('grade_id', grade.id)
-    .or('package_type.eq.video,package_type.is.null')
     .eq('is_active', true)
     .order('name', { ascending: true })
 
-  // Student's active video subscriptions
+  // All active subscriptions — no subscription_type filter
   const { data: subs } = await supabase
     .from('student_subscriptions')
-    .select('package_id, purchased_at, expires_at')
+    .select('package_id, purchased_at')
     .eq('student_id', user!.id)
     .eq('status', 'active')
-    .eq('subscription_type', 'video')
 
-  const subsByPackage = new Map((subs ?? []).map((s: any) => [s.package_id, s]))
+  const subsByPackage = new Map((subs ?? []).filter((s: any) => s.package_id).map((s: any) => [s.package_id, s]))
   const subscribedPackageIds = new Set(subsByPackage.keys())
 
   const subscribedPackages = (allVideoPackages ?? []).filter((p: any) => subscribedPackageIds.has(p.id))

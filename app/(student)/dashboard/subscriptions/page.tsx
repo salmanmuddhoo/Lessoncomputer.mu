@@ -22,18 +22,18 @@ export default async function StudentSubscriptionsPage() {
     .from('student_subscriptions')
     .select(`
       id,
-      subscription_type,
+      package_id,
       purchased_at,
-      expires_at,
       package:subscription_packages(
-        id, name, month, year, package_type, price
+        id, name, month, year, price,
+        grade:grades(slug, name, color)
       )
     `)
     .eq('student_id', user.id)
     .eq('status', 'active')
     .order('purchased_at', { ascending: false })
 
-  const activeSubs = (subs ?? []).filter((s: any) => s.package !== null)
+  const activeSubs = (subs ?? []).filter((s: any) => s.package_id && s.package)
 
   return (
     <div>
@@ -57,7 +57,7 @@ export default async function StudentSubscriptionsPage() {
         <div className="space-y-3">
           {activeSubs.map((sub: any) => {
             const pkg = sub.package
-            const isLive = sub.subscription_type === 'live' || pkg?.package_type === 'live_month'
+            const isLive = pkg?.month != null && pkg?.year != null
             const monthLabel = pkg?.month && pkg?.year
               ? `${MONTHS[pkg.month - 1]} ${pkg.year}`
               : null
