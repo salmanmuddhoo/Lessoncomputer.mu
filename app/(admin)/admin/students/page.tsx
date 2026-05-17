@@ -125,7 +125,19 @@ export default function AdminStudentsPage() {
         .eq('status', 'active'),
     ])
     const gradeId = student.grade?.id
-    setSubPackages((pkgData ?? []).filter((p) => !gradeId || p.grade_id === gradeId) as SubscriptionPackage[])
+    const now = new Date()
+    const currentMonth = now.getMonth() + 1
+    const currentYear = now.getFullYear()
+    setSubPackages(
+      ((pkgData ?? []) as SubscriptionPackage[]).filter((p) => {
+        if (gradeId && p.grade_id !== gradeId) return false
+        if (p.package_type === 'live_month') {
+          if (!p.month || !p.year) return false
+          return p.year < currentYear || (p.year === currentYear && p.month <= currentMonth)
+        }
+        return true
+      })
+    )
     setStudentSubs((subData ?? []) as StudentSub[])
     setSubLoading(false)
   }
