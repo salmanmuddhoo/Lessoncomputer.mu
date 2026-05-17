@@ -26,6 +26,7 @@ const schema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   file_url: z.string().url('Please enter a valid URL').min(1, 'Document URL is required'),
+  file_url_live: z.union([z.string().url('Please enter a valid URL'), z.literal('')]).optional(),
   file_name: z.string().optional(),
   is_published: z.boolean(),
   is_published_for_live: z.boolean(),
@@ -36,7 +37,7 @@ type FormData = z.infer<typeof schema>
 interface DocumentFormProps {
   grades: { id: string; name: string; color: string }[]
   packages: PackageOption[]
-  document?: Document & { is_published_for_live?: boolean }
+  document?: Document & { is_published_for_live?: boolean; file_url_live?: string | null }
   initialGradeId?: string
   initialPackageId?: string
 }
@@ -68,6 +69,7 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
       title: document?.title ?? '',
       description: document?.description ?? '',
       file_url: document?.file_url ?? '',
+      file_url_live: document?.file_url_live ?? '',
       file_name: document?.file_name ?? '',
       is_published: document?.is_published ?? true,
       is_published_for_live: document?.is_published_for_live ?? false,
@@ -118,6 +120,7 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
       grade_id: resolvedGradeId,
       chapter_id: chapterId || null,
       file_url: data.file_url,
+      file_url_live: data.file_url_live || null,
       file_name: data.file_name || null,
       is_published: data.is_published,
       is_published_for_live: data.is_published_for_live,
@@ -189,10 +192,21 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="file_url">Document URL *</Label>
+          <Label htmlFor="file_url" className="flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5 text-primary" /> Video Package Document URL *
+          </Label>
           <Input id="file_url" type="url" placeholder="https://drive.google.com/…" {...register('file_url')} />
-          <p className="text-xs text-muted-foreground">Paste a link to the PDF (Google Drive, Dropbox, etc.)</p>
+          <p className="text-xs text-muted-foreground">Visible to video package subscribers when published</p>
           {errors.file_url && <p className="text-xs text-destructive">{errors.file_url.message}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="file_url_live" className="flex items-center gap-1.5">
+            <Radio className="w-3.5 h-3.5 text-primary" /> Live Classes Document URL
+          </Label>
+          <Input id="file_url_live" type="url" placeholder="https://drive.google.com/…" {...register('file_url_live')} />
+          <p className="text-xs text-muted-foreground">Visible to live month subscribers when published for live</p>
+          {errors.file_url_live && <p className="text-xs text-destructive">{errors.file_url_live.message}</p>}
         </div>
 
         <div className="space-y-2">

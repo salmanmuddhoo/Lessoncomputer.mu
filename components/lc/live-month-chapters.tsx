@@ -87,7 +87,7 @@ export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapte
                     {chDocs.map((doc: any) => (
                       <a
                         key={doc.id}
-                        href={doc.file_url}
+                        href={doc.file_url_live || doc.file_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:bg-muted/30 transition-colors group"
