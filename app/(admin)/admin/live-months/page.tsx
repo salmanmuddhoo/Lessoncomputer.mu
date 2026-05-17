@@ -38,7 +38,6 @@ interface VideoItem {
   is_published_for_live: boolean
   is_published: boolean
   duration_minutes: number | null
-  updated_at: string
 }
 
 interface DocItem {
@@ -48,10 +47,6 @@ interface DocItem {
   is_published_for_live: boolean
   is_published: boolean
   file_name: string | null
-}
-
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 export default function AdminLiveMonthsPage() {
@@ -130,7 +125,7 @@ export default function AdminLiveMonthsPage() {
     if (allChapterIds.length > 0) {
       const [{ data: vids, error: vErr }, { data: docs, error: dErr }] = await Promise.all([
         supabase.from('videos')
-          .select('id,title,chapter_id,streamable_url_live,is_published_for_live,is_published,duration_minutes,updated_at')
+          .select('id,title,chapter_id,streamable_url_live,is_published_for_live,is_published,duration_minutes')
           .in('chapter_id', allChapterIds)
           .order('created_at', { ascending: false }),
         supabase.from('documents')
@@ -155,7 +150,6 @@ export default function AdminLiveMonthsPage() {
         ...v,
         streamable_url_live: v.streamable_url_live ?? null,
         is_published_for_live: v.is_published_for_live ?? false,
-        updated_at: v.updated_at ?? new Date().toISOString(),
       })) as VideoItem[]
       const documents = ((dErr ? docsBase : docs) ?? []).map((d: any) => ({
         ...d,
@@ -484,7 +478,8 @@ export default function AdminLiveMonthsPage() {
                                   {chVideos.map((v) => {
                                     const edit = videoEdits[v.id] ?? { url: v.streamable_url_live ?? '', publishedForLive: v.is_published_for_live }
                                     const detectedId = edit.url ? extractStreamableId(edit.url) : null
-                                    const hasLiveUrl = !!v.streamable_url_live
+                                    // Show badge when either the DB has a URL or the current input has one
+                                    const hasLiveUrl = !!(detectedId || v.streamable_url_live)
 
                                     return (
                                       <div key={v.id} className="px-5 py-3 space-y-2">
@@ -497,7 +492,7 @@ export default function AdminLiveMonthsPage() {
 
                                           {hasLiveUrl && (
                                             <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 shrink-0 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400">
-                                              <Radio className="w-2.5 h-2.5" /> Live URL · {fmtDate(v.updated_at)}
+                                              <Radio className="w-2.5 h-2.5" /> Live URL ✓
                                             </Badge>
                                           )}
 
@@ -523,13 +518,13 @@ export default function AdminLiveMonthsPage() {
                                         <div className="flex items-end gap-3 pl-0">
                                           <div className="flex-1 min-w-0">
                                             <Label className="text-[10px] text-muted-foreground mb-1 block">
-                                              Live Classes URL
+                                              Live Classes URL (monthly subscription)
                                             </Label>
                                             <Input
                                               value={edit.url}
                                               onChange={(e) => setVideoEdits((prev) => ({
                                                 ...prev,
-                                                [v.id]: { ...edit, url: e.target.value },
+                                                [v.id]: { ...prev[v.id]!, url: e.target.value },
                                               }))}
                                               placeholder="https://streamable.com/…"
                                               className="text-xs h-8 font-mono"
@@ -551,7 +546,7 @@ export default function AdminLiveMonthsPage() {
                                                 checked={edit.publishedForLive}
                                                 onCheckedChange={(val) => setVideoEdits((prev) => ({
                                                   ...prev,
-                                                  [v.id]: { ...edit, publishedForLive: val },
+                                                  [v.id]: { ...prev[v.id]!, publishedForLive: val },
                                                 }))}
                                               />
                                             </div>
@@ -578,12 +573,12 @@ export default function AdminLiveMonthsPage() {
                                         </span>
                                         <div className="flex items-center gap-1.5 shrink-0">
                                           <Label className="text-[10px] text-muted-foreground">Live</Label>
-                                          {edit.publishedForLive
+                                          {docEdits[d.id]?.publishedForLive
                                             ? <Eye className="w-3 h-3 text-primary" />
                                             : <EyeOff className="w-3 h-3 text-muted-foreground" />
                                           }
                                           <Switch
-                                            checked={edit.publishedForLive}
+                                            checked={docEdits[d.id]?.publishedForLive ?? d.is_published_for_live}
                                             onCheckedChange={(val) => setDocEdits((prev) => ({
                                               ...prev,
                                               [d.id]: { publishedForLive: val },
