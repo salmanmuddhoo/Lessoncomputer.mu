@@ -10,6 +10,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
 interface VideoPackageItem {
   id: string
   name: string
@@ -17,49 +19,62 @@ interface VideoPackageItem {
   chapterCount: number
 }
 
+interface LivePackageItem {
+  id: string
+  name: string
+  month: number
+  year: number
+}
+
 interface Props {
   videoPackages: VideoPackageItem[]
   mandatoryPackageId?: string
   subscribedPackageIds?: string[]
+  subscribedLivePackageIds?: string[]
   gradeName: string
   liveSubscriptionPrice: number
   liveSubscriptionEnabled: boolean
   liveMonthPackageId?: string
   liveMonthLabel?: string
+  pastLivePackages?: LivePackageItem[]
   defaultMode?: 'video' | 'live'
   triggerLabel?: string
   triggerSize?: 'sm' | 'default'
   isLoggedIn?: boolean
-  hasAnyLiveSubscription?: boolean
 }
 
 export function BuySubscribeDialog({
   videoPackages,
   mandatoryPackageId,
   subscribedPackageIds = [],
+  subscribedLivePackageIds = [],
   gradeName,
   liveSubscriptionPrice,
   liveSubscriptionEnabled,
   liveMonthPackageId,
   liveMonthLabel,
+  pastLivePackages = [],
   defaultMode = 'video',
   triggerLabel,
   triggerSize = 'default',
   isLoggedIn,
-  hasAnyLiveSubscription = false,
 }: Props) {
   const subscribedSet = new Set(subscribedPackageIds)
-  const isLiveAlreadySubscribed = hasAnyLiveSubscription || !!(liveMonthPackageId && subscribedSet.has(liveMonthPackageId))
+  const subscribedLiveSet = new Set(subscribedLivePackageIds)
+  const isCurrentMonthSubscribed = !!(liveMonthPackageId && subscribedLiveSet.has(liveMonthPackageId))
+
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'video' | 'live'>(defaultMode)
   const [isRecurring, setIsRecurring] = useState(true)
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(mandatoryPackageId ? [mandatoryPackageId] : [])
   )
+  const [selectedPastLive, setSelectedPastLive] = useState<Set<string>>(new Set())
 
   function handleOpen() {
     setMode(defaultMode)
     setSelected(new Set(mandatoryPackageId ? [mandatoryPackageId] : []))
+    setSelectedPastLive(new Set())
     setOpen(true)
   }
 
@@ -72,8 +87,33 @@ export function BuySubscribeDialog({
     })
   }
 
+  function togglePastLive(id: string) {
+    setSelectedPastLive((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   const selectedPackages = videoPackages.filter((p) => selected.has(p.id))
   const total = selectedPackages.reduce((sum, p) => sum + p.price, 0)
+
+  const unsubscribedPastPackages = pastLivePackages.filter((p) => !subscribedLiveSet.has(p.id))
+
+  // Total live months to purchase = current month + any selected past months
+  const liveMonthCount = 1 + selectedPastLive.size
+  const liveTotal = liveMonthCount * liveSubscriptionPrice
+
+  function buildLiveContactUrl() {
+    const allPkgIds = [liveMonthPackageId, ...Array.from(selectedPastLive)].filter(Boolean)
+    const allLabels = [
+      liveMonthLabel,
+      ...unsubscribedPastPackages
+        .filter((p) => selectedPastLive.has(p.id))
+        .map((p) => `${MONTHS[p.month - 1]} ${p.year}`),
+    ].filter(Boolean)
+    return `/contact?type=live&packages=${allPkgIds.join(',')}&months=${allLabels.map(encodeURIComponent).join(',')}&recurring=${isRecurring ? '1' : '0'}`
+  }
 
   const label = triggerLabel ?? (defaultMode === 'live' ? 'Subscribe' : 'Buy')
 
@@ -217,12 +257,13 @@ export function BuySubscribeDialog({
                 </>
               )}
             </div>
-          ) : isLiveAlreadySubscribed ? (
+          ) : isCurrentMonthSubscribed ? (
+            /* Already have current month — redirect to live classes */
             <div className="py-6 text-center space-y-3">
               <CheckCircle2 className="w-10 h-10 text-primary mx-auto" />
               <p className="font-semibold">Already Subscribed</p>
               <p className="text-sm text-muted-foreground">
-                You already have an active live classes subscription.
+                You are already subscribed to {liveMonthLabel ?? 'this month'}'s live classes.
               </p>
               <Link
                 href="/dashboard/live-classes"
@@ -233,22 +274,51 @@ export function BuySubscribeDialog({
               </Link>
             </div>
           ) : (
+            /* Not subscribed to current month — show subscription form */
             <div className="py-2 space-y-4">
-              <div className="p-4 rounded-lg border border-border/60 bg-muted/20">
-                <p className="font-semibold">{gradeName}</p>
-                {liveMonthLabel && (
-                  <p className="text-sm text-primary font-medium mt-0.5">{liveMonthLabel} Live Classes</p>
-                )}
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-2xl font-bold text-primary">
-                    Rs {liveSubscriptionPrice.toFixed(2)}
-                  </span>
+              {/* Current month — mandatory */}
+              <div className="p-4 rounded-lg border border-primary/30 bg-primary/5">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20 gap-1">
+                    <Lock className="w-2.5 h-2.5" /> Required
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">current month</span>
+                </div>
+                <p className="font-semibold">{liveMonthLabel} Live Classes</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xl font-bold text-primary">Rs {liveSubscriptionPrice.toFixed(2)}</span>
                   <span className="text-sm text-muted-foreground">/month</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Get access to all live classes and subscriber-exclusive content for {liveMonthLabel ?? 'this month'}.
-                </p>
               </div>
+
+              {/* Past months — optional */}
+              {unsubscribedPastPackages.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">
+                    Also add past months (optional)
+                  </p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {unsubscribedPastPackages.map((pkg) => (
+                      <label
+                        key={pkg.id}
+                        className="flex items-center gap-3 p-2.5 rounded-lg border border-border/60 hover:bg-muted/20 cursor-pointer transition-colors"
+                      >
+                        <Checkbox
+                          checked={selectedPastLive.has(pkg.id)}
+                          onCheckedChange={() => togglePastLive(pkg.id)}
+                          className="shrink-0"
+                        />
+                        <span className="flex-1 text-sm">{MONTHS[pkg.month - 1]} {pkg.year}</span>
+                        <span className="text-sm font-semibold text-primary shrink-0">
+                          Rs {liveSubscriptionPrice.toFixed(2)}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recurring toggle */}
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <Checkbox
                   id="live-recurring"
@@ -261,24 +331,30 @@ export function BuySubscribeDialog({
                     Recurring subscription
                   </span>
                   <p className="text-xs text-muted-foreground">
-                    {isRecurring
-                      ? 'Auto-renews each month'
-                      : 'One-off — you will need to manually renew'}
+                    {isRecurring ? 'Auto-renews each month' : 'One-off — you will need to manually renew'}
                   </p>
                 </div>
               </label>
+
+              {/* Total */}
+              {liveMonthCount > 1 && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/60">
+                  <span className="text-sm font-medium">{liveMonthCount} months</span>
+                  <span className="text-base font-bold text-primary">Rs {liveTotal.toFixed(2)}</span>
+                </div>
+              )}
             </div>
           )}
 
           <DialogFooter className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setOpen(false)}>
-              {mode === 'live' && isLiveAlreadySubscribed ? 'Close' : 'Cancel'}
+              {mode === 'live' && isCurrentMonthSubscribed ? 'Close' : 'Cancel'}
             </Button>
-            {!(mode === 'live' && isLiveAlreadySubscribed) && (
+            {!(mode === 'live' && isCurrentMonthSubscribed) && (
               <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
                 <Link href={
-                  mode === 'live' && liveMonthPackageId
-                    ? `/contact?type=live&package=${liveMonthPackageId}&month=${encodeURIComponent(liveMonthLabel ?? '')}&recurring=${isRecurring ? '1' : '0'}`
+                  mode === 'live'
+                    ? buildLiveContactUrl()
                     : '/contact'
                 }>
                   <CheckCircle2 className="w-4 h-4 mr-2" />
