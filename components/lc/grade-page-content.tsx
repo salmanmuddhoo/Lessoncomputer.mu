@@ -228,6 +228,7 @@ export function GradePageContent({
                     <BuySubscribeDialog
                       videoPackages={dialogPackageList}
                       mandatoryPackageId={pkg.id}
+                      subscribedPackageIds={subscribedVideoPackageIds}
                       gradeName={gradeName}
                       liveSubscriptionPrice={liveSubscriptionPrice}
                       liveSubscriptionEnabled={liveSubscriptionEnabled}

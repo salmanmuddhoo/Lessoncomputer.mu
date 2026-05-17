@@ -115,15 +115,19 @@ export default async function GradePage({ params }: PageProps) {
   if (user) {
     const { data: subs } = await supabase
       .from('student_subscriptions')
-      .select('package_id, grade_id, subscription_type')
+      .select('package_id')
       .eq('student_id', user.id)
       .eq('status', 'active')
+      .not('package_id', 'is', null)
+
+    const videoPackageIds = new Set((rawPackages ?? []).map((p: any) => p.id))
 
     for (const s of subs ?? []) {
-      if (s.subscription_type === 'video' && s.package_id) {
+      if (!s.package_id) continue
+      if (videoPackageIds.has(s.package_id)) {
         subscribedVideoPackageIds.push(s.package_id)
       }
-      if (s.subscription_type === 'live' && s.package_id && currentLivePackage && s.package_id === currentLivePackage.id) {
+      if (currentLivePackage && s.package_id === (currentLivePackage as any).id) {
         isLiveSubscribed = true
       }
     }
@@ -252,6 +256,7 @@ export default async function GradePage({ params }: PageProps) {
             ) : user ? (
               <BuySubscribeDialog
                 videoPackages={dialogPackageList}
+                subscribedPackageIds={subscribedVideoPackageIds}
                 gradeName={grade.name}
                 liveSubscriptionPrice={liveSubscriptionPrice}
                 liveSubscriptionEnabled={liveSubscriptionEnabled}
