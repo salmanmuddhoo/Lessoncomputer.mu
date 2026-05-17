@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, CalendarDays, Settings2, Video, FileText, Eye, EyeOff } from 'lucide-react'
+import Link from 'next/link'
+import {
+  Loader2, CalendarDays, Settings2, Video, FileText,
+  Eye, EyeOff, FolderOpen, ChevronDown, ChevronUp, Pencil, Radio, Clock,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -32,6 +36,9 @@ interface VideoItem {
   chapter_id: string
   streamable_url_live: string | null
   is_published_for_live: boolean
+  is_published: boolean
+  duration_minutes: number | null
+  updated_at: string
 }
 
 interface DocItem {
@@ -39,6 +46,12 @@ interface DocItem {
   title: string
   chapter_id: string
   is_published_for_live: boolean
+  is_published: boolean
+  file_name: string | null
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 export default function AdminLiveMonthsPage() {
@@ -60,9 +73,10 @@ export default function AdminLiveMonthsPage() {
   const [contentVideos, setContentVideos] = useState<VideoItem[]>([])
   const [contentDocs, setContentDocs] = useState<DocItem[]>([])
   const [contentLoading, setContentLoading] = useState(false)
-  const [videoEdits, setVideoEdits] = useState<Record<string, { url: string; published: boolean }>>({})
-  const [docEdits, setDocEdits] = useState<Record<string, { published: boolean }>>({})
+  const [videoEdits, setVideoEdits] = useState<Record<string, { url: string; publishedForLive: boolean }>>({})
+  const [docEdits, setDocEdits] = useState<Record<string, { publishedForLive: boolean }>>({})
   const [savingContent, setSavingContent] = useState(false)
+  const [openContentChapters, setOpenContentChapters] = useState<Set<string>>(new Set())
 
   const supabase = createClient()
   const currentYear = new Date().getFullYear()
@@ -117,14 +131,12 @@ export default function AdminLiveMonthsPage() {
     const pkg = monthPackages.find((p) => p.month === month)
     const initSelected = pkg?.chapterIds ?? []
 
-    // Chapters already assigned to OTHER months — exclude them from the selection list
     const otherMonthChapterIds = new Set(
       monthPackages
         .filter((p) => p.month !== month && p.id !== null)
         .flatMap((p) => p.chapterIds)
     )
 
-    // Show chapters not assigned to other months, plus any already in this month
     const available = chapters.filter(
       (ch) => !otherMonthChapterIds.has(ch.id) || initSelected.includes(ch.id)
     )
@@ -140,6 +152,7 @@ export default function AdminLiveMonthsPage() {
     setContentDocs([])
     setVideoEdits({})
     setDocEdits({})
+    setOpenContentChapters(new Set())
     setManageMonth(month)
   }
 
@@ -152,30 +165,32 @@ export default function AdminLiveMonthsPage() {
     setContentLoading(true)
     const [{ data: vids }, { data: docs }] = await Promise.all([
       supabase.from('videos')
-        .select('id,title,chapter_id,streamable_url_live,is_published_for_live')
+        .select('id,title,chapter_id,streamable_url_live,is_published_for_live,is_published,duration_minutes,updated_at')
         .in('chapter_id', chapterIds)
-        .eq('is_published', true)
         .order('created_at', { ascending: false }),
       supabase.from('documents')
-        .select('id,title,chapter_id,is_published_for_live')
+        .select('id,title,chapter_id,is_published_for_live,is_published,file_name')
         .in('chapter_id', chapterIds)
-        .eq('is_published', true)
         .order('created_at', { ascending: false }),
     ])
     const videos = (vids ?? []) as VideoItem[]
     const documents = (docs ?? []) as DocItem[]
     setContentVideos(videos)
     setContentDocs(documents)
-    const vEdits: Record<string, { url: string; published: boolean }> = {}
-    for (const v of videos) vEdits[v.id] = { url: v.streamable_url_live ?? '', published: v.is_published_for_live }
-    const dEdits: Record<string, { published: boolean }> = {}
-    for (const d of documents) dEdits[d.id] = { published: d.is_published_for_live }
+
+    const vEdits: Record<string, { url: string; publishedForLive: boolean }> = {}
+    for (const v of videos) vEdits[v.id] = { url: v.streamable_url_live ?? '', publishedForLive: v.is_published_for_live }
+    const dEdits: Record<string, { publishedForLive: boolean }> = {}
+    for (const d of documents) dEdits[d.id] = { publishedForLive: d.is_published_for_live }
+
     setVideoEdits(vEdits)
     setDocEdits(dEdits)
+    // Default all chapters open
+    setOpenContentChapters(new Set(chapterIds))
     setContentLoading(false)
   }
 
-  function toggleChapter(id: string) {
+  function toggleChapterSelection(id: string) {
     setSelectedChapterIds((prev) =>
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
     )
@@ -183,6 +198,14 @@ export default function AdminLiveMonthsPage() {
 
   function toggleVisibility(id: string, val: boolean) {
     setVisibilityMap((prev) => ({ ...prev, [id]: val }))
+  }
+
+  function toggleContentChapter(id: string) {
+    setOpenContentChapters((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
   async function handleSave() {
@@ -232,8 +255,6 @@ export default function AdminLiveMonthsPage() {
     toast.success(`${name} saved`)
     setSaving(false)
     load()
-    // Stay in dialog so admin can edit content
-    setManageMonth(manageMonth)
     setMonthPackages((prev) => prev.map((p) =>
       p.month === manageMonth ? { ...p, id: pkgId, chapterIds: selectedChapterIds } : p
     ))
@@ -246,18 +267,26 @@ export default function AdminLiveMonthsPage() {
       const url = streamableId ? `https://streamable.com/e/${streamableId}` : (edit.url || null)
       return supabase.from('videos').update({
         streamable_url_live: url,
-        is_published_for_live: edit.published,
+        is_published_for_live: edit.publishedForLive,
       }).eq('id', id)
     })
     const docUpdates = Object.entries(docEdits).map(([id, edit]) =>
-      supabase.from('documents').update({ is_published_for_live: edit.published }).eq('id', id)
+      supabase.from('documents').update({ is_published_for_live: edit.publishedForLive }).eq('id', id)
     )
     const results = await Promise.all([...videoUpdates, ...docUpdates])
     const err = results.find((r) => r.error)?.error
     if (err) { toast.error(err.message); setSavingContent(false); return }
+
+    // Refresh content to pick up updated_at timestamps
+    await loadContent(selectedChapterIds)
     toast.success('Content updated')
     setSavingContent(false)
   }
+
+  // Chapters selected for this month, sorted by order_index
+  const sortedSelectedChapters = dialogChapters
+    .filter((ch) => selectedChapterIds.includes(ch.id))
+    .sort((a, b) => a.order_index - b.order_index)
 
   return (
     <div>
@@ -332,7 +361,7 @@ export default function AdminLiveMonthsPage() {
       )}
 
       <Dialog open={manageMonth != null} onOpenChange={(open) => { if (!open) setManageMonth(null) }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {manageMonth != null ? `${MONTHS[manageMonth - 1]} ${selectedYear}` : ''}
@@ -340,7 +369,7 @@ export default function AdminLiveMonthsPage() {
           </DialogHeader>
 
           {/* Tabs */}
-          <div className="flex gap-2 border-b border-border/60 pb-0 -mx-1">
+          <div className="flex gap-2 border-b border-border/60 -mx-1">
             <button
               onClick={() => setContentTab('chapters')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -366,6 +395,7 @@ export default function AdminLiveMonthsPage() {
             </button>
           </div>
 
+          {/* ── Chapters tab ── */}
           {contentTab === 'chapters' && (
             <div className="space-y-4 py-2">
               <div>
@@ -385,7 +415,7 @@ export default function AdminLiveMonthsPage() {
                         <input
                           type="checkbox"
                           checked={selectedChapterIds.includes(ch.id)}
-                          onChange={() => toggleChapter(ch.id)}
+                          onChange={() => toggleChapterSelection(ch.id)}
                           className="accent-primary"
                         />
                         <span className="text-sm flex-1">{ch.title}</span>
@@ -417,99 +447,177 @@ export default function AdminLiveMonthsPage() {
             </div>
           )}
 
+          {/* ── Videos & Docs tab ── */}
           {contentTab === 'content' && (
-            <div className="py-2 space-y-4">
+            <div className="py-2">
               {contentLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                 </div>
-              ) : contentVideos.length === 0 && contentDocs.length === 0 ? (
+              ) : sortedSelectedChapters.length === 0 ? (
                 <div className="py-8 text-center text-sm text-muted-foreground">
-                  {selectedChapterIds.length === 0
-                    ? 'Assign chapters first, then switch to this tab.'
-                    : 'No published videos or documents found for the assigned chapters.'}
+                  Assign chapters first, then switch to this tab.
                 </div>
               ) : (
-                <>
-                  {contentVideos.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                        <Video className="w-4 h-4 text-primary" /> Videos
-                      </p>
-                      <div className="space-y-3">
-                        {contentVideos.map((v) => {
-                          const edit = videoEdits[v.id] ?? { url: '', published: false }
-                          const detectedId = edit.url ? extractStreamableId(edit.url) : null
-                          return (
-                            <div key={v.id} className="rounded-lg border border-border/60 p-3 space-y-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-sm font-medium line-clamp-1">{v.title}</span>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  {edit.published
-                                    ? <Eye className="w-3.5 h-3.5 text-primary" />
-                                    : <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
-                                  }
-                                  <Switch
-                                    checked={edit.published}
-                                    onCheckedChange={(v2) => setVideoEdits((prev) => ({
-                                      ...prev, [v.id]: { ...edit, published: v2 },
-                                    }))}
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <Label className="text-xs text-muted-foreground mb-1 block">Live Classes URL</Label>
-                                <Input
-                                  value={edit.url}
-                                  onChange={(e) => setVideoEdits((prev) => ({
-                                    ...prev, [v.id]: { ...edit, url: e.target.value },
-                                  }))}
-                                  placeholder="https://streamable.com/…"
-                                  className="text-xs h-8 font-mono"
-                                />
-                                {detectedId && (
-                                  <p className="text-[10px] text-green-600 dark:text-green-400 mt-1">
-                                    ✓ Detected: {detectedId}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
+                <div className="space-y-3">
+                  {sortedSelectedChapters.map((ch) => {
+                    const chVideos = contentVideos.filter((v) => v.chapter_id === ch.id)
+                    const chDocs = contentDocs.filter((d) => d.chapter_id === ch.id)
+                    const total = chVideos.length + chDocs.length
+                    const isOpen = openContentChapters.has(ch.id)
 
-                  {contentDocs.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                        <FileText className="w-4 h-4 text-primary" /> Documents
-                      </p>
-                      <div className="rounded-lg border border-border/60 divide-y divide-border/40">
-                        {contentDocs.map((d) => {
-                          const edit = docEdits[d.id] ?? { published: false }
-                          return (
-                            <div key={d.id} className="flex items-center justify-between px-3 py-2.5 gap-2">
-                              <span className="text-sm line-clamp-1 flex-1">{d.title}</span>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {edit.published
-                                  ? <Eye className="w-3.5 h-3.5 text-primary" />
-                                  : <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
-                                }
-                                <Switch
-                                  checked={edit.published}
-                                  onCheckedChange={(v) => setDocEdits((prev) => ({
-                                    ...prev, [d.id]: { published: v },
-                                  }))}
-                                />
-                              </div>
-                            </div>
-                          )
-                        })}
+                    return (
+                      <div key={ch.id} className="rounded-xl border border-border/60 overflow-hidden">
+                        <button
+                          onClick={() => toggleContentChapter(ch.id)}
+                          className="w-full flex items-center gap-2 px-4 py-3 bg-muted/20 hover:bg-muted/40 transition-colors text-left"
+                        >
+                          <FolderOpen className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-sm font-semibold flex-1">{ch.title}</span>
+                          <span className="text-xs text-muted-foreground mr-2">
+                            {total} item{total !== 1 ? 's' : ''}
+                          </span>
+                          {isOpen
+                            ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                            : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                          }
+                        </button>
+
+                        {isOpen && (
+                          <div className="divide-y divide-border/40">
+                            {chVideos.length === 0 && chDocs.length === 0 ? (
+                              <p className="px-4 py-4 text-xs text-muted-foreground">
+                                No videos or documents in this chapter yet.
+                              </p>
+                            ) : (
+                              <>
+                                {chVideos.map((v) => {
+                                  const edit = videoEdits[v.id] ?? { url: v.streamable_url_live ?? '', publishedForLive: v.is_published_for_live }
+                                  const detectedId = edit.url ? extractStreamableId(edit.url) : null
+                                  const hasLiveUrl = !!v.streamable_url_live
+
+                                  return (
+                                    <div key={v.id} className="px-4 py-3 space-y-2.5">
+                                      {/* Row 1: title + badges + actions */}
+                                      <div className="flex items-start gap-2 flex-wrap">
+                                        <Badge variant="outline" className="text-xs gap-1 shrink-0 text-primary border-primary/30 bg-primary/5">
+                                          <Video className="w-2.5 h-2.5" /> Video
+                                        </Badge>
+                                        <span className="font-medium text-sm flex-1 min-w-0">{v.title}</span>
+
+                                        {/* Live URL badge with date */}
+                                        {hasLiveUrl && (
+                                          <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-5 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400 shrink-0">
+                                            <Radio className="w-2.5 h-2.5" /> Live URL · {fmtDate(v.updated_at)}
+                                          </Badge>
+                                        )}
+
+                                        {v.duration_minutes && (
+                                          <span className="text-xs text-muted-foreground flex items-center gap-0.5 shrink-0">
+                                            <Clock className="w-3 h-3" />{v.duration_minutes}m
+                                          </span>
+                                        )}
+
+                                        {/* Published for video badge */}
+                                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${v.is_published ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+                                          {v.is_published ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                          {v.is_published ? 'Published' : 'Draft'}
+                                        </span>
+
+                                        <Button variant="ghost" size="sm" asChild className="shrink-0 h-6 w-6 p-0">
+                                          <Link href={`/admin/videos/${v.id}/edit`} title="Edit full details">
+                                            <Pencil className="w-3.5 h-3.5" />
+                                          </Link>
+                                        </Button>
+                                      </div>
+
+                                      {/* Row 2: live URL input + publish_for_live toggle */}
+                                      <div className="flex items-end gap-3 pl-0">
+                                        <div className="flex-1 min-w-0">
+                                          <Label className="text-[10px] text-muted-foreground mb-1 block">
+                                            Live Classes URL
+                                          </Label>
+                                          <Input
+                                            value={edit.url}
+                                            onChange={(e) => setVideoEdits((prev) => ({
+                                              ...prev,
+                                              [v.id]: { ...edit, url: e.target.value },
+                                            }))}
+                                            placeholder="https://streamable.com/…"
+                                            className="text-xs h-8 font-mono"
+                                          />
+                                          {detectedId && (
+                                            <p className="text-[10px] text-green-600 dark:text-green-400 mt-0.5">
+                                              ✓ {detectedId}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div className="shrink-0 flex flex-col items-center gap-1 pb-0.5">
+                                          <Label className="text-[10px] text-muted-foreground">Published for Live</Label>
+                                          <div className="flex items-center gap-1">
+                                            {edit.publishedForLive
+                                              ? <Eye className="w-3 h-3 text-primary" />
+                                              : <EyeOff className="w-3 h-3 text-muted-foreground" />
+                                            }
+                                            <Switch
+                                              checked={edit.publishedForLive}
+                                              onCheckedChange={(val) => setVideoEdits((prev) => ({
+                                                ...prev,
+                                                [v.id]: { ...edit, publishedForLive: val },
+                                              }))}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+
+                                {chDocs.map((d) => {
+                                  const edit = docEdits[d.id] ?? { publishedForLive: d.is_published_for_live }
+                                  return (
+                                    <div key={d.id} className="px-4 py-3 flex items-center gap-2 flex-wrap">
+                                      <Badge variant="outline" className="text-xs gap-1 shrink-0 text-orange-600 border-orange-300 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 dark:text-orange-400">
+                                        <FileText className="w-2.5 h-2.5" /> PDF
+                                      </Badge>
+                                      <span className="font-medium text-sm flex-1 min-w-0">{d.title}</span>
+                                      {d.file_name && (
+                                        <span className="text-xs text-muted-foreground shrink-0">{d.file_name}</span>
+                                      )}
+                                      <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${d.is_published ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+                                        {d.is_published ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                        {d.is_published ? 'Published' : 'Draft'}
+                                      </span>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <Label className="text-[10px] text-muted-foreground">Live</Label>
+                                        {edit.publishedForLive
+                                          ? <Eye className="w-3 h-3 text-primary" />
+                                          : <EyeOff className="w-3 h-3 text-muted-foreground" />
+                                        }
+                                        <Switch
+                                          checked={edit.publishedForLive}
+                                          onCheckedChange={(val) => setDocEdits((prev) => ({
+                                            ...prev,
+                                            [d.id]: { publishedForLive: val },
+                                          }))}
+                                        />
+                                      </div>
+                                      <Button variant="ghost" size="sm" asChild className="shrink-0 h-6 w-6 p-0">
+                                        <Link href={`/admin/videos/documents/${d.id}/edit`} title="Edit full details">
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </Link>
+                                      </Button>
+                                    </div>
+                                  )
+                                })}
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </>
+                    )
+                  })}
+                </div>
               )}
             </div>
           )}
@@ -528,7 +636,7 @@ export default function AdminLiveMonthsPage() {
             ) : (
               <Button
                 onClick={handleSaveContent}
-                disabled={savingContent}
+                disabled={savingContent || sortedSelectedChapters.length === 0}
                 className="bg-primary text-primary-foreground hover:bg-accent"
               >
                 {savingContent && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
