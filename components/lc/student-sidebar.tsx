@@ -5,29 +5,21 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Video, Users, BookOpen, LogOut,
-  ChevronRight, User, Menu, X, Calendar, Package,
+  ChevronRight, User, Menu, X, Package,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
-const NAV_ITEMS = [
-  { label: 'Dashboard',   href: '/dashboard',              icon: LayoutDashboard, exact: true },
-  { label: 'My Video Packages', href: '/dashboard/my-videos',    icon: BookOpen },
-  { label: 'Live Classes',href: '/dashboard/live-classes', icon: Users },
-  { label: 'Timetable',      href: '/dashboard/timetable',       icon: Calendar },
-  { label: 'Subscriptions', href: '/dashboard/subscriptions',  icon: Package },
-  { label: 'Browse',        href: '/grades',                   icon: Video },
-  { label: 'My Account',  href: '/dashboard/account',      icon: User },
-]
-
 interface StudentSidebarProps {
   userName?: string | null
   gradeName?: string | null
+  hasLiveSubscription?: boolean
+  hasVideoSubscription?: boolean
 }
 
-function NavContent({ userName, gradeName, onNav }: StudentSidebarProps & { onNav?: () => void }) {
+function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscription, onNav }: StudentSidebarProps & { onNav?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -43,10 +35,19 @@ function NavContent({ userName, gradeName, onNav }: StudentSidebarProps & { onNa
     router.refresh()
   }
 
+  const navItems = [
+    { label: 'Dashboard',         href: '/dashboard',              icon: LayoutDashboard, exact: true, show: true },
+    { label: 'My Video Packages', href: '/dashboard/my-videos',   icon: BookOpen,         show: hasVideoSubscription },
+    { label: 'Live Classes',      href: '/dashboard/live-classes', icon: Users,            show: hasLiveSubscription },
+    { label: 'Subscriptions',     href: '/dashboard/subscriptions',icon: Package,          show: true },
+    { label: 'Browse',            href: '/grades',                 icon: Video,            show: true },
+    { label: 'My Account',        href: '/dashboard/account',      icon: User,             show: true },
+  ]
+
   return (
     <>
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map((item) => (
+        {navItems.filter((item) => item.show).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -83,7 +84,7 @@ function NavContent({ userName, gradeName, onNav }: StudentSidebarProps & { onNa
   )
 }
 
-export function StudentSidebar({ userName, gradeName }: StudentSidebarProps) {
+export function StudentSidebar({ userName, gradeName, hasLiveSubscription, hasVideoSubscription }: StudentSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
@@ -96,7 +97,7 @@ export function StudentSidebar({ userName, gradeName }: StudentSidebarProps) {
             <p className="text-xs text-muted-foreground mt-1 truncate">Hi, {userName.split(' ')[0]}</p>
           )}
         </div>
-        <NavContent userName={userName} gradeName={gradeName} />
+        <NavContent userName={userName} gradeName={gradeName} hasLiveSubscription={hasLiveSubscription} hasVideoSubscription={hasVideoSubscription} />
       </aside>
 
       {/* ── Mobile top bar ── */}
@@ -129,7 +130,7 @@ export function StudentSidebar({ userName, gradeName }: StudentSidebarProps) {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <NavContent userName={userName} gradeName={gradeName} onNav={() => setMobileOpen(false)} />
+            <NavContent userName={userName} gradeName={gradeName} hasLiveSubscription={hasLiveSubscription} hasVideoSubscription={hasVideoSubscription} onNav={() => setMobileOpen(false)} />
           </aside>
         </div>
       )}
