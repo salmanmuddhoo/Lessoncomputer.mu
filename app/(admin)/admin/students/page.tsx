@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, Users, Trash2, UserX, UserCheck, Search, Package, RefreshCw, X } from 'lucide-react'
+import { Loader2, Users, Trash2, UserX, UserCheck, Search, Package, RefreshCw, X, Radio } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,10 +33,11 @@ interface Grade {
 interface SubscriptionPackage {
   id: string
   name: string
-  month: number
-  year: number
+  month: number | null
+  year: number | null
   price: number
   grade_id: string
+  package_type: string
 }
 
 interface StudentSub {
@@ -60,8 +61,12 @@ export default function AdminStudentsPage() {
   const [subPackages, setSubPackages] = useState<SubscriptionPackage[]>([])
   const [studentSubs, setStudentSubs] = useState<StudentSub[]>([])
   const [subLoading, setSubLoading] = useState(false)
-  const [addingPkg, setAddingPkg] = useState('')
-  const [addRecurring, setAddRecurring] = useState(false)
+
+  // Separate grant state for video vs live
+  const [addingVideoPkg, setAddingVideoPkg] = useState('')
+  const [videoRecurring, setVideoRecurring] = useState(false)
+  const [addingLivePkg, setAddingLivePkg] = useState('')
+  const [liveRecurring, setLiveRecurring] = useState(true)
 
   async function load() {
     const supabase = createClient()
@@ -104,11 +109,13 @@ export default function AdminStudentsPage() {
   async function openSubDialog(student: Student) {
     setSubStudent(student)
     setSubLoading(true)
+    setAddingVideoPkg('')
+    setAddingLivePkg('')
     const supabase = createClient()
     const [{ data: pkgData }, { data: subData }] = await Promise.all([
       supabase
         .from('subscription_packages')
-        .select('id, name, month, year, price, grade_id')
+        .select('id, name, month, year, price, grade_id, package_type')
         .eq('is_active', true)
         .order('year', { ascending: false })
         .order('month', { ascending: false }),
@@ -118,27 +125,25 @@ export default function AdminStudentsPage() {
         .eq('student_id', student.id)
         .eq('status', 'active'),
     ])
-    // Only show packages matching student's grade (or all if no grade)
     const gradeId = student.grade?.id
     setSubPackages((pkgData ?? []).filter((p) => !gradeId || p.grade_id === gradeId) as SubscriptionPackage[])
     setStudentSubs((subData ?? []) as StudentSub[])
     setSubLoading(false)
   }
 
-  async function addSubscription() {
-    if (!subStudent || !addingPkg) return
+  async function grantAccess(packageId: string, recurring: boolean) {
+    if (!subStudent || !packageId) return
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     const { error } = await supabase.from('student_subscriptions').upsert({
       student_id: subStudent.id,
-      package_id: addingPkg,
-      is_recurring: addRecurring,
+      package_id: packageId,
+      is_recurring: recurring,
       status: 'active',
       created_by: user?.id,
     }, { onConflict: 'student_id,package_id' })
     if (error) { toast.error(error.message); return }
     toast.success('Subscription granted')
-    setAddingPkg('')
     openSubDialog(subStudent)
   }
 
@@ -157,11 +162,56 @@ export default function AdminStudentsPage() {
     .filter((s) => gradeFilter === 'all' || s.grade?.id === gradeFilter)
     .filter((s) => !search || (s.full_name ?? '').toLowerCase().includes(search.toLowerCase()))
 
-  // Count per grade
   const countByGrade: Record<string, number> = {}
   for (const s of students) {
     const key = s.grade?.id ?? 'none'
     countByGrade[key] = (countByGrade[key] ?? 0) + 1
+  }
+
+  // Split active subs into video vs live
+  const videoSubs = studentSubs.filter((sub) => {
+    const pkg = subPackages.find((p) => p.id === sub.package_id)
+    return !pkg || pkg.package_type !== 'live_month'
+  })
+  const liveSubs = studentSubs.filter((sub) => {
+    const pkg = subPackages.find((p) => p.id === sub.package_id)
+    return pkg?.package_type === 'live_month'
+  })
+
+  // Split available packages for dropdowns
+  const videoPackages = subPackages.filter((p) => p.package_type !== 'live_month')
+  const livePackages = subPackages.filter((p) => p.package_type === 'live_month')
+
+  const subscribedIds = new Set(studentSubs.map((s) => s.package_id))
+
+  function renderSubRow(sub: StudentSub) {
+    const pkg = subPackages.find((p) => p.id === sub.package_id)
+    const isLive = pkg?.package_type === 'live_month'
+    return (
+      <div key={sub.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-border/60 bg-muted/20">
+        <div>
+          <p className="text-sm font-medium">{pkg?.name ?? sub.package_id}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            {pkg && isLive && pkg.month && pkg.year && (
+              <span className="text-xs text-muted-foreground">{MONTHS[pkg.month - 1]} {pkg.year}</span>
+            )}
+            {sub.is_recurring && (
+              <span className="flex items-center gap-0.5 text-xs text-primary">
+                <RefreshCw className="w-2.5 h-2.5" /> Recurring
+              </span>
+            )}
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:bg-destructive/10 shrink-0"
+          onClick={() => cancelSubscription(sub.id)}
+        >
+          <X className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -307,9 +357,7 @@ export default function AdminStudentsPage() {
       <Dialog open={!!subStudent} onOpenChange={(open) => { if (!open) setSubStudent(null) }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              Subscriptions — {subStudent?.full_name ?? 'Student'}
-            </DialogTitle>
+            <DialogTitle>Subscriptions — {subStudent?.full_name ?? 'Student'}</DialogTitle>
           </DialogHeader>
 
           {subLoading ? (
@@ -317,91 +365,111 @@ export default function AdminStudentsPage() {
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="space-y-5 py-2">
-              {/* Current subscriptions */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Active Subscriptions
-                </p>
-                {studentSubs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">No active subscriptions.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {studentSubs.map((sub) => {
-                      const pkg = subPackages.find((p) => p.id === sub.package_id)
-                      return (
-                        <div key={sub.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-border/60 bg-muted/20">
-                          <div>
-                            <p className="text-sm font-medium">{pkg?.name ?? sub.package_id}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              {pkg && (
-                                <span className="text-xs text-muted-foreground">
-                                  {MONTHS[pkg.month - 1]} {pkg.year}
-                                </span>
-                              )}
-                              {sub.is_recurring && (
-                                <span className="flex items-center gap-0.5 text-xs text-primary">
-                                  <RefreshCw className="w-2.5 h-2.5" /> Recurring
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:bg-destructive/10 shrink-0"
-                            onClick={() => cancelSubscription(sub.id)}
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+            <div className="space-y-6 py-2">
 
-              {/* Add new subscription */}
-              <div className="border-t border-border/40 pt-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                  Grant Access to Package
+              {/* ── Video Package Subscriptions ── */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5" /> Video Package Subscriptions
                 </p>
-                <div className="space-y-3">
-                  <Select value={addingPkg} onValueChange={setAddingPkg}>
+                {videoSubs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No active video package subscriptions.</p>
+                ) : (
+                  <div className="space-y-2">{videoSubs.map(renderSubRow)}</div>
+                )}
+
+                {/* Grant video package */}
+                <div className="mt-3 space-y-2.5 border-t border-border/40 pt-3">
+                  <p className="text-xs text-muted-foreground font-medium">Grant access to a video package</p>
+                  <Select value={addingVideoPkg} onValueChange={setAddingVideoPkg}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a package…" />
+                      <SelectValue placeholder="Select video package…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {subPackages
-                        .filter((p) => !studentSubs.some((s) => s.package_id === p.id))
-                        .map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name} — {MONTHS[p.month - 1]} {p.year} (Rs {p.price})
-                          </SelectItem>
-                        ))}
+                      {videoPackages.filter((p) => !subscribedIds.has(p.id)).length === 0 ? (
+                        <SelectItem value="__none__" disabled>All packages already granted</SelectItem>
+                      ) : (
+                        videoPackages
+                          .filter((p) => !subscribedIds.has(p.id))
+                          .map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name} — Rs {p.price}
+                            </SelectItem>
+                          ))
+                      )}
                     </SelectContent>
                   </Select>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm">Recurring</Label>
-                      <p className="text-xs text-muted-foreground">Student pays monthly</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Switch id="video-recurring" checked={videoRecurring} onCheckedChange={setVideoRecurring} />
+                      <Label htmlFor="video-recurring" className="text-sm cursor-pointer">Recurring</Label>
                     </div>
-                    <Switch checked={addRecurring} onCheckedChange={setAddRecurring} />
+                    <Button
+                      size="sm"
+                      disabled={!addingVideoPkg || addingVideoPkg === '__none__'}
+                      onClick={() => grantAccess(addingVideoPkg, videoRecurring)}
+                      className="bg-primary text-primary-foreground hover:bg-accent shrink-0"
+                    >
+                      Grant Access
+                    </Button>
                   </div>
                 </div>
               </div>
+
+              {/* ── Live Classes Subscriptions ── */}
+              <div className="border-t border-border/60 pt-5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                  <Radio className="w-3.5 h-3.5" /> Live Classes Subscriptions
+                </p>
+                {liveSubs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No active live classes subscriptions.</p>
+                ) : (
+                  <div className="space-y-2">{liveSubs.map(renderSubRow)}</div>
+                )}
+
+                {/* Grant live subscription */}
+                <div className="mt-3 space-y-2.5 border-t border-border/40 pt-3">
+                  <p className="text-xs text-muted-foreground font-medium">Grant access to a live classes month</p>
+                  <Select value={addingLivePkg} onValueChange={setAddingLivePkg}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select live month…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {livePackages.filter((p) => !subscribedIds.has(p.id)).length === 0 ? (
+                        <SelectItem value="__none__" disabled>All months already granted</SelectItem>
+                      ) : (
+                        livePackages
+                          .filter((p) => !subscribedIds.has(p.id))
+                          .map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}{p.month && p.year ? ` — ${MONTHS[p.month - 1]} ${p.year}` : ''} (Rs {p.price})
+                            </SelectItem>
+                          ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Switch id="live-recurring" checked={liveRecurring} onCheckedChange={setLiveRecurring} />
+                      <Label htmlFor="live-recurring" className="text-sm cursor-pointer">Recurring</Label>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={!addingLivePkg || addingLivePkg === '__none__'}
+                      onClick={() => grantAccess(addingLivePkg, liveRecurring)}
+                      className="bg-primary text-primary-foreground hover:bg-accent shrink-0"
+                    >
+                      Grant Access
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
             </div>
           )}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setSubStudent(null)}>Close</Button>
-            <Button
-              onClick={addSubscription}
-              disabled={!addingPkg}
-              className="bg-primary text-primary-foreground hover:bg-accent"
-            >
-              Grant Access
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
