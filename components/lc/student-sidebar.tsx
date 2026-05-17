@@ -89,7 +89,7 @@ export function StudentSidebar({ userName, gradeName }: StudentSidebarProps) {
   return (
     <>
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col h-screen sticky top-0 bg-sidebar border-r border-sidebar-border">
+      <aside className="hidden md:flex w-64 shrink-0 flex-col h-full bg-sidebar border-r border-sidebar-border">
         <div className="p-5 border-b border-sidebar-border">
           <Logo size="sm" />
           {userName && (

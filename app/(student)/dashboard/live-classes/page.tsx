@@ -4,11 +4,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import {
-  Radio, ExternalLink, Lock, CheckCircle2,
-  Calendar, ArrowRight, BookOpen,
+  Radio, ExternalLink, Calendar, ArrowRight, BookOpen,
 } from 'lucide-react'
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
-import { LiveMonthChapters } from '@/components/lc/live-month-chapters'
+import { LiveMonthsList } from '@/components/lc/live-months-list'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Live Classes' }
@@ -122,7 +121,19 @@ export default async function StudentLiveClassesPage() {
     }
   }
 
-  const hasAnyContent = (livePackages ?? []).length > 0
+  // Shape packages for the client component
+  const monthPackages = (livePackages ?? []).map((pkg: any) => ({
+    id: pkg.id,
+    name: pkg.name,
+    month: pkg.month,
+    year: pkg.year,
+    chapters: (pkg.subscription_package_chapters ?? [])
+      .map((c: any) => c.chapter)
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.order_index - b.order_index),
+  }))
+
+  const hasAnyContent = monthPackages.length > 0
 
   return (
     <div>
@@ -200,110 +211,26 @@ export default async function StudentLiveClassesPage() {
         </div>
       )}
 
-      {/* All months */}
+      {/* All months — collapsible list */}
       {!hasAnyContent ? (
         <div className="py-16 text-center rounded-xl border border-border/60">
           <Calendar className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-muted-foreground">No monthly packages published yet for {grade.name}.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {(livePackages ?? []).map((pkg: any) => {
-            const isSubscribed = subscribedPackageIds.has(pkg.id)
-            const isCurrentMonth = pkg.month === currentMonth && pkg.year === currentYear
-            const isPast = pkg.year < currentYear || (pkg.year === currentYear && pkg.month < currentMonth)
-            const monthLabel = `${MONTHS[pkg.month - 1]} ${pkg.year}`
-
-            const chapters = (pkg.subscription_package_chapters ?? [])
-              .map((c: any) => c.chapter)
-              .filter(Boolean)
-              .sort((a: any, b: any) => a.order_index - b.order_index)
-
-            return (
-              <div
-                key={pkg.id}
-                className={`rounded-2xl border overflow-hidden ${
-                  isSubscribed ? 'border-primary/30' : 'border-border/60'
-                }`}
-              >
-                {/* Month header */}
-                <div className={`px-5 py-4 flex items-center justify-between gap-4 ${
-                  isSubscribed ? 'bg-primary/5' : 'bg-card'
-                }`}>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className="font-bold">{monthLabel}</span>
-                    {isCurrentMonth && (
-                      <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">
-                        Current
-                      </Badge>
-                    )}
-                    {isSubscribed && (
-                      <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Subscribed
-                      </span>
-                    )}
-                    {!isSubscribed && isPast && (
-                      <Badge variant="secondary" className="text-xs gap-1">
-                        <Lock className="w-2.5 h-2.5" /> Past month
-                      </Badge>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {chapters.length} chapter{chapters.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-
-                  {!isSubscribed && (
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-sm font-bold text-primary">
-                        Rs {Number(grade.live_subscription_price).toFixed(2)}
-                      </span>
-                      <Button
-                        asChild
-                        size="sm"
-                        variant={isPast ? 'outline' : 'default'}
-                        className={isPast ? '' : 'bg-primary text-primary-foreground hover:bg-accent'}
-                      >
-                        <Link href={`/contact?type=live&package=${pkg.id}&month=${encodeURIComponent(monthLabel)}`}>
-                          {isPast ? 'Buy Videos' : 'Subscribe'}
-                        </Link>
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Content for subscribed months */}
-                {isSubscribed && (
-                  <div className="px-5 pb-5">
-                    {isPast && !isCurrentMonth && (
-                      <p className="text-xs text-muted-foreground mt-3 mb-1 flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        Live classes for this month have ended — videos and documents are still accessible.
-                      </p>
-                    )}
-                    <LiveMonthChapters
-                      chapters={chapters}
-                      videosByChapter={videosByChapter}
-                      documentsByChapter={documentsByChapter}
-                    />
-                  </div>
-                )}
-
-                {/* Locked preview for non-subscribed past months */}
-                {!isSubscribed && isPast && chapters.length > 0 && (
-                  <div className="px-5 py-3 border-t border-border/40">
-                    <p className="text-xs text-muted-foreground">
-                      Includes: {chapters.map((ch: any) => ch.title).join(' · ')}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+        <LiveMonthsList
+          packages={monthPackages}
+          subscribedPackageIds={[...subscribedPackageIds] as string[]}
+          videosByChapter={videosByChapter}
+          documentsByChapter={documentsByChapter}
+          currentMonth={currentMonth}
+          currentYear={currentYear}
+          liveSubscriptionPrice={grade.live_subscription_price}
+        />
       )}
 
       {/* CTA if no subscriptions at all */}
-      {(livePackages ?? []).length > 0 && [...subscribedPackageIds].length === 0 && (
+      {hasAnyContent && subscribedPackageIds.size === 0 && (
         <div className="mt-8 p-5 rounded-xl border border-primary/20 bg-primary/5 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1">
             <p className="font-semibold">Start with this month</p>
