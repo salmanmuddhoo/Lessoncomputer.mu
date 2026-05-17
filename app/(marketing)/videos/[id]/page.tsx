@@ -9,6 +9,7 @@ import { Clock, ArrowLeft, Lock, BookOpen, Package } from 'lucide-react'
 
 interface PageProps {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ live?: string }>
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -36,16 +37,31 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function VideoPage({ params }: PageProps) {
+export default async function VideoPage({ params, searchParams }: PageProps) {
   const { id } = await params
+  const { live } = await searchParams
+  const isLiveContext = live === '1'
   const supabase = await createClient()
 
-  const { data: video } = await supabase
-    .from('videos')
-    .select('*, grade:grades(*), chapter:chapters(*)')
-    .eq('id', id)
-    .eq('is_published', true)
-    .single()
+  // In live context, accept videos published for live OR for regular packages
+  let video: any = null
+  if (isLiveContext) {
+    const { data } = await supabase
+      .from('videos')
+      .select('*, grade:grades(*), chapter:chapters(*)')
+      .eq('id', id)
+      .or('is_published.eq.true,is_published_for_live.eq.true' as any)
+      .single()
+    video = data
+  } else {
+    const { data } = await supabase
+      .from('videos')
+      .select('*, grade:grades(*), chapter:chapters(*)')
+      .eq('id', id)
+      .eq('is_published', true)
+      .single()
+    video = data
+  }
 
   if (!video) notFound()
 
@@ -81,6 +97,7 @@ export default async function VideoPage({ params }: PageProps) {
 
   const grade = video.grade as { name: string; color: string; slug: string } | null
   const chapter = video.chapter as { title: string } | null
+  const playerUrl = (isLiveContext && video.streamable_url_live) ? video.streamable_url_live : video.streamable_url
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -109,7 +126,7 @@ export default async function VideoPage({ params }: PageProps) {
 
       {/* Player or paywall */}
       {hasAccess ? (
-        <StreamablePlayer url={video.streamable_url} title={video.title} />
+        <StreamablePlayer url={playerUrl} title={video.title} />
       ) : (
         <div className="aspect-video rounded-xl bg-secondary/50 border border-border/60 flex flex-col items-center justify-center gap-4 px-6 text-center">
           <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">

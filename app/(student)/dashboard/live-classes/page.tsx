@@ -124,8 +124,8 @@ export default async function StudentLiveClassesPage() {
 
   if (subscribedChapterIds.length > 0) {
     const [{ data: videos }, { data: docs }] = await Promise.all([
-      supabase.from('videos').select('*').in('chapter_id', subscribedChapterIds).eq('is_published', true),
-      supabase.from('documents').select('*').in('chapter_id', subscribedChapterIds).eq('is_published', true),
+      supabase.from('videos').select('*').in('chapter_id', subscribedChapterIds).eq('is_published_for_live' as any, true),
+      supabase.from('documents').select('*').in('chapter_id', subscribedChapterIds).eq('is_published_for_live' as any, true),
     ])
     for (const v of videos ?? []) {
       videosByChapter[v.chapter_id] ??= []
