@@ -111,11 +111,12 @@ export default async function GradePage({ params }: PageProps) {
 
   let subscribedVideoPackageIds: string[] = []
   let isLiveSubscribed = false
+  let hasAnyLiveSubscription = false
 
   if (user) {
     const { data: subs } = await supabase
       .from('student_subscriptions')
-      .select('package_id')
+      .select('package_id, package:subscription_packages(package_type)')
       .eq('student_id', user.id)
       .eq('status', 'active')
       .not('package_id', 'is', null)
@@ -129,6 +130,9 @@ export default async function GradePage({ params }: PageProps) {
       }
       if (currentLivePackage && s.package_id === (currentLivePackage as any).id) {
         isLiveSubscribed = true
+      }
+      if ((s as any).package?.package_type === 'live_month') {
+        hasAnyLiveSubscription = true
       }
     }
   }
@@ -265,6 +269,7 @@ export default async function GradePage({ params }: PageProps) {
                 defaultMode="live"
                 triggerLabel="Subscribe"
                 isLoggedIn={!!user}
+                hasAnyLiveSubscription={hasAnyLiveSubscription}
               />
             ) : (
               <a
@@ -281,6 +286,15 @@ export default async function GradePage({ params }: PageProps) {
 
       {(totalVideos > 0 || (chapters?.length ?? 0) > 0 || packages.length > 0) && (
         <section className="mb-12">
+          {/* "Or" separator — only shown when live subscription banner is visible */}
+          {liveSubscriptionEnabled && (
+            <div className="flex items-center gap-4 mb-8">
+              <div className="flex-1 border-t border-border/60" />
+              <span className="text-sm font-semibold text-muted-foreground uppercase tracking-widest px-2">Or</span>
+              <div className="flex-1 border-t border-border/60" />
+            </div>
+          )}
+
           {hasPackages && (
             <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
               <Package className="w-5 h-5 text-primary" /> Video Packages
@@ -306,6 +320,7 @@ export default async function GradePage({ params }: PageProps) {
             liveSubscriptionPrice={liveSubscriptionPrice}
             liveMonthChapterIds={liveMonthChapterIds}
             liveMonthLabel={liveMonthLabel}
+            hasAnyLiveSubscription={hasAnyLiveSubscription}
           />
         </section>
       )}

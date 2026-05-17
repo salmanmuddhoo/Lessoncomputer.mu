@@ -60,6 +60,7 @@ interface Props {
   liveSubscriptionPrice: number
   liveMonthChapterIds?: string[]
   liveMonthLabel?: string
+  hasAnyLiveSubscription?: boolean
 }
 
 export function GradePageContent({
@@ -77,6 +78,7 @@ export function GradePageContent({
   liveSubscriptionPrice,
   liveMonthChapterIds = [],
   liveMonthLabel,
+  hasAnyLiveSubscription = false,
 }: Props) {
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
   const [demoModal, setDemoModal] = useState<{ videos: VideoRow[]; activeIdx: number } | null>(null)
@@ -185,26 +187,32 @@ export function GradePageContent({
                     <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Purchased
                     </span>
-                  ) : isLoggedIn ? (
-                    <BuySubscribeDialog
-                      videoPackages={dialogPackageList}
-                      mandatoryPackageId={pkg.id}
-                      subscribedPackageIds={subscribedVideoPackageIds}
-                      gradeName={gradeName}
-                      liveSubscriptionPrice={liveSubscriptionPrice}
-                      liveSubscriptionEnabled={liveSubscriptionEnabled}
-                      defaultMode="video"
-                      triggerLabel="Buy"
-                      triggerSize="sm"
-                      isLoggedIn={isLoggedIn}
-                    />
                   ) : (
-                    <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
-                      <Link href={`/login?redirectTo=/grades/${gradeSlug}`}>
-                        <ShoppingCart className="w-4 h-4 mr-2" />
-                        Buy
-                      </Link>
-                    </Button>
+                    <>
+                      <span className="text-base font-bold text-primary">Rs {pkg.price.toFixed(2)}</span>
+                      {isLoggedIn ? (
+                        <BuySubscribeDialog
+                          videoPackages={dialogPackageList}
+                          mandatoryPackageId={pkg.id}
+                          subscribedPackageIds={subscribedVideoPackageIds}
+                          gradeName={gradeName}
+                          liveSubscriptionPrice={liveSubscriptionPrice}
+                          liveSubscriptionEnabled={liveSubscriptionEnabled}
+                          defaultMode="video"
+                          triggerLabel="Buy"
+                          triggerSize="sm"
+                          isLoggedIn={isLoggedIn}
+                          hasAnyLiveSubscription={hasAnyLiveSubscription}
+                        />
+                      ) : (
+                        <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
+                          <Link href={`/login?redirectTo=/grades/${gradeSlug}`}>
+                            <ShoppingCart className="w-4 h-4 mr-2" />
+                            Buy
+                          </Link>
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

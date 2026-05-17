@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ShoppingCart, Radio, Lock, RefreshCw, CheckCircle2 } from 'lucide-react'
+import { ShoppingCart, Radio, Lock, RefreshCw, CheckCircle2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
@@ -30,6 +30,7 @@ interface Props {
   triggerLabel?: string
   triggerSize?: 'sm' | 'default'
   isLoggedIn?: boolean
+  hasAnyLiveSubscription?: boolean
 }
 
 export function BuySubscribeDialog({
@@ -45,9 +46,10 @@ export function BuySubscribeDialog({
   triggerLabel,
   triggerSize = 'default',
   isLoggedIn,
+  hasAnyLiveSubscription = false,
 }: Props) {
   const subscribedSet = new Set(subscribedPackageIds)
-  const isLiveAlreadySubscribed = !!(liveMonthPackageId && subscribedSet.has(liveMonthPackageId))
+  const isLiveAlreadySubscribed = hasAnyLiveSubscription || !!(liveMonthPackageId && subscribedSet.has(liveMonthPackageId))
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'video' | 'live'>(defaultMode)
   const [isRecurring, setIsRecurring] = useState(true)
@@ -216,12 +218,19 @@ export function BuySubscribeDialog({
               )}
             </div>
           ) : isLiveAlreadySubscribed ? (
-            <div className="py-6 text-center space-y-2">
+            <div className="py-6 text-center space-y-3">
               <CheckCircle2 className="w-10 h-10 text-primary mx-auto" />
               <p className="font-semibold">Already Subscribed</p>
               <p className="text-sm text-muted-foreground">
-                You are already subscribed to {liveMonthLabel ?? 'this month'}'s live classes.
+                You already have an active live classes subscription.
               </p>
+              <Link
+                href="/dashboard/live-classes"
+                onClick={() => setOpen(false)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-accent text-sm font-medium transition-colors"
+              >
+                Go to Live Classes <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           ) : (
             <div className="py-2 space-y-4">
