@@ -63,7 +63,7 @@ export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapte
                 )}
                 {chVideos.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-3">
-                    {chVideos.map((v: any) => <VideoCard key={v.id} video={v} />)}
+                    {chVideos.map((v: any) => <VideoCard key={v.id} video={v} owned />)}
                   </div>
                 )}
                 {chDocs.length > 0 && (
