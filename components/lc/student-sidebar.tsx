@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Video, Users, BookOpen, LogOut,
+  LayoutDashboard, Users, BookOpen, LogOut,
   ChevronRight, User, Menu, X, Package,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
@@ -40,7 +40,6 @@ function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscrip
     { label: 'My Video Packages', href: '/dashboard/my-videos',   icon: BookOpen,         show: hasVideoSubscription },
     { label: 'Live Classes',      href: '/dashboard/live-classes', icon: Users,            show: hasLiveSubscription },
     { label: 'Subscriptions',     href: '/dashboard/subscriptions',icon: Package,          show: true },
-    { label: 'Browse',            href: '/grades',                 icon: Video,            show: true },
     { label: 'My Account',        href: '/dashboard/account',      icon: User,             show: true },
   ]
 

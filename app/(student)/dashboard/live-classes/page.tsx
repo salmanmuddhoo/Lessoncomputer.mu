@@ -72,6 +72,7 @@ export default async function StudentLiveClassesPage() {
       .eq('grade_id', grade.id)
       .eq('package_type', 'live_month')
       .eq('is_active', true)
+      .or(`year.lt.${currentYear},and(year.eq.${currentYear},month.lte.${currentMonth})`)
       .order('year', { ascending: false })
       .order('month', { ascending: false }),
     supabase
