@@ -294,7 +294,6 @@ export function VideoForm({ packages, grades, video, initialPackageId = '', init
               value={videoPackageId || '__none__'}
               onValueChange={(v) => {
                 setVideoPackageId(v === '__none__' ? '' : v)
-                setValue('chapter_id', undefined)
               }}
               disabled={!gradeId || videoPackagesForGrade.length === 0}
             >
@@ -322,7 +321,6 @@ export function VideoForm({ packages, grades, video, initialPackageId = '', init
               value={livePackageId || '__none__'}
               onValueChange={(v) => {
                 setLivePackageId(v === '__none__' ? '' : v)
-                setValue('chapter_id', undefined)
               }}
               disabled={!gradeId || livePackagesForGrade.length === 0}
             >

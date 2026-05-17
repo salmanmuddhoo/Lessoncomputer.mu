@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { VideoPackagesAccordion } from '@/components/lc/video-packages-accordion'
+import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -170,9 +171,23 @@ export default async function MyVideoPackagesPage() {
                   </div>
                   <div className="px-5 py-3 border-t border-border/60 flex items-center justify-between">
                     <span className="text-lg font-bold text-primary">Rs {Number(pkg.price).toFixed(2)}</span>
-                    <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent h-8">
-                      <Link href={`/contact?type=video&package=${pkg.id}`}>Buy</Link>
-                    </Button>
+                    <BuySubscribeDialog
+                      videoPackages={allVideoPackages.map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        price: Number(p.price),
+                        chapterCount: getChapters(p).length,
+                      }))}
+                      mandatoryPackageId={pkg.id}
+                      subscribedPackageIds={[...subscribedPackageIds]}
+                      gradeName={grade.name}
+                      liveSubscriptionPrice={0}
+                      liveSubscriptionEnabled={false}
+                      defaultMode="video"
+                      triggerLabel="Buy"
+                      triggerSize="sm"
+                      isLoggedIn
+                    />
                   </div>
                 </div>
               )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -95,6 +95,12 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
     }
     return Array.from(chapterMap.values()).sort((a, b) => a.order_index - b.order_index)
   })()
+
+  useEffect(() => {
+    if (chapterId && !availableChapters.find(c => c.id === chapterId)) {
+      setChapterId('')
+    }
+  }, [videoPackageId, livePackageId])
 
   async function onSubmit(data: FormData) {
     if (!videoPackageId && !livePackageId) {
@@ -201,7 +207,6 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
               value={videoPackageId || '__none__'}
               onValueChange={(v) => {
                 setVideoPackageId(v === '__none__' ? '' : v)
-                setChapterId('')
               }}
               disabled={!gradeId || videoPackagesForGrade.length === 0}
             >
@@ -229,7 +234,6 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
               value={livePackageId || '__none__'}
               onValueChange={(v) => {
                 setLivePackageId(v === '__none__' ? '' : v)
-                setChapterId('')
               }}
               disabled={!gradeId || livePackagesForGrade.length === 0}
             >

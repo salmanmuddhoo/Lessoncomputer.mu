@@ -292,7 +292,6 @@ export default function AdminVideosPage() {
                       const chContent = getContentForChapter(grade.id, ch.id)
                       if (!chContent.length) return null
                       const isChCollapsed = collapsedChapters.has(ch.id)
-                      const { inVideo, inLive } = getPackageTags(grade.id, ch.id)
 
                       return (
                         <div key={ch.id}>
@@ -302,18 +301,6 @@ export default function AdminVideosPage() {
                           >
                             <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
                             <span className="text-xs font-semibold flex-1">{ch.title}</span>
-                            <div className="flex items-center gap-1 mr-2">
-                              {inVideo && (
-                                <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 text-primary border-primary/30 bg-primary/5">
-                                  <Package className="w-2.5 h-2.5" /> Video
-                                </Badge>
-                              )}
-                              {inLive && (
-                                <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400">
-                                  <Radio className="w-2.5 h-2.5" /> Live
-                                </Badge>
-                              )}
-                            </div>
                             <span className="text-xs text-muted-foreground mr-2">{chContent.length} item{chContent.length !== 1 ? 's' : ''}</span>
                             {isChCollapsed
                               ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -326,6 +313,7 @@ export default function AdminVideosPage() {
                               onDeleteVideo={handleDeleteVideo}
                               onDeleteDocument={handleDeleteDocument}
                               deleting={deleting}
+                              pkgInfos={pkgInfos}
                             />
                           )}
                         </div>
@@ -347,6 +335,7 @@ export default function AdminVideosPage() {
                             onDeleteVideo={handleDeleteVideo}
                             onDeleteDocument={handleDeleteDocument}
                             deleting={deleting}
+                            pkgInfos={pkgInfos}
                           />
                         </div>
                       )
@@ -362,16 +351,27 @@ export default function AdminVideosPage() {
   )
 }
 
+function getItemTags(pkgInfos: PkgInfo[], gradeId: string, chapterId: string | null) {
+  if (!chapterId) return { inVideo: false, inLive: false }
+  const gradePkgs = pkgInfos.filter((p) => p.grade_id === gradeId)
+  return {
+    inVideo: gradePkgs.some((p) => p.package_type !== 'live_month' && p.chapterIds.includes(chapterId)),
+    inLive: gradePkgs.some((p) => p.package_type === 'live_month' && p.chapterIds.includes(chapterId)),
+  }
+}
+
 function ContentTable({
   items,
   onDeleteVideo,
   onDeleteDocument,
   deleting,
+  pkgInfos,
 }: {
   items: ContentItem[]
   onDeleteVideo: (v: VideoRow) => void
   onDeleteDocument: (d: DocumentRow) => void
   deleting: string | null
+  pkgInfos: PkgInfo[]
 }) {
   return (
     <div className="overflow-x-auto">
@@ -380,14 +380,25 @@ function ContentTable({
           {items.map((item) => {
             if (item.type === 'video') {
               const v = item.data
+              const { inVideo, inLive } = getItemTags(pkgInfos, v.grade_id, v.chapter_id)
               return (
                 <tr key={`v-${v.id}`} className="hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-2.5 w-full">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="text-xs gap-1 shrink-0 text-primary border-primary/30 bg-primary/5">
                         <Video className="w-2.5 h-2.5" /> Video
                       </Badge>
-                      <span className="font-medium line-clamp-1 max-w-[220px] block">{v.title}</span>
+                      <span className="font-medium line-clamp-1 max-w-[180px] block">{v.title}</span>
+                      {inVideo && (
+                        <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 text-primary border-primary/30 bg-primary/5 shrink-0">
+                          <Package className="w-2.5 h-2.5" /> Video Pkg
+                        </Badge>
+                      )}
+                      {inLive && (
+                        <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400 shrink-0">
+                          <Radio className="w-2.5 h-2.5" /> Live
+                        </Badge>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-2.5 whitespace-nowrap">
@@ -429,14 +440,25 @@ function ContentTable({
             }
 
             const d = item.data
+            const { inVideo: dInVideo, inLive: dInLive } = getItemTags(pkgInfos, d.grade_id, d.chapter_id)
             return (
               <tr key={`d-${d.id}`} className="hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-2.5 w-full">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className="text-xs gap-1 shrink-0 text-orange-600 border-orange-300 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 dark:text-orange-400">
                       <FileText className="w-2.5 h-2.5" /> PDF
                     </Badge>
-                    <span className="font-medium line-clamp-1 max-w-[220px] block">{d.title}</span>
+                    <span className="font-medium line-clamp-1 max-w-[180px] block">{d.title}</span>
+                    {dInVideo && (
+                      <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 text-primary border-primary/30 bg-primary/5 shrink-0">
+                        <Package className="w-2.5 h-2.5" /> Video Pkg
+                      </Badge>
+                    )}
+                    {dInLive && (
+                      <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400 shrink-0">
+                        <Radio className="w-2.5 h-2.5" /> Live
+                      </Badge>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-xs text-muted-foreground" colSpan={2}>
