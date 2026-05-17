@@ -55,25 +55,28 @@ export default async function VideoPage({ params }: PageProps) {
 
   // Check subscription access for paid videos with a chapter
   if (!hasAccess && user && video.chapter_id) {
-    // Find packages containing this chapter that the student is subscribed to
-    const { data: sub } = await supabase
+    // Step 1: get the student's active subscribed package IDs (student can always read own rows)
+    const { data: subs } = await supabase
       .from('student_subscriptions')
-      .select('id')
+      .select('package_id')
       .eq('student_id', user.id)
       .eq('status', 'active')
-      .in(
-        'package_id',
-        // sub-select: packages that include this chapter
-        (
-          await supabase
-            .from('subscription_package_chapters')
-            .select('package_id')
-            .eq('chapter_id', video.chapter_id)
-        ).data?.map((r: any) => r.package_id) ?? []
-      )
-      .maybeSingle()
+      .not('package_id', 'is', null)
 
-    hasAccess = !!sub
+    const pkgIds = (subs ?? []).map((s: any) => s.package_id).filter(Boolean)
+
+    // Step 2: check if this chapter belongs to any of the student's packages
+    if (pkgIds.length > 0) {
+      const { data: link } = await supabase
+        .from('subscription_package_chapters')
+        .select('package_id')
+        .eq('chapter_id', video.chapter_id)
+        .in('package_id', pkgIds)
+        .limit(1)
+        .maybeSingle()
+
+      hasAccess = !!link
+    }
   }
 
   const grade = video.grade as { name: string; color: string; slug: string } | null
