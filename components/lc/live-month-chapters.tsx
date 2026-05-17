@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { VideoCard } from '@/components/lc/video-card'
-import { FolderOpen, ChevronDown, ChevronUp, FileText, Download } from 'lucide-react'
+import Link from 'next/link'
+import { FolderOpen, ChevronDown, ChevronUp, FileText, Download, Play } from 'lucide-react'
 
 interface Chapter {
   id: string
@@ -62,8 +62,24 @@ export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapte
                   <p className="text-sm text-muted-foreground mb-3">{ch.description}</p>
                 )}
                 {chVideos.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-3">
-                    {chVideos.map((v: any) => <VideoCard key={v.id} video={v} owned />)}
+                  <div className="space-y-1.5 mb-3">
+                    {chVideos.map((v: any) => (
+                      <Link
+                        key={v.id}
+                        href={`/videos/${v.id}?live=1`}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:bg-muted/30 transition-colors group"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                          <Play className="w-3.5 h-3.5 text-primary fill-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{v.title}</p>
+                          {v.duration_minutes && (
+                            <p className="text-xs text-muted-foreground">{v.duration_minutes} min</p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
                   </div>
                 )}
                 {chDocs.length > 0 && (
