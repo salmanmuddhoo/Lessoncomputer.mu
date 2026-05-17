@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   ChevronDown, ChevronUp, FolderOpen, Video,
   Package, Lock, CheckCircle2, ShoppingCart, Play,
-  FileText, Download,
+  FileText, Download, Radio,
 } from 'lucide-react'
 
 interface Chapter {
@@ -58,6 +58,8 @@ interface Props {
   gradeName: string
   liveSubscriptionEnabled: boolean
   liveSubscriptionPrice: number
+  liveMonthChapterIds?: string[]
+  liveMonthLabel?: string
 }
 
 export function GradePageContent({
@@ -73,9 +75,13 @@ export function GradePageContent({
   gradeName,
   liveSubscriptionEnabled,
   liveSubscriptionPrice,
+  liveMonthChapterIds = [],
+  liveMonthLabel,
 }: Props) {
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
   const [demoModal, setDemoModal] = useState<{ videos: VideoRow[]; activeIdx: number } | null>(null)
+
+  const liveChapters = chapters.filter((ch) => liveMonthChapterIds.includes(ch.id))
 
   function toggleChapter(key: string) {
     setOpenChapters((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -90,8 +96,89 @@ export function GradePageContent({
     chapterCount: p.chapterIds.length,
   }))
 
+  function renderChapterContent(ch: Chapter, chVideos: VideoRow[], chDocs: DocumentRow[]) {
+    return (
+      <div className="px-5 pb-5 pt-2 bg-muted/10">
+        {ch.description && (
+          <p className="text-sm text-muted-foreground mb-3">{ch.description}</p>
+        )}
+        {chVideos.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+            {chVideos.map((v) => <VideoCard key={v.id} video={v} />)}
+          </div>
+        )}
+        {chDocs.length > 0 && (
+          <div className="space-y-2">
+            {chDocs.map((doc) => (
+              <a
+                key={doc.id}
+                href={doc.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-card hover:bg-muted/30 transition-colors group"
+              >
+                <FileText className="w-5 h-5 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{doc.title}</p>
+                  {doc.description && (
+                    <p className="text-xs text-muted-foreground truncate">{doc.description}</p>
+                  )}
+                </div>
+                <Download className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
+              </a>
+            ))}
+          </div>
+        )}
+        {chVideos.length === 0 && chDocs.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border/60 py-8 text-center">
+            <p className="text-sm text-muted-foreground">No content in this chapter yet.</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const liveContentSection = liveChapters.length > 0 ? (
+    <section className="mb-8">
+      <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
+        <Radio className="w-5 h-5 text-primary" />
+        Live Class Content{liveMonthLabel ? ` — ${liveMonthLabel}` : ''}
+      </h2>
+      <div className="space-y-4">
+        {liveChapters.map((ch) => {
+          const key = `live-${ch.id}`
+          const isOpen = openChapters[key] ?? false
+          const chVideos = videosByChapter[ch.id] ?? []
+          const chDocs = documentsByChapter[ch.id] ?? []
+          const itemCount = chVideos.length + chDocs.length
+          return (
+            <div key={ch.id} className="rounded-2xl border border-primary/20 overflow-hidden">
+              <button
+                onClick={() => toggleChapter(key)}
+                className="w-full flex items-center gap-3 px-5 py-4 hover:bg-muted/30 transition-colors text-left bg-card"
+              >
+                <FolderOpen className="w-4 h-4 text-primary shrink-0" />
+                <span className="flex-1 font-semibold">{ch.title}</span>
+                <span className="text-xs text-muted-foreground mr-2">
+                  {itemCount} item{itemCount !== 1 ? 's' : ''}
+                </span>
+                {isOpen
+                  ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                  : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                }
+              </button>
+              {isOpen && renderChapterContent(ch, chVideos, chDocs)}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  ) : null
+
   if (packages.length > 0) {
     return (
+      <>
+        {liveContentSection}
       <div className="space-y-6">
         {packages.map((pkg) => {
           const isSubscribed = subscribedSet.has(pkg.id)
@@ -201,45 +288,7 @@ export function GradePageContent({
                         ) : null}
                       </button>
 
-                      {canAccess && isOpen && (
-                        <div className="px-5 pb-5 pt-2 bg-muted/10">
-                          {ch.description && (
-                            <p className="text-sm text-muted-foreground mb-3">{ch.description}</p>
-                          )}
-                          {chVideos.length > 0 && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-                              {chVideos.map((v) => <VideoCard key={v.id} video={v} />)}
-                            </div>
-                          )}
-                          {chDocs.length > 0 && (
-                            <div className="space-y-2">
-                              {chDocs.map((doc) => (
-                                <a
-                                  key={doc.id}
-                                  href={doc.file_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-card hover:bg-muted/30 transition-colors group"
-                                >
-                                  <FileText className="w-5 h-5 text-primary shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-sm truncate">{doc.title}</p>
-                                    {doc.description && (
-                                      <p className="text-xs text-muted-foreground truncate">{doc.description}</p>
-                                    )}
-                                  </div>
-                                  <Download className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                          {chVideos.length === 0 && chDocs.length === 0 && (
-                            <div className="rounded-xl border border-dashed border-border/60 py-8 text-center">
-                              <p className="text-sm text-muted-foreground">No content in this chapter yet.</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      {canAccess && isOpen && renderChapterContent(ch, chVideos, chDocs)}
                     </div>
                   )
                 })}
@@ -297,10 +346,13 @@ export function GradePageContent({
           </div>
         )}
       </div>
+      </>
     )
   }
 
   return (
+    <>
+      {liveContentSection}
     <div className="space-y-4">
       {chapters.map((ch) => {
         const key = ch.id
@@ -323,22 +375,7 @@ export function GradePageContent({
                 : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
               }
             </button>
-            {isOpen && (
-              <div className="px-5 pb-5 pt-3 bg-muted/10">
-                {ch.description && (
-                  <p className="text-sm text-muted-foreground mb-3">{ch.description}</p>
-                )}
-                {chVideos.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {chVideos.map((v) => <VideoCard key={v.id} video={v} />)}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-border/60 py-8 text-center">
-                    <p className="text-sm text-muted-foreground">No videos in this chapter yet.</p>
-                  </div>
-                )}
-              </div>
-            )}
+            {isOpen && renderChapterContent(ch, chVideos, documentsByChapter[ch.id] ?? [])}
           </div>
         )
       })}
@@ -355,5 +392,6 @@ export function GradePageContent({
         </div>
       )}
     </div>
+    </>
   )
 }

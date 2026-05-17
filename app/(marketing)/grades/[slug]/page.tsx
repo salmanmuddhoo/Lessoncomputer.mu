@@ -100,7 +100,7 @@ export default async function GradePage({ params }: PageProps) {
       .order('created_at', { ascending: false }),
     supabase
       .from('subscription_packages')
-      .select('id, name, price, month, year')
+      .select('id, name, price, month, year, subscription_package_chapters(chapter_id)')
       .eq('grade_id', grade.id)
       .eq('package_type', 'live_month')
       .eq('month', currentMonth)
@@ -164,7 +164,11 @@ export default async function GradePage({ params }: PageProps) {
   const liveSubscriptionPrice = (grade as any).live_subscription_price ?? 0
 
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
-  const liveMonthLabel = currentLivePackage ? `${MONTHS[currentLivePackage.month - 1]} ${currentLivePackage.year}` : `${MONTHS[currentMonth - 1]} ${currentYear}`
+  const liveMonthLabel = currentLivePackage ? `${MONTHS[(currentLivePackage as any).month - 1]} ${(currentLivePackage as any).year}` : `${MONTHS[currentMonth - 1]} ${currentYear}`
+
+  const liveMonthChapterIds: string[] = isLiveSubscribed && currentLivePackage
+    ? ((currentLivePackage as any).subscription_package_chapters ?? []).map((c: any) => c.chapter_id)
+    : []
 
   const dialogPackageList = packages.map((p) => ({
     id: p.id,
@@ -235,9 +239,6 @@ export default async function GradePage({ params }: PageProps) {
             ) : (
               <p className="text-sm text-muted-foreground">Live classes for {liveMonthLabel}</p>
             )}
-            {!currentLivePackage && (
-              <p className="text-xs text-muted-foreground mt-1">Schedule not yet published for this month.</p>
-            )}
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -248,15 +249,13 @@ export default async function GradePage({ params }: PageProps) {
               <Badge className="gap-1 bg-primary/10 text-primary border-primary/20" variant="outline">
                 <Radio className="w-3 h-3" /> Subscribed
               </Badge>
-            ) : !currentLivePackage ? (
-              <Badge variant="secondary" className="text-xs">Coming soon</Badge>
             ) : user ? (
               <BuySubscribeDialog
                 videoPackages={dialogPackageList}
                 gradeName={grade.name}
                 liveSubscriptionPrice={liveSubscriptionPrice}
                 liveSubscriptionEnabled={liveSubscriptionEnabled}
-                liveMonthPackageId={currentLivePackage.id}
+                liveMonthPackageId={currentLivePackage?.id}
                 liveMonthLabel={liveMonthLabel}
                 defaultMode="live"
                 triggerLabel="Subscribe"
@@ -300,6 +299,8 @@ export default async function GradePage({ params }: PageProps) {
             gradeName={grade.name}
             liveSubscriptionEnabled={liveSubscriptionEnabled}
             liveSubscriptionPrice={liveSubscriptionPrice}
+            liveMonthChapterIds={liveMonthChapterIds}
+            liveMonthLabel={liveMonthLabel}
           />
         </section>
       )}
