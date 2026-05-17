@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Loader2, CalendarDays, Settings2, Video, FileText,
-  Eye, EyeOff, FolderOpen, ChevronDown, ChevronUp, Pencil, Radio, Clock, Save,
+  Eye, EyeOff, FolderOpen, ChevronDown, ChevronUp, Pencil, Radio, Clock,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -62,7 +62,7 @@ export default function AdminLiveMonthsPage() {
   const [allDocs, setAllDocs] = useState<DocItem[]>([])
   const [videoEdits, setVideoEdits] = useState<Record<string, { url: string; publishedForLive: boolean }>>({})
   const [docEdits, setDocEdits] = useState<Record<string, { publishedForLive: boolean }>>({})
-  const [savingContent, setSavingContent] = useState(false)
+  const [savingItem, setSavingItem] = useState<string | null>(null)
 
   // Collapse state for months and chapters
   const [openMonths, setOpenMonths] = useState<Set<number>>(new Set())
@@ -176,24 +176,6 @@ export default function AdminLiveMonthsPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Detect unsaved changes
-  const isDirty = useMemo(() => {
-    for (const v of allVideos) {
-      const edit = videoEdits[v.id]
-      if (!edit) continue
-      const normalizedUrl = edit.url
-        ? (extractStreamableId(edit.url) ? `https://streamable.com/e/${extractStreamableId(edit.url)}` : edit.url)
-        : null
-      if (normalizedUrl !== (v.streamable_url_live ?? null)) return true
-      if (edit.publishedForLive !== v.is_published_for_live) return true
-    }
-    for (const d of allDocs) {
-      const edit = docEdits[d.id]
-      if (!edit) continue
-      if (edit.publishedForLive !== d.is_published_for_live) return true
-    }
-    return false
-  }, [videoEdits, docEdits, allVideos, allDocs])
 
   function toggleMonth(m: number) {
     const pkg = monthPackages.find((p) => p.month === m)
@@ -306,25 +288,44 @@ export default function AdminLiveMonthsPage() {
     load()
   }
 
-  async function handleSaveContent() {
-    setSavingContent(true)
-    const videoUpdates = Object.entries(videoEdits).map(([id, edit]) => {
-      const sid = edit.url ? extractStreamableId(edit.url) : null
-      const url = sid ? `https://streamable.com/e/${sid}` : (edit.url || null)
-      return supabase.from('videos').update({
-        streamable_url_live: url,
-        is_published_for_live: edit.publishedForLive,
-      }).eq('id', id)
-    })
-    const docUpdates = Object.entries(docEdits).map(([id, edit]) =>
-      supabase.from('documents').update({ is_published_for_live: edit.publishedForLive }).eq('id', id)
-    )
-    const results = await Promise.all([...videoUpdates, ...docUpdates])
-    const err = results.find((r) => r.error)?.error
-    if (err) { toast.error(err.message); setSavingContent(false); return }
-    toast.success('Content saved')
-    setSavingContent(false)
-    load()
+
+  async function autoSaveVideoToggle(videoId: string, val: boolean) {
+    setSavingItem(videoId)
+    const { error } = await supabase.from('videos')
+      .update({ is_published_for_live: val } as any)
+      .eq('id', videoId)
+    if (error) {
+      toast.error(`Save failed: ${error.message}`)
+      setVideoEdits((prev) => ({
+        ...prev,
+        [videoId]: { ...prev[videoId]!, publishedForLive: !val },
+      }))
+    }
+    setSavingItem(null)
+  }
+
+  async function autoSaveDocToggle(docId: string, val: boolean) {
+    setSavingItem(docId)
+    const { error } = await supabase.from('documents')
+      .update({ is_published_for_live: val } as any)
+      .eq('id', docId)
+    if (error) {
+      toast.error(`Save failed: ${error.message}`)
+      setDocEdits((prev) => ({ ...prev, [docId]: { publishedForLive: !val } }))
+    }
+    setSavingItem(null)
+  }
+
+  async function autoSaveVideoUrl(videoId: string, urlInput: string) {
+    const sid = urlInput ? extractStreamableId(urlInput) : null
+    const url = sid ? `https://streamable.com/e/${sid}` : (urlInput || null)
+    setSavingItem(videoId)
+    const { error } = await supabase.from('videos')
+      .update({ streamable_url_live: url } as any)
+      .eq('id', videoId)
+    if (error) toast.error(`Save failed: ${error.message}`)
+    else if (url) toast.success('Live URL saved')
+    setSavingItem(null)
   }
 
   return (
@@ -337,19 +338,6 @@ export default function AdminLiveMonthsPage() {
             Manage monthly content folders for live class subscribers
           </p>
         </div>
-        {isDirty && (
-          <Button
-            onClick={handleSaveContent}
-            disabled={savingContent}
-            className="bg-primary text-primary-foreground hover:bg-accent"
-          >
-            {savingContent
-              ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              : <Save className="w-4 h-4 mr-2" />
-            }
-            Save Changes
-          </Button>
-        )}
       </div>
 
       {/* Grade + Year selectors */}
@@ -526,6 +514,7 @@ export default function AdminLiveMonthsPage() {
                                                 ...prev,
                                                 [v.id]: { ...prev[v.id]!, url: e.target.value },
                                               }))}
+                                              onBlur={() => autoSaveVideoUrl(v.id, edit.url)}
                                               placeholder="https://streamable.com/…"
                                               className="text-xs h-8 font-mono"
                                             />
@@ -538,16 +527,22 @@ export default function AdminLiveMonthsPage() {
                                           <div className="shrink-0 flex flex-col items-center gap-1 pb-0.5">
                                             <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Published for Live</Label>
                                             <div className="flex items-center gap-1">
-                                              {edit.publishedForLive
-                                                ? <Eye className="w-3 h-3 text-primary" />
-                                                : <EyeOff className="w-3 h-3 text-muted-foreground" />
+                                              {savingItem === v.id
+                                                ? <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                                                : edit.publishedForLive
+                                                  ? <Eye className="w-3 h-3 text-primary" />
+                                                  : <EyeOff className="w-3 h-3 text-muted-foreground" />
                                               }
                                               <Switch
                                                 checked={edit.publishedForLive}
-                                                onCheckedChange={(val) => setVideoEdits((prev) => ({
-                                                  ...prev,
-                                                  [v.id]: { ...prev[v.id]!, publishedForLive: val },
-                                                }))}
+                                                disabled={savingItem === v.id}
+                                                onCheckedChange={(val) => {
+                                                  setVideoEdits((prev) => ({
+                                                    ...prev,
+                                                    [v.id]: { ...prev[v.id]!, publishedForLive: val },
+                                                  }))
+                                                  autoSaveVideoToggle(v.id, val)
+                                                }}
                                               />
                                             </div>
                                           </div>
@@ -573,16 +568,19 @@ export default function AdminLiveMonthsPage() {
                                         </span>
                                         <div className="flex items-center gap-1.5 shrink-0">
                                           <Label className="text-[10px] text-muted-foreground">Live</Label>
-                                          {docEdits[d.id]?.publishedForLive
-                                            ? <Eye className="w-3 h-3 text-primary" />
-                                            : <EyeOff className="w-3 h-3 text-muted-foreground" />
+                                          {savingItem === d.id
+                                            ? <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                                            : docEdits[d.id]?.publishedForLive
+                                              ? <Eye className="w-3 h-3 text-primary" />
+                                              : <EyeOff className="w-3 h-3 text-muted-foreground" />
                                           }
                                           <Switch
                                             checked={docEdits[d.id]?.publishedForLive ?? d.is_published_for_live}
-                                            onCheckedChange={(val) => setDocEdits((prev) => ({
-                                              ...prev,
-                                              [d.id]: { publishedForLive: val },
-                                            }))}
+                                            disabled={savingItem === d.id}
+                                            onCheckedChange={(val) => {
+                                              setDocEdits((prev) => ({ ...prev, [d.id]: { publishedForLive: val } }))
+                                              autoSaveDocToggle(d.id, val)
+                                            }}
                                           />
                                         </div>
                                         <Button variant="ghost" size="sm" asChild className="shrink-0 h-6 w-6 p-0">
