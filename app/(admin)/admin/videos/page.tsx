@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Loader2, Plus, Pencil, Trash2, Clock, Eye, EyeOff, Video,
-  FolderOpen, ChevronDown, ChevronUp, Package, FileText,
+  FolderOpen, ChevronDown, ChevronUp, Package, FileText, Radio,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -13,8 +13,6 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
-
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 interface Grade {
   id: string
@@ -32,8 +30,9 @@ interface Chapter {
 interface PkgInfo {
   id: string
   grade_id: string
-  month: number
-  year: number
+  month: number | null
+  year: number | null
+  package_type: string | null
   chapterIds: string[]
 }
 
@@ -73,16 +72,10 @@ export default function AdminVideosPage() {
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [collapsedGrades, setCollapsedGrades] = useState<Set<string>>(new Set())
-  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
   const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(new Set())
 
   function toggleGrade(key: string) {
     setCollapsedGrades((prev) => {
-      const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next
-    })
-  }
-  function toggleMonth(key: string) {
-    setCollapsedMonths((prev) => {
       const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next
     })
   }
@@ -112,7 +105,7 @@ export default function AdminVideosPage() {
       supabase.from('grades').select('id,name,color').eq('is_active', true).order('order_index'),
       supabase.from('chapters').select('id,grade_id,title,order_index').order('order_index'),
       supabase.from('subscription_packages')
-        .select('id, grade_id, month, year, subscription_package_chapters(chapter_id)')
+        .select('id, grade_id, month, year, package_type, subscription_package_chapters(chapter_id)')
         .eq('is_active', true)
         .order('year', { ascending: true })
         .order('month', { ascending: true }),
@@ -124,8 +117,9 @@ export default function AdminVideosPage() {
     setPkgInfos((pkgData ?? []).map((p: any) => ({
       id: p.id,
       grade_id: p.grade_id,
-      month: p.month,
-      year: p.year,
+      month: p.month ?? null,
+      year: p.year ?? null,
+      package_type: p.package_type ?? null,
       chapterIds: (p.subscription_package_chapters ?? []).map((c: any) => c.chapter_id),
     })))
     setLoading(false)
@@ -165,13 +159,9 @@ export default function AdminVideosPage() {
       )
     : grades.filter((g) => g.id === gradeFilter)
 
-  function getPkgsForGrade(gradeId: string) {
-    return pkgInfos.filter((p) => p.grade_id === gradeId)
-  }
-
-  function getChaptersForPkg(pkg: PkgInfo) {
+  function getChaptersForGrade(gradeId: string) {
     return chapters
-      .filter((c) => pkg.chapterIds.includes(c.id))
+      .filter((c) => c.grade_id === gradeId)
       .sort((a, b) => a.order_index - b.order_index)
   }
 
@@ -183,6 +173,13 @@ export default function AdminVideosPage() {
       .filter((d) => d.grade_id === gradeId && d.chapter_id === chapterId)
       .map((d): ContentItem => ({ type: 'document', data: d }))
     return [...vids, ...docs]
+  }
+
+  function getPackageTags(gradeId: string, chapterId: string): { inVideo: boolean; inLive: boolean } {
+    const gradePkgs = pkgInfos.filter((p) => p.grade_id === gradeId)
+    const inVideo = gradePkgs.some((p) => p.package_type !== 'live_month' && p.chapterIds.includes(chapterId))
+    const inLive = gradePkgs.some((p) => p.package_type === 'live_month' && p.chapterIds.includes(chapterId))
+    return { inVideo, inLive }
   }
 
   const totalCount = filteredVideos.length + filteredDocuments.length
@@ -270,9 +267,9 @@ export default function AdminVideosPage() {
             const gradeVideos = filteredVideos.filter((v) => v.grade_id === grade.id)
             const gradeDocuments = filteredDocuments.filter((d) => d.grade_id === grade.id)
             if (!gradeVideos.length && !gradeDocuments.length) return null
-            const gradePkgs = getPkgsForGrade(grade.id)
             const isGradeCollapsed = collapsedGrades.has(grade.id)
             const gradeTotal = gradeVideos.length + gradeDocuments.length
+            const gradeChapters = getChaptersForGrade(grade.id)
 
             return (
               <div key={grade.id} className="rounded-xl border border-border/60 overflow-hidden">
@@ -291,61 +288,46 @@ export default function AdminVideosPage() {
 
                 {!isGradeCollapsed && (
                   <div className="divide-y divide-border/40">
-                    {gradePkgs.map((pkg) => {
-                      const pkgChapters = getChaptersForPkg(pkg)
-                      const pkgContent = pkgChapters.flatMap((ch) => getContentForChapter(grade.id, ch.id))
-                      if (!pkgContent.length) return null
-                      const monthKey = pkg.id
-                      const isMonthCollapsed = collapsedMonths.has(monthKey)
+                    {gradeChapters.map((ch) => {
+                      const chContent = getContentForChapter(grade.id, ch.id)
+                      if (!chContent.length) return null
+                      const isChCollapsed = collapsedChapters.has(ch.id)
+                      const { inVideo, inLive } = getPackageTags(grade.id, ch.id)
 
                       return (
-                        <div key={pkg.id}>
+                        <div key={ch.id}>
                           <button
-                            onClick={() => toggleMonth(monthKey)}
-                            className="w-full flex items-center gap-2 px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors text-left"
+                            onClick={() => toggleChapter(ch.id)}
+                            className="w-full flex items-center gap-2 px-4 py-2.5 bg-muted/20 hover:bg-muted/40 transition-colors text-left"
                           >
-                            <Package className="w-3.5 h-3.5 text-primary shrink-0" />
-                            <span className="text-xs font-bold flex-1">{MONTHS[pkg.month - 1]} {pkg.year}</span>
-                            <span className="text-xs text-muted-foreground mr-2">{pkgContent.length} item{pkgContent.length !== 1 ? 's' : ''}</span>
-                            {isMonthCollapsed
+                            <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="text-xs font-semibold flex-1">{ch.title}</span>
+                            <div className="flex items-center gap-1 mr-2">
+                              {inVideo && (
+                                <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 text-primary border-primary/30 bg-primary/5">
+                                  <Package className="w-2.5 h-2.5" /> Video
+                                </Badge>
+                              )}
+                              {inLive && (
+                                <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400">
+                                  <Radio className="w-2.5 h-2.5" /> Live
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground mr-2">{chContent.length} item{chContent.length !== 1 ? 's' : ''}</span>
+                            {isChCollapsed
                               ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                               : <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             }
                           </button>
-
-                          {!isMonthCollapsed && pkgChapters.map((ch) => {
-                            const chContent = getContentForChapter(grade.id, ch.id)
-                            if (!chContent.length) return null
-                            const chKey = `${pkg.id}-${ch.id}`
-                            const isChCollapsed = collapsedChapters.has(chKey)
-
-                            return (
-                              <div key={ch.id}>
-                                <button
-                                  onClick={() => toggleChapter(chKey)}
-                                  className="w-full flex items-center gap-2 pl-8 pr-4 py-2.5 bg-muted/20 hover:bg-muted/40 transition-colors text-left"
-                                >
-                                  <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
-                                  <span className="text-xs font-semibold flex-1">{ch.title}</span>
-                                  <span className="text-xs text-muted-foreground mr-2">{chContent.length} item{chContent.length !== 1 ? 's' : ''}</span>
-                                  {isChCollapsed
-                                    ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                                    : <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                                  }
-                                </button>
-                                {!isChCollapsed && (
-                                  <div className="pl-12">
-                                    <ContentTable
-                                      items={chContent}
-                                      onDeleteVideo={handleDeleteVideo}
-                                      onDeleteDocument={handleDeleteDocument}
-                                      deleting={deleting}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })}
+                          {!isChCollapsed && (
+                            <ContentTable
+                              items={chContent}
+                              onDeleteVideo={handleDeleteVideo}
+                              onDeleteDocument={handleDeleteDocument}
+                              deleting={deleting}
+                            />
+                          )}
                         </div>
                       )
                     })}

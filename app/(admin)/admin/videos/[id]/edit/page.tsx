@@ -17,7 +17,7 @@ export default async function EditVideoPage({ params }: PageProps) {
     supabase.from('videos').select('*').eq('id', id).single(),
     supabase
       .from('subscription_packages')
-      .select('id, name, grade_id, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, order_index))')
+      .select('id, name, grade_id, month, year, package_type, subscription_package_chapters(chapter_id, chapter:chapters(id, title, order_index))')
       .eq('is_active', true)
       .order('year', { ascending: false })
       .order('month', { ascending: false }),
@@ -30,8 +30,9 @@ export default async function EditVideoPage({ params }: PageProps) {
     id: p.id,
     name: p.name,
     grade_id: p.grade_id,
-    month: p.month,
-    year: p.year,
+    month: p.month ?? null,
+    year: p.year ?? null,
+    package_type: p.package_type ?? null,
     chapters: (p.subscription_package_chapters ?? [])
       .map((spc: any) => spc.chapter)
       .filter(Boolean),

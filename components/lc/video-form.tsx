@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Loader2, Trash2, Package, Radio } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,12 +19,6 @@ import {
 import { toast } from 'sonner'
 import type { Video } from '@/lib/types/database'
 
-/**
- * Extracts the Streamable video ID from:
- *  - Full embed HTML: <iframe src="https://streamable.com/e/abc123"...
- *  - Direct URL:  https://streamable.com/abc123
- *  - Embed URL:   https://streamable.com/e/abc123
- */
 export function extractStreamableId(input: string): string | null {
   const srcMatch = input.match(/src=["']https?:\/\/streamable\.com\/e\/([a-z0-9]{2,})/i)
   if (srcMatch) return srcMatch[1]
@@ -43,15 +36,19 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const schema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().optional(),
-  package_id: z.string().min(1, 'Please select a subscription package'),
   chapter_id: z.string().optional(),
-  streamable_embed: z.string().min(1, 'Please paste the Streamable embed code or URL').refine(
+  streamable_embed: z.string().min(1, 'Paste the Streamable embed or URL for video packages').refine(
     (v) => extractStreamableId(v) !== null,
     'No Streamable video found. Paste the full embed code or a streamable.com URL.'
+  ),
+  streamable_embed_live: z.string().optional().refine(
+    (v) => !v || extractStreamableId(v) !== null,
+    'No Streamable video found in the live URL.'
   ),
   thumbnail_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   duration_minutes: z.coerce.number().min(0).optional(),
   is_published: z.boolean(),
+  is_published_for_live: z.boolean(),
   is_demo: z.boolean(),
 })
 
@@ -61,15 +58,16 @@ export interface PackageOption {
   id: string
   name: string
   grade_id: string
-  month: number
-  year: number
+  month: number | null
+  year: number | null
+  package_type: 'video' | 'live_month' | null
   chapters: { id: string; title: string; order_index: number }[]
 }
 
 interface VideoFormProps {
   packages: PackageOption[]
   grades: { id: string; name: string; color: string }[]
-  video?: Video
+  video?: Video & { streamable_url_live?: string | null; is_published_for_live?: boolean }
   initialPackageId?: string
   initialGradeId?: string
 }
@@ -83,55 +81,91 @@ export function VideoForm({ packages, grades, video, initialPackageId = '', init
   const defaultGradeId = initialGradeId || grades[0]?.id || ''
   const [gradeId, setGradeId] = useState(defaultGradeId)
 
+  const [videoPackageId, setVideoPackageId] = useState(() => {
+    if (!video?.chapter_id) return initialPackageId && packages.find(p => p.id === initialPackageId && p.package_type !== 'live_month') ? initialPackageId : ''
+    const match = packages.find(p => p.package_type !== 'live_month' && p.chapters.some(ch => ch.id === video.chapter_id))
+    return match?.id ?? ''
+  })
+  const [livePackageId, setLivePackageId] = useState(() => {
+    if (!video?.chapter_id) return initialPackageId && packages.find(p => p.id === initialPackageId && p.package_type === 'live_month') ? initialPackageId : ''
+    const match = packages.find(p => p.package_type === 'live_month' && p.chapters.some(ch => ch.id === video.chapter_id))
+    return match?.id ?? ''
+  })
+
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       title: video?.title ?? '',
       description: video?.description ?? '',
-      package_id: initialPackageId,
       chapter_id: video?.chapter_id ?? undefined,
       streamable_embed: video?.streamable_url ?? '',
+      streamable_embed_live: video?.streamable_url_live ?? '',
       thumbnail_url: video?.thumbnail_url ?? '',
       duration_minutes: video?.duration_minutes ?? undefined,
-      is_published: video?.is_published ?? false,
+      is_published: video?.is_published ?? true,
+      is_published_for_live: video?.is_published_for_live ?? false,
       is_demo: video?.is_demo ?? false,
     },
   })
 
   const embedInput = watch('streamable_embed')
-  const selectedPackageId = watch('package_id')
+  const embedLiveInput = watch('streamable_embed_live')
   const streamableId = embedInput ? extractStreamableId(embedInput) : null
+  const streamableIdLive = embedLiveInput ? extractStreamableId(embedLiveInput) : null
 
-  const packagesForGrade = packages.filter((p) => p.grade_id === gradeId)
-  const selectedPackage = packages.find((p) => p.id === selectedPackageId)
-  const chaptersForPackage = selectedPackage
-    ? [...selectedPackage.chapters].sort((a, b) => a.order_index - b.order_index)
-    : []
+  const videoPackagesForGrade = packages.filter(p => p.grade_id === gradeId && p.package_type !== 'live_month')
+  const livePackagesForGrade = packages.filter(p => p.grade_id === gradeId && p.package_type === 'live_month')
+
+  const selectedVideoPackage = packages.find(p => p.id === videoPackageId)
+  const selectedLivePackage = packages.find(p => p.id === livePackageId)
+
+  const availableChapters = (() => {
+    const chapterMap = new Map<string, { id: string; title: string; order_index: number }>()
+    if (videoPackageId && selectedVideoPackage) {
+      for (const ch of selectedVideoPackage.chapters) chapterMap.set(ch.id, ch)
+    }
+    if (livePackageId && selectedLivePackage) {
+      for (const ch of selectedLivePackage.chapters) chapterMap.set(ch.id, ch)
+    }
+    if (!videoPackageId && !livePackageId) {
+      for (const p of packages.filter(p => p.grade_id === gradeId)) {
+        for (const ch of p.chapters) chapterMap.set(ch.id, ch)
+      }
+    }
+    return Array.from(chapterMap.values()).sort((a, b) => a.order_index - b.order_index)
+  })()
+
+  const selectedChapterId = watch('chapter_id')
 
   useEffect(() => {
-    const currentChapter = watch('chapter_id')
-    if (currentChapter && !chaptersForPackage.find((c) => c.id === currentChapter)) {
+    const current = watch('chapter_id')
+    if (current && !availableChapters.find(c => c.id === current)) {
       setValue('chapter_id', undefined)
     }
-  }, [selectedPackageId])
+  }, [videoPackageId, livePackageId])
 
   async function onSubmit(data: FormData) {
+    if (!videoPackageId && !livePackageId) {
+      toast.error('Select at least one package (Video or Live Month)')
+      return
+    }
     setLoading(true)
     const supabase = createClient()
 
-    const pkg = packages.find((p) => p.id === data.package_id)
-    const payload = {
+    const payload: Record<string, any> = {
       title: data.title,
       description: data.description || null,
-      grade_id: pkg?.grade_id ?? '',
+      grade_id: gradeId,
       chapter_id: data.chapter_id || null,
       streamable_url: normalizeStreamableUrl(data.streamable_embed),
+      streamable_url_live: data.streamable_embed_live ? normalizeStreamableUrl(data.streamable_embed_live) : null,
       thumbnail_url: data.thumbnail_url || null,
       price: 0,
       is_free: false,
       is_demo: data.is_demo,
       duration_minutes: data.duration_minutes || null,
       is_published: data.is_published,
+      is_published_for_live: data.is_published_for_live,
     }
 
     if (isEditing) {
@@ -163,43 +197,58 @@ export function VideoForm({ packages, grades, video, initialPackageId = '', init
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl">
 
-      {/* ── Streamable embed ── */}
-      <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="p-5">
-          <Label className="text-base font-semibold mb-1 block">
-            Streamable Embed Code or URL *
-          </Label>
-          <p className="text-xs text-muted-foreground mb-3">
-            Paste the full embed code from Streamable (or just the video URL).
-          </p>
-          <Textarea
-            rows={4}
-            placeholder={`Paste embed code:\n<div style="..."><iframe src="https://streamable.com/e/abc123"...></iframe></div>\n\nOr just the URL:\nhttps://streamable.com/abc123`}
-            className="font-mono text-xs"
-            {...register('streamable_embed')}
-          />
-          {errors.streamable_embed && (
-            <p className="text-xs text-destructive mt-1">{errors.streamable_embed.message}</p>
-          )}
-
-          {streamableId && (
-            <div className="mt-4 flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-green-700 dark:text-green-400">Video detected</p>
-                <code className="text-xs text-muted-foreground">{streamableId}</code>
+      {/* ── Streamable URLs ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-5">
+            <Label className="text-sm font-semibold mb-1 flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5 text-primary" /> Video Package URL *
+            </Label>
+            <p className="text-xs text-muted-foreground mb-2">Streamable URL for video package subscribers.</p>
+            <Textarea
+              rows={3}
+              placeholder="https://streamable.com/abc123"
+              className="font-mono text-xs"
+              {...register('streamable_embed')}
+            />
+            {errors.streamable_embed && (
+              <p className="text-xs text-destructive mt-1">{errors.streamable_embed.message}</p>
+            )}
+            {streamableId && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                <span className="font-medium">✓ Detected:</span>
+                <code>{streamableId}</code>
+                <a href={`https://streamable.com/${streamableId}`} target="_blank" rel="noopener noreferrer" className="hover:underline shrink-0">Verify ↗</a>
               </div>
-              <a
-                href={`https://streamable.com/${streamableId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline shrink-0"
-              >
-                Verify on Streamable ↗
-              </a>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60">
+          <CardContent className="p-5">
+            <Label className="text-sm font-semibold mb-1 flex items-center gap-1.5">
+              <Radio className="w-3.5 h-3.5 text-primary" /> Live Classes URL
+            </Label>
+            <p className="text-xs text-muted-foreground mb-2">Separate Streamable URL for live class subscribers (optional — can be added later).</p>
+            <Textarea
+              rows={3}
+              placeholder="https://streamable.com/xyz789"
+              className="font-mono text-xs"
+              {...register('streamable_embed_live')}
+            />
+            {errors.streamable_embed_live && (
+              <p className="text-xs text-destructive mt-1">{errors.streamable_embed_live.message}</p>
+            )}
+            {streamableIdLive && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                <span className="font-medium">✓ Detected:</span>
+                <code>{streamableIdLive}</code>
+                <a href={`https://streamable.com/${streamableIdLive}`} target="_blank" rel="noopener noreferrer" className="hover:underline shrink-0">Verify ↗</a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ── Basic info ── */}
       <div className="space-y-4">
@@ -214,14 +263,15 @@ export function VideoForm({ packages, grades, video, initialPackageId = '', init
           <Textarea id="description" placeholder="What will students learn?" rows={3} {...register('description')} />
         </div>
 
-        {/* Grade selector */}
+        {/* Grade */}
         <div className="space-y-2">
           <Label>Grade *</Label>
           <Select
             value={gradeId}
             onValueChange={(v) => {
               setGradeId(v)
-              setValue('package_id', '')
+              setVideoPackageId('')
+              setLivePackageId('')
               setValue('chapter_id', undefined)
             }}
           >
@@ -234,50 +284,87 @@ export function VideoForm({ packages, grades, video, initialPackageId = '', init
           </Select>
         </div>
 
-        {/* Package + Chapter row */}
+        {/* Package selection — side by side */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Subscription Package *</Label>
+            <Label className="flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5 text-primary" /> Video Package
+            </Label>
             <Select
-              value={selectedPackageId || undefined}
-              onValueChange={(v) => setValue('package_id', v)}
+              value={videoPackageId || '__none__'}
+              onValueChange={(v) => {
+                setVideoPackageId(v === '__none__' ? '' : v)
+                setValue('chapter_id', undefined)
+              }}
+              disabled={!gradeId || videoPackagesForGrade.length === 0}
             >
-              <SelectTrigger><SelectValue placeholder="Select package" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder={
+                  !gradeId ? 'Select grade first' :
+                  videoPackagesForGrade.length === 0 ? 'No video packages' :
+                  'Select video package'
+                } />
+              </SelectTrigger>
               <SelectContent>
-                {packagesForGrade.map((p) => (
+                <SelectItem value="__none__">None</SelectItem>
+                {videoPackagesForGrade.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5">
+              <Radio className="w-3.5 h-3.5 text-primary" /> Live Month Package
+            </Label>
+            <Select
+              value={livePackageId || '__none__'}
+              onValueChange={(v) => {
+                setLivePackageId(v === '__none__' ? '' : v)
+                setValue('chapter_id', undefined)
+              }}
+              disabled={!gradeId || livePackagesForGrade.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={
+                  !gradeId ? 'Select grade first' :
+                  livePackagesForGrade.length === 0 ? 'No live packages' :
+                  'Select live package'
+                } />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {livePackagesForGrade.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
-                    {p.name} — {MONTHS[p.month - 1]} {p.year}
+                    {p.name}{p.month && p.year ? ` — ${MONTHS[p.month - 1]} ${p.year}` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.package_id && (
-              <p className="text-xs text-destructive">{errors.package_id.message}</p>
-            )}
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <Label>Chapter</Label>
-            <Select
-              value={watch('chapter_id') ?? '__none__'}
-              onValueChange={(v) => setValue('chapter_id', v === '__none__' ? undefined : v)}
-              disabled={!selectedPackageId || chaptersForPackage.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={
-                  !selectedPackageId ? 'Select a package first' :
-                  chaptersForPackage.length === 0 ? 'No chapters in this package' :
-                  'Optional — select chapter'
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">No chapter</SelectItem>
-                {chaptersForPackage.map((ch) => (
-                  <SelectItem key={ch.id} value={ch.id}>{ch.title}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Chapter */}
+        <div className="space-y-2">
+          <Label>Chapter</Label>
+          <Select
+            value={selectedChapterId ?? '__none__'}
+            onValueChange={(v) => setValue('chapter_id', v === '__none__' ? undefined : v)}
+            disabled={availableChapters.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={
+                availableChapters.length === 0 ? 'Select a package first' : 'Optional — select chapter'
+              } />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No chapter</SelectItem>
+              {availableChapters.map((ch) => (
+                <SelectItem key={ch.id} value={ch.id}>{ch.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -297,15 +384,26 @@ export function VideoForm({ packages, grades, video, initialPackageId = '', init
         <CardContent className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <Label>Published</Label>
-              <p className="text-xs text-muted-foreground">Make this video visible to students</p>
+              <Label className="flex items-center gap-1.5">
+                <Package className="w-3.5 h-3.5 text-primary" /> Published for Video Packages
+              </Label>
+              <p className="text-xs text-muted-foreground">Visible to video package subscribers</p>
             </div>
             <Switch checked={watch('is_published')} onCheckedChange={(v) => setValue('is_published', v)} />
           </div>
           <div className="flex items-center justify-between">
             <div>
+              <Label className="flex items-center gap-1.5">
+                <Radio className="w-3.5 h-3.5 text-primary" /> Published for Live Classes
+              </Label>
+              <p className="text-xs text-muted-foreground">Visible to live class subscribers (uses Live Classes URL)</p>
+            </div>
+            <Switch checked={watch('is_published_for_live')} onCheckedChange={(v) => setValue('is_published_for_live', v)} />
+          </div>
+          <div className="flex items-center justify-between border-t border-border/40 pt-4">
+            <div>
               <Label>Demo video</Label>
-              <p className="text-xs text-muted-foreground">Freely watchable without login or subscription</p>
+              <p className="text-xs text-muted-foreground">Freely watchable without subscription</p>
             </div>
             <Switch checked={watch('is_demo')} onCheckedChange={(v) => setValue('is_demo', v)} />
           </div>
