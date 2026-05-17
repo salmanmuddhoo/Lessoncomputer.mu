@@ -98,12 +98,14 @@ export interface Video {
   grade_id: string
   chapter_id: string | null
   streamable_url: string
+  streamable_url_live: string | null
   thumbnail_url: string | null
   price: number
   is_free: boolean
   is_demo: boolean
   duration_minutes: number | null
   is_published: boolean
+  is_published_for_live: boolean
   created_by: string
   created_at: string
   grade?: Grade
@@ -175,8 +177,10 @@ export interface Document {
   grade_id: string
   chapter_id: string | null
   file_url: string
+  file_url_live: string | null
   file_name: string | null
   is_published: boolean
+  is_published_for_live: boolean
   created_by: string
   created_at: string
   grade?: Grade

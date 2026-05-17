@@ -44,6 +44,7 @@ interface DocItem {
   id: string
   title: string
   chapter_id: string
+  file_url_live: string | null
   is_published_for_live: boolean
   is_published: boolean
   file_name: string | null
@@ -61,7 +62,7 @@ export default function AdminLiveMonthsPage() {
   const [allVideos, setAllVideos] = useState<VideoItem[]>([])
   const [allDocs, setAllDocs] = useState<DocItem[]>([])
   const [videoEdits, setVideoEdits] = useState<Record<string, { url: string; publishedForLive: boolean }>>({})
-  const [docEdits, setDocEdits] = useState<Record<string, { publishedForLive: boolean }>>({})
+  const [docEdits, setDocEdits] = useState<Record<string, { url: string; publishedForLive: boolean }>>({})
   const [savingItem, setSavingItem] = useState<string | null>(null)
 
   // Collapse state for months and chapters
@@ -129,7 +130,7 @@ export default function AdminLiveMonthsPage() {
           .in('chapter_id', allChapterIds)
           .order('created_at', { ascending: false }),
         supabase.from('documents')
-          .select('id,title,chapter_id,is_published_for_live,is_published,file_name')
+          .select('id,title,chapter_id,file_url_live,is_published_for_live,is_published,file_name')
           .in('chapter_id', allChapterIds)
           .order('created_at', { ascending: false }),
       ])
@@ -153,6 +154,7 @@ export default function AdminLiveMonthsPage() {
       })) as VideoItem[]
       const documents = ((dErr ? docsBase : docs) ?? []).map((d: any) => ({
         ...d,
+        file_url_live: d.file_url_live ?? null,
         is_published_for_live: d.is_published_for_live ?? false,
       })) as DocItem[]
       setAllVideos(videos)
@@ -160,8 +162,8 @@ export default function AdminLiveMonthsPage() {
 
       const vEdits: Record<string, { url: string; publishedForLive: boolean }> = {}
       for (const v of videos) vEdits[v.id] = { url: v.streamable_url_live ?? '', publishedForLive: v.is_published_for_live }
-      const dEdits: Record<string, { publishedForLive: boolean }> = {}
-      for (const d of documents) dEdits[d.id] = { publishedForLive: d.is_published_for_live }
+      const dEdits: Record<string, { url: string; publishedForLive: boolean }> = {}
+      for (const d of documents) dEdits[d.id] = { url: d.file_url_live ?? '', publishedForLive: d.is_published_for_live }
       setVideoEdits(vEdits)
       setDocEdits(dEdits)
     } else {
@@ -313,6 +315,17 @@ export default function AdminLiveMonthsPage() {
       toast.error(`Save failed: ${error.message}`)
       setDocEdits((prev) => ({ ...prev, [docId]: { publishedForLive: !val } }))
     }
+    setSavingItem(null)
+  }
+
+  async function autoSaveDocUrl(docId: string, urlInput: string) {
+    const url = urlInput.trim() || null
+    setSavingItem(docId)
+    const { error } = await supabase.from('documents')
+      .update({ file_url_live: url } as any)
+      .eq('id', docId)
+    if (error) toast.error(`Save failed: ${error.message}`)
+    else if (url) toast.success('Live document URL saved')
     setSavingItem(null)
   }
 
@@ -552,42 +565,77 @@ export default function AdminLiveMonthsPage() {
                                   })}
 
                                   {chDocs.map((d) => {
-                                    const edit = docEdits[d.id] ?? { publishedForLive: d.is_published_for_live }
+                                    const edit = docEdits[d.id] ?? { url: d.file_url_live ?? '', publishedForLive: d.is_published_for_live }
+                                    const hasLiveUrl = !!(edit.url || d.file_url_live)
                                     return (
-                                      <div key={d.id} className="px-5 py-2.5 flex items-center gap-2 flex-wrap">
-                                        <Badge variant="outline" className="text-[10px] gap-0.5 px-1.5 py-0 h-4 shrink-0 text-orange-600 border-orange-300 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 dark:text-orange-400">
-                                          <FileText className="w-2.5 h-2.5" /> PDF
-                                        </Badge>
-                                        <span className="font-medium text-sm flex-1 min-w-0 truncate">{d.title}</span>
-                                        {d.file_name && (
-                                          <span className="text-[10px] text-muted-foreground shrink-0">{d.file_name}</span>
-                                        )}
-                                        <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0 h-4 rounded-full shrink-0 ${d.is_published ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
-                                          {d.is_published ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
-                                          {d.is_published ? 'Published' : 'Draft'}
-                                        </span>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                          <Label className="text-[10px] text-muted-foreground">Live</Label>
-                                          {savingItem === d.id
-                                            ? <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-                                            : docEdits[d.id]?.publishedForLive
-                                              ? <Eye className="w-3 h-3 text-primary" />
-                                              : <EyeOff className="w-3 h-3 text-muted-foreground" />
-                                          }
-                                          <Switch
-                                            checked={docEdits[d.id]?.publishedForLive ?? d.is_published_for_live}
-                                            disabled={savingItem === d.id}
-                                            onCheckedChange={(val) => {
-                                              setDocEdits((prev) => ({ ...prev, [d.id]: { publishedForLive: val } }))
-                                              autoSaveDocToggle(d.id, val)
-                                            }}
-                                          />
+                                      <div key={d.id} className="px-5 py-3 space-y-2">
+                                        {/* Title row */}
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <Badge variant="outline" className="text-[10px] gap-0.5 px-1.5 py-0 h-4 shrink-0 text-orange-600 border-orange-300 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 dark:text-orange-400">
+                                            <FileText className="w-2.5 h-2.5" /> PDF
+                                          </Badge>
+                                          <span className="font-medium text-sm flex-1 min-w-0 truncate">{d.title}</span>
+
+                                          {hasLiveUrl && (
+                                            <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 shrink-0 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400">
+                                              <Radio className="w-2.5 h-2.5" /> Live URL ✓
+                                            </Badge>
+                                          )}
+
+                                          {d.file_name && (
+                                            <span className="text-[10px] text-muted-foreground shrink-0">{d.file_name}</span>
+                                          )}
+                                          <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0 h-4 rounded-full shrink-0 ${d.is_published ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+                                            {d.is_published ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                            {d.is_published ? 'Published' : 'Draft'}
+                                          </span>
+                                          <Button variant="ghost" size="sm" asChild className="shrink-0 h-6 w-6 p-0 ml-auto">
+                                            <Link href={`/admin/videos/documents/${d.id}/edit`} title="Edit full details">
+                                              <Pencil className="w-3.5 h-3.5" />
+                                            </Link>
+                                          </Button>
                                         </div>
-                                        <Button variant="ghost" size="sm" asChild className="shrink-0 h-6 w-6 p-0">
-                                          <Link href={`/admin/videos/documents/${d.id}/edit`} title="Edit full details">
-                                            <Pencil className="w-3.5 h-3.5" />
-                                          </Link>
-                                        </Button>
+
+                                        {/* Live URL input + publish toggle */}
+                                        <div className="flex items-end gap-3">
+                                          <div className="flex-1 min-w-0">
+                                            <Label className="text-[10px] text-muted-foreground mb-1 block">
+                                              Live Classes Document URL (monthly subscription)
+                                            </Label>
+                                            <Input
+                                              value={edit.url}
+                                              onChange={(e) => setDocEdits((prev) => ({
+                                                ...prev,
+                                                [d.id]: { ...prev[d.id]!, url: e.target.value },
+                                              }))}
+                                              onBlur={() => autoSaveDocUrl(d.id, edit.url)}
+                                              placeholder="https://drive.google.com/…"
+                                              className="text-xs h-8 font-mono"
+                                            />
+                                          </div>
+                                          <div className="shrink-0 flex flex-col items-center gap-1 pb-0.5">
+                                            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Published for Live</Label>
+                                            <div className="flex items-center gap-1">
+                                              {savingItem === d.id
+                                                ? <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                                                : edit.publishedForLive
+                                                  ? <Eye className="w-3 h-3 text-primary" />
+                                                  : <EyeOff className="w-3 h-3 text-muted-foreground" />
+                                              }
+                                              <Switch
+                                                checked={edit.publishedForLive}
+                                                disabled={savingItem === d.id}
+                                                onCheckedChange={(val) => {
+                                                  setDocEdits((prev) => ({
+                                                    ...prev,
+                                                    [d.id]: { ...prev[d.id]!, publishedForLive: val },
+                                                  }))
+                                                  autoSaveDocToggle(d.id, val)
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
                                       </div>
                                     )
                                   })}
