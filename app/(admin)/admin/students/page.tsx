@@ -64,7 +64,6 @@ export default function AdminStudentsPage() {
 
   // Separate grant state for video vs live
   const [addingVideoPkg, setAddingVideoPkg] = useState('')
-  const [videoRecurring, setVideoRecurring] = useState(false)
   const [addingLivePkg, setAddingLivePkg] = useState('')
   const [liveRecurring, setLiveRecurring] = useState(true)
 
@@ -399,15 +398,11 @@ export default function AdminStudentsPage() {
                       )}
                     </SelectContent>
                   </Select>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Switch id="video-recurring" checked={videoRecurring} onCheckedChange={setVideoRecurring} />
-                      <Label htmlFor="video-recurring" className="text-sm cursor-pointer">Recurring</Label>
-                    </div>
+                  <div className="flex items-center justify-end">
                     <Button
                       size="sm"
                       disabled={!addingVideoPkg || addingVideoPkg === '__none__'}
-                      onClick={() => grantAccess(addingVideoPkg, videoRecurring)}
+                      onClick={() => grantAccess(addingVideoPkg, false)}
                       className="bg-primary text-primary-foreground hover:bg-accent shrink-0"
                     >
                       Grant Access
