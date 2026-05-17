@@ -65,6 +65,7 @@ export default async function GradePage({ params }: PageProps) {
     { data: rawPackages },
     { data: documents },
     { data: currentLivePackage },
+    { data: pastLivePackages },
   ] = await Promise.all([
     supabase
       .from('videos')
@@ -107,21 +108,31 @@ export default async function GradePage({ params }: PageProps) {
       .eq('year', currentYear)
       .eq('is_active', true)
       .maybeSingle(),
+    supabase
+      .from('subscription_packages')
+      .select('id, name, month, year')
+      .eq('grade_id', grade.id)
+      .eq('package_type', 'live_month')
+      .eq('is_active', true)
+      .or(`year.lt.${currentYear},and(year.eq.${currentYear},month.lt.${currentMonth})`)
+      .order('year', { ascending: false })
+      .order('month', { ascending: false }),
   ])
 
   let subscribedVideoPackageIds: string[] = []
+  let subscribedLivePackageIds: string[] = []
   let isLiveSubscribed = false
-  let hasAnyLiveSubscription = false
 
   if (user) {
     const { data: subs } = await supabase
       .from('student_subscriptions')
-      .select('package_id, package:subscription_packages(package_type)')
+      .select('package_id')
       .eq('student_id', user.id)
       .eq('status', 'active')
       .not('package_id', 'is', null)
 
     const videoPackageIds = new Set((rawPackages ?? []).map((p: any) => p.id))
+    const pastLiveIds = new Set((pastLivePackages ?? []).map((p: any) => p.id))
 
     for (const s of subs ?? []) {
       if (!s.package_id) continue
@@ -130,9 +141,10 @@ export default async function GradePage({ params }: PageProps) {
       }
       if (currentLivePackage && s.package_id === (currentLivePackage as any).id) {
         isLiveSubscribed = true
+        subscribedLivePackageIds.push(s.package_id)
       }
-      if ((s as any).package?.package_type === 'live_month') {
-        hasAnyLiveSubscription = true
+      if (pastLiveIds.has(s.package_id)) {
+        subscribedLivePackageIds.push(s.package_id)
       }
     }
   }
@@ -264,12 +276,13 @@ export default async function GradePage({ params }: PageProps) {
                 gradeName={grade.name}
                 liveSubscriptionPrice={liveSubscriptionPrice}
                 liveSubscriptionEnabled={liveSubscriptionEnabled}
-                liveMonthPackageId={currentLivePackage?.id}
+                liveMonthPackageId={(currentLivePackage as any)?.id}
                 liveMonthLabel={liveMonthLabel}
+                pastLivePackages={(pastLivePackages ?? []) as any}
+                subscribedLivePackageIds={subscribedLivePackageIds}
                 defaultMode="live"
                 triggerLabel="Subscribe"
                 isLoggedIn={!!user}
-                hasAnyLiveSubscription={hasAnyLiveSubscription}
               />
             ) : (
               <a
@@ -314,13 +327,15 @@ export default async function GradePage({ params }: PageProps) {
             gradeColor={grade.color}
             gradeSlug={grade.slug}
             subscribedVideoPackageIds={subscribedVideoPackageIds}
+            subscribedLivePackageIds={subscribedLivePackageIds}
             isLoggedIn={!!user}
             gradeName={grade.name}
             liveSubscriptionEnabled={liveSubscriptionEnabled}
             liveSubscriptionPrice={liveSubscriptionPrice}
             liveMonthChapterIds={liveMonthChapterIds}
             liveMonthLabel={liveMonthLabel}
-            hasAnyLiveSubscription={hasAnyLiveSubscription}
+            liveMonthPackageId={(currentLivePackage as any)?.id}
+            pastLivePackages={(pastLivePackages ?? []) as any}
           />
         </section>
       )}

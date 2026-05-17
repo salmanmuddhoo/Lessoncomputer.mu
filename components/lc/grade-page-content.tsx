@@ -54,13 +54,15 @@ interface Props {
   gradeColor: string
   gradeSlug: string
   subscribedVideoPackageIds: string[]
+  subscribedLivePackageIds?: string[]
   isLoggedIn: boolean
   gradeName: string
   liveSubscriptionEnabled: boolean
   liveSubscriptionPrice: number
   liveMonthChapterIds?: string[]
   liveMonthLabel?: string
-  hasAnyLiveSubscription?: boolean
+  liveMonthPackageId?: string
+  pastLivePackages?: { id: string; name: string; month: number; year: number }[]
 }
 
 export function GradePageContent({
@@ -72,13 +74,15 @@ export function GradePageContent({
   gradeColor,
   gradeSlug,
   subscribedVideoPackageIds,
+  subscribedLivePackageIds = [],
   isLoggedIn,
   gradeName,
   liveSubscriptionEnabled,
   liveSubscriptionPrice,
   liveMonthChapterIds = [],
   liveMonthLabel,
-  hasAnyLiveSubscription = false,
+  liveMonthPackageId,
+  pastLivePackages = [],
 }: Props) {
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
   const [demoModal, setDemoModal] = useState<{ videos: VideoRow[]; activeIdx: number } | null>(null)
@@ -195,14 +199,17 @@ export function GradePageContent({
                           videoPackages={dialogPackageList}
                           mandatoryPackageId={pkg.id}
                           subscribedPackageIds={subscribedVideoPackageIds}
+                          subscribedLivePackageIds={subscribedLivePackageIds}
                           gradeName={gradeName}
                           liveSubscriptionPrice={liveSubscriptionPrice}
                           liveSubscriptionEnabled={liveSubscriptionEnabled}
+                          liveMonthPackageId={liveMonthPackageId}
+                          liveMonthLabel={liveMonthLabel}
+                          pastLivePackages={pastLivePackages}
                           defaultMode="video"
                           triggerLabel="Buy"
                           triggerSize="sm"
                           isLoggedIn={isLoggedIn}
-                          hasAnyLiveSubscription={hasAnyLiveSubscription}
                         />
                       ) : (
                         <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
