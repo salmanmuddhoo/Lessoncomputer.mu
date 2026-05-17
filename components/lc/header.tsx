@@ -44,23 +44,30 @@ export function Header({ user }: HeaderProps) {
               Home
             </Link>
 
-            {/* Grades dropdown */}
-            <div className="relative" onMouseEnter={() => setGradesOpen(true)} onMouseLeave={() => setGradesOpen(false)}>
-              <button className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground lc-transition rounded-lg hover:bg-secondary">
+            {/* Grades dropdown — click-based to avoid hover gap closing */}
+            <div className="relative">
+              <button
+                onClick={() => setGradesOpen((v) => !v)}
+                className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground lc-transition rounded-lg hover:bg-secondary"
+              >
                 Grades <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${gradesOpen ? 'rotate-180' : ''}`} />
               </button>
               {gradesOpen && (
-                <div className="absolute top-full left-0 mt-1 w-44 bg-card border border-border rounded-xl lc-shadow py-1.5 animate-scale-fade-in">
-                  {GRADES.map((g) => (
-                    <Link
-                      key={g.slug}
-                      href={`/grades/${g.slug}`}
-                      className="block px-4 py-2 text-sm text-foreground/70 hover:text-foreground hover:bg-secondary lc-transition"
-                    >
-                      {g.name}
-                    </Link>
-                  ))}
-                </div>
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setGradesOpen(false)} />
+                  <div className="absolute top-full left-0 mt-1 w-44 bg-card border border-border rounded-xl lc-shadow py-1.5 animate-scale-fade-in z-20">
+                    {GRADES.map((g) => (
+                      <Link
+                        key={g.slug}
+                        href={`/grades/${g.slug}`}
+                        onClick={() => setGradesOpen(false)}
+                        className="block px-4 py-2 text-sm text-foreground/70 hover:text-foreground hover:bg-secondary lc-transition"
+                      >
+                        {g.name}
+                      </Link>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
 

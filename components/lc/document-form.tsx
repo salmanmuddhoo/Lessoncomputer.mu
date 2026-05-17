@@ -134,6 +134,30 @@ export function DocumentForm({ grades, packages, document, initialGradeId = '', 
       toast.success('Document added')
     }
 
+    // Sync subscription_package_chapters for the selected chapter
+    if (chapterId) {
+      const livePkgIds = livePackagesForGrade.map(p => p.id)
+      const videoPkgIds = videoPackagesForGrade.map(p => p.id)
+
+      if (livePkgIds.length > 0) {
+        await supabase.from('subscription_package_chapters')
+          .delete().eq('chapter_id', chapterId).in('package_id', livePkgIds)
+        if (livePackageId) {
+          await supabase.from('subscription_package_chapters')
+            .insert({ package_id: livePackageId, chapter_id: chapterId })
+        }
+      }
+
+      if (videoPkgIds.length > 0) {
+        await supabase.from('subscription_package_chapters')
+          .delete().eq('chapter_id', chapterId).in('package_id', videoPkgIds)
+        if (videoPackageId) {
+          await supabase.from('subscription_package_chapters')
+            .insert({ package_id: videoPackageId, chapter_id: chapterId })
+        }
+      }
+    }
+
     router.push('/admin/videos')
     router.refresh()
   }

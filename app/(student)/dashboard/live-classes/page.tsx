@@ -160,14 +160,17 @@ export default async function StudentLiveClassesPage() {
         </p>
       </div>
 
-      {/* Join banner — only when subscribed to current month */}
-      {isSubscribedCurrentMonth && (
-        <div className="mb-8 p-5 rounded-xl border border-primary/30 bg-primary/5 flex flex-col sm:flex-row sm:items-center gap-4">
+      {/* Join banner — always visible when there's a current live class or current month package */}
+      {(currentLiveClass || currentMonthPkg) && (
+        <div className={`mb-8 p-5 rounded-xl border flex flex-col sm:flex-row sm:items-center gap-4 ${
+          isSubscribedCurrentMonth ? 'border-primary/30 bg-primary/5' : 'border-border/60 bg-card'
+        }`}>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <Radio className="w-4 h-4 text-primary shrink-0" />
               <span className="text-xs font-semibold text-primary uppercase tracking-wide">
-                {MONTHS[currentMonth - 1]} {currentYear} — Active
+                {MONTHS[currentMonth - 1]} {currentYear}
+                {isSubscribedCurrentMonth ? ' — Active' : ' — Current Month'}
               </span>
             </div>
             {currentLiveClass ? (
@@ -186,18 +189,22 @@ export default async function StudentLiveClassesPage() {
               <p className="text-sm text-muted-foreground">Live class schedule not published yet.</p>
             )}
           </div>
-          {currentLiveClass?.meet_url ? (
-            <a
-              href={currentLiveClass.meet_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-accent text-sm font-semibold transition-colors shrink-0"
-            >
-              <ExternalLink className="w-4 h-4" />
-              Join Live Class
-            </a>
+          {isSubscribedCurrentMonth ? (
+            currentLiveClass?.meet_url ? (
+              <a
+                href={currentLiveClass.meet_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-accent text-sm font-semibold transition-colors shrink-0"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Join Live Class
+              </a>
+            ) : (
+              <Badge variant="secondary" className="shrink-0">Link coming soon</Badge>
+            )
           ) : (
-            <Badge variant="secondary" className="shrink-0">Link coming soon</Badge>
+            <p className="text-xs text-muted-foreground shrink-0">Subscribe below to join</p>
           )}
         </div>
       )}
