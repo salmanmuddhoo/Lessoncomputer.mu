@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   ChevronDown, ChevronUp, FolderOpen, Video,
   Package, Lock, CheckCircle2, ShoppingCart, Play,
-  FileText, Download, Radio,
+  FileText, Download,
 } from 'lucide-react'
 
 interface Chapter {
@@ -138,47 +138,8 @@ export function GradePageContent({
     )
   }
 
-  const liveContentSection = liveChapters.length > 0 ? (
-    <section className="mb-8">
-      <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
-        <Radio className="w-5 h-5 text-primary" />
-        Live Class Content{liveMonthLabel ? ` — ${liveMonthLabel}` : ''}
-      </h2>
-      <div className="space-y-4">
-        {liveChapters.map((ch) => {
-          const key = `live-${ch.id}`
-          const isOpen = openChapters[key] ?? false
-          const chVideos = videosByChapter[ch.id] ?? []
-          const chDocs = documentsByChapter[ch.id] ?? []
-          const itemCount = chVideos.length + chDocs.length
-          return (
-            <div key={ch.id} className="rounded-2xl border border-primary/20 overflow-hidden">
-              <button
-                onClick={() => toggleChapter(key)}
-                className="w-full flex items-center gap-3 px-5 py-4 hover:bg-muted/30 transition-colors text-left bg-card"
-              >
-                <FolderOpen className="w-4 h-4 text-primary shrink-0" />
-                <span className="flex-1 font-semibold">{ch.title}</span>
-                <span className="text-xs text-muted-foreground mr-2">
-                  {itemCount} item{itemCount !== 1 ? 's' : ''}
-                </span>
-                {isOpen
-                  ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
-                  : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-                }
-              </button>
-              {isOpen && renderChapterContent(ch, chVideos, chDocs)}
-            </div>
-          )
-        })}
-      </div>
-    </section>
-  ) : null
-
   if (packages.length > 0) {
     return (
-      <>
-        {liveContentSection}
       <div className="space-y-6">
         {packages.map((pkg) => {
           const isSubscribed = subscribedSet.has(pkg.id)
@@ -347,13 +308,10 @@ export function GradePageContent({
           </div>
         )}
       </div>
-      </>
     )
   }
 
   return (
-    <>
-      {liveContentSection}
     <div className="space-y-4">
       {chapters.map((ch) => {
         const key = ch.id
@@ -393,6 +351,5 @@ export function GradePageContent({
         </div>
       )}
     </div>
-    </>
   )
 }

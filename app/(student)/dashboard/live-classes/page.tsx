@@ -65,7 +65,7 @@ export default async function StudentLiveClassesPage() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
 
-  const [{ data: livePackages }, { data: subs }, { data: currentLiveClass }] = await Promise.all([
+  const [{ data: livePackages }, { data: videoPackagesRaw }, { data: subs }, { data: currentLiveClass }] = await Promise.all([
     supabase
       .from('subscription_packages')
       .select('id, name, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index))')
@@ -74,6 +74,13 @@ export default async function StudentLiveClassesPage() {
       .eq('is_active', true)
       .order('year', { ascending: false })
       .order('month', { ascending: false }),
+    supabase
+      .from('subscription_packages')
+      .select('id, name, price, subscription_package_chapters(chapter_id)')
+      .eq('grade_id', grade.id)
+      .neq('package_type', 'live_month')
+      .eq('is_active', true)
+      .order('name', { ascending: true }),
     supabase
       .from('student_subscriptions')
       .select('package_id, purchased_at')
@@ -92,6 +99,15 @@ export default async function StudentLiveClassesPage() {
   ])
 
   const subscribedPackageIds = new Set((subs ?? []).map((s: any) => s.package_id).filter(Boolean))
+
+  const videoPackages = (videoPackagesRaw ?? []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    price: Number(p.price),
+    chapterCount: (p.subscription_package_chapters ?? []).length,
+  }))
+  const videoPackageIds = new Set(videoPackages.map((p) => p.id))
+  const subscribedVideoPackageIds = [...subscribedPackageIds].filter((id) => videoPackageIds.has(id as string)) as string[]
 
   const currentMonthPkg = (livePackages ?? []).find(
     (p: any) => p.month === currentMonth && p.year === currentYear
@@ -186,31 +202,6 @@ export default async function StudentLiveClassesPage() {
         </div>
       )}
 
-      {/* Current month — not subscribed yet */}
-      {!isSubscribedCurrentMonth && currentMonthPkg && (
-        <div className="mb-8 p-5 rounded-xl border border-border/60 bg-card flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <Radio className="w-4 h-4 text-primary shrink-0" />
-              <span className="text-xs font-semibold text-primary uppercase tracking-wide">
-                {MONTHS[currentMonth - 1]} {currentYear} — Current Month
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">Subscribe to join this month's live classes and access content.</p>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="text-lg font-bold text-primary">
-              Rs {Number(grade.live_subscription_price).toFixed(2)}<span className="text-sm font-normal text-muted-foreground">/mo</span>
-            </span>
-            <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
-              <Link href={`/contact?type=live&package=${currentMonthPkg.id}&month=${encodeURIComponent(`${MONTHS[currentMonth - 1]} ${currentYear}`)}`}>
-                <Radio className="w-4 h-4 mr-2" /> Subscribe
-              </Link>
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* All months — collapsible list */}
       {!hasAnyContent ? (
         <div className="py-16 text-center rounded-xl border border-border/60">
@@ -226,6 +217,9 @@ export default async function StudentLiveClassesPage() {
           currentMonth={currentMonth}
           currentYear={currentYear}
           liveSubscriptionPrice={grade.live_subscription_price}
+          gradeName={grade.name}
+          videoPackages={videoPackages}
+          subscribedVideoPackageIds={subscribedVideoPackageIds}
         />
       )}
 

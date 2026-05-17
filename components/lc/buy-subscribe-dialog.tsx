@@ -47,6 +47,7 @@ export function BuySubscribeDialog({
   isLoggedIn,
 }: Props) {
   const subscribedSet = new Set(subscribedPackageIds)
+  const isLiveAlreadySubscribed = !!(liveMonthPackageId && subscribedSet.has(liveMonthPackageId))
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'video' | 'live'>(defaultMode)
   const [isRecurring, setIsRecurring] = useState(true)
@@ -214,6 +215,14 @@ export function BuySubscribeDialog({
                 </>
               )}
             </div>
+          ) : isLiveAlreadySubscribed ? (
+            <div className="py-6 text-center space-y-2">
+              <CheckCircle2 className="w-10 h-10 text-primary mx-auto" />
+              <p className="font-semibold">Already Subscribed</p>
+              <p className="text-sm text-muted-foreground">
+                You are already subscribed to {liveMonthLabel ?? 'this month'}'s live classes.
+              </p>
+            </div>
           ) : (
             <div className="py-2 space-y-4">
               <div className="p-4 rounded-lg border border-border/60 bg-muted/20">
@@ -253,17 +262,21 @@ export function BuySubscribeDialog({
           )}
 
           <DialogFooter className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
-              <Link href={
-                mode === 'live' && liveMonthPackageId
-                  ? `/contact?type=live&package=${liveMonthPackageId}&month=${encodeURIComponent(liveMonthLabel ?? '')}&recurring=${isRecurring ? '1' : '0'}`
-                  : '/contact'
-              }>
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                {mode === 'video' ? 'Contact to Buy' : 'Contact to Subscribe'}
-              </Link>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              {mode === 'live' && isLiveAlreadySubscribed ? 'Close' : 'Cancel'}
             </Button>
+            {!(mode === 'live' && isLiveAlreadySubscribed) && (
+              <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
+                <Link href={
+                  mode === 'live' && liveMonthPackageId
+                    ? `/contact?type=live&package=${liveMonthPackageId}&month=${encodeURIComponent(liveMonthLabel ?? '')}&recurring=${isRecurring ? '1' : '0'}`
+                    : '/contact'
+                }>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  {mode === 'video' ? 'Contact to Buy' : 'Contact to Subscribe'}
+                </Link>
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

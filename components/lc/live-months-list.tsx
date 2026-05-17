@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { Radio, CheckCircle2, Lock, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
 import { LiveMonthChapters } from '@/components/lc/live-month-chapters'
+import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -27,6 +28,13 @@ interface MonthPackage {
   chapters: Chapter[]
 }
 
+interface VideoPackageItem {
+  id: string
+  name: string
+  price: number
+  chapterCount: number
+}
+
 interface Props {
   packages: MonthPackage[]
   subscribedPackageIds: string[]
@@ -35,6 +43,9 @@ interface Props {
   currentMonth: number
   currentYear: number
   liveSubscriptionPrice: number
+  gradeName?: string
+  videoPackages?: VideoPackageItem[]
+  subscribedVideoPackageIds?: string[]
 }
 
 export function LiveMonthsList({
@@ -45,6 +56,9 @@ export function LiveMonthsList({
   currentMonth,
   currentYear,
   liveSubscriptionPrice,
+  gradeName,
+  videoPackages,
+  subscribedVideoPackageIds,
 }: Props) {
   const subscribedSet = new Set(subscribedPackageIds)
   const [openMonths, setOpenMonths] = useState<Record<string, boolean>>(() =>
@@ -112,16 +126,32 @@ export function LiveMonthsList({
                     <span className="text-sm font-bold text-primary">
                       Rs {Number(liveSubscriptionPrice).toFixed(2)}
                     </span>
-                    <Button
-                      asChild
-                      size="sm"
-                      variant={isPast ? 'outline' : 'default'}
-                      className={isPast ? '' : 'bg-primary text-primary-foreground hover:bg-accent'}
-                    >
-                      <Link href={`/contact?type=live&package=${pkg.id}&month=${encodeURIComponent(monthLabel)}`}>
-                        {isPast ? 'Buy Videos' : 'Subscribe'}
-                      </Link>
-                    </Button>
+                    {gradeName && videoPackages ? (
+                      <BuySubscribeDialog
+                        videoPackages={videoPackages}
+                        subscribedPackageIds={[...(subscribedVideoPackageIds ?? []), ...subscribedPackageIds]}
+                        gradeName={gradeName}
+                        liveSubscriptionPrice={liveSubscriptionPrice}
+                        liveSubscriptionEnabled
+                        liveMonthPackageId={pkg.id}
+                        liveMonthLabel={monthLabel}
+                        defaultMode="live"
+                        triggerLabel={isPast ? 'Buy Videos' : 'Subscribe'}
+                        triggerSize="sm"
+                        isLoggedIn
+                      />
+                    ) : (
+                      <Button
+                        asChild
+                        size="sm"
+                        variant={isPast ? 'outline' : 'default'}
+                        className={isPast ? '' : 'bg-primary text-primary-foreground hover:bg-accent'}
+                      >
+                        <Link href={`/contact?type=live&package=${pkg.id}&month=${encodeURIComponent(monthLabel)}`}>
+                          {isPast ? 'Buy Videos' : 'Subscribe'}
+                        </Link>
+                      </Button>
+                    )}
                   </>
                 )}
                 {isSubscribed && (
