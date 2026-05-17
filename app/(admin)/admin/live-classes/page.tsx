@@ -12,6 +12,10 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 export default async function AdminLiveClassesPage() {
   const supabase = await createClient()
 
+  const now = new Date()
+  const currentMonth = now.getMonth() + 1
+  const currentYear = now.getFullYear()
+
   const { data: classes } = await supabase
     .from('live_classes')
     .select('*, grade:grades(name, color), package:subscription_packages(id, name, month, year)')
@@ -49,7 +53,11 @@ export default async function AdminLiveClassesPage() {
                 {classes.map((c) => {
                   const grade = c.grade as { name: string; color: string } | null
                   const pkg = c.package as { id: string; name: string; month: number; year: number } | null
-                  const isPast = new Date(c.scheduled_at) < new Date()
+                  const d = new Date(c.scheduled_at)
+                  const classMonth = d.getMonth() + 1
+                  const classYear = d.getFullYear()
+                  const isCurrentMonth = classMonth === currentMonth && classYear === currentYear
+                  const isPastMonth = classYear < currentYear || (classYear === currentYear && classMonth < currentMonth)
                   return (
                     <tr key={c.id} className="hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
@@ -90,11 +98,13 @@ export default async function AdminLiveClassesPage() {
                         <span className={`inline-flex text-xs px-2 py-0.5 rounded-full ${
                           !c.is_published
                             ? 'bg-secondary text-muted-foreground'
-                            : isPast
+                            : isPastMonth
                             ? 'bg-muted text-muted-foreground'
-                            : 'bg-primary/10 text-primary'
+                            : isCurrentMonth
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400'
                         }`}>
-                          {!c.is_published ? 'Draft' : isPast ? 'Ended' : 'Upcoming'}
+                          {!c.is_published ? 'Draft' : isPastMonth ? 'Ended' : isCurrentMonth ? 'Active' : 'Upcoming'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
