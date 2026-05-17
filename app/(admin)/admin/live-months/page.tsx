@@ -321,9 +321,13 @@ export default function AdminLiveMonthsPage() {
   async function autoSaveDocUrl(docId: string, urlInput: string) {
     const url = urlInput.trim() || null
     setSavingItem(docId)
-    const { error } = await supabase.from('documents')
-      .update({ file_url_live: url } as any)
-      .eq('id', docId)
+    const updates: Record<string, any> = { file_url_live: url }
+    // If URL is cleared, unpublish for live too
+    if (!url && docEdits[docId]?.publishedForLive) {
+      updates.is_published_for_live = false
+      setDocEdits((prev) => ({ ...prev, [docId]: { ...prev[docId]!, publishedForLive: false } }))
+    }
+    const { error } = await supabase.from('documents').update(updates as any).eq('id', docId)
     if (error) toast.error(`Save failed: ${error.message}`)
     else if (url) toast.success('Live document URL saved')
     setSavingItem(null)
@@ -333,9 +337,13 @@ export default function AdminLiveMonthsPage() {
     const sid = urlInput ? extractStreamableId(urlInput) : null
     const url = sid ? `https://streamable.com/e/${sid}` : (urlInput || null)
     setSavingItem(videoId)
-    const { error } = await supabase.from('videos')
-      .update({ streamable_url_live: url } as any)
-      .eq('id', videoId)
+    const updates: Record<string, any> = { streamable_url_live: url }
+    // If URL is cleared, unpublish for live too
+    if (!url && videoEdits[videoId]?.publishedForLive) {
+      updates.is_published_for_live = false
+      setVideoEdits((prev) => ({ ...prev, [videoId]: { ...prev[videoId]!, publishedForLive: false } }))
+    }
+    const { error } = await supabase.from('videos').update(updates as any).eq('id', videoId)
     if (error) toast.error(`Save failed: ${error.message}`)
     else if (url) toast.success('Live URL saved')
     setSavingItem(null)
@@ -538,17 +546,17 @@ export default function AdminLiveMonthsPage() {
                                             )}
                                           </div>
                                           <div className="shrink-0 flex flex-col items-center gap-1 pb-0.5">
-                                            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Published for Live</Label>
-                                            <div className="flex items-center gap-1">
+                                            <Label className={`text-[10px] whitespace-nowrap ${!hasLiveUrl ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}>Published for Live</Label>
+                                            <div className="flex items-center gap-1" title={!hasLiveUrl ? 'Add a live URL first' : undefined}>
                                               {savingItem === v.id
                                                 ? <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
                                                 : edit.publishedForLive
                                                   ? <Eye className="w-3 h-3 text-primary" />
-                                                  : <EyeOff className="w-3 h-3 text-muted-foreground" />
+                                                  : <EyeOff className={`w-3 h-3 ${!hasLiveUrl ? 'text-muted-foreground/30' : 'text-muted-foreground'}`} />
                                               }
                                               <Switch
                                                 checked={edit.publishedForLive}
-                                                disabled={savingItem === v.id}
+                                                disabled={savingItem === v.id || !hasLiveUrl}
                                                 onCheckedChange={(val) => {
                                                   setVideoEdits((prev) => ({
                                                     ...prev,
@@ -614,17 +622,17 @@ export default function AdminLiveMonthsPage() {
                                             />
                                           </div>
                                           <div className="shrink-0 flex flex-col items-center gap-1 pb-0.5">
-                                            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Published for Live</Label>
-                                            <div className="flex items-center gap-1">
+                                            <Label className={`text-[10px] whitespace-nowrap ${!hasLiveUrl ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}>Published for Live</Label>
+                                            <div className="flex items-center gap-1" title={!hasLiveUrl ? 'Add a live URL first' : undefined}>
                                               {savingItem === d.id
                                                 ? <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
                                                 : edit.publishedForLive
                                                   ? <Eye className="w-3 h-3 text-primary" />
-                                                  : <EyeOff className="w-3 h-3 text-muted-foreground" />
+                                                  : <EyeOff className={`w-3 h-3 ${!hasLiveUrl ? 'text-muted-foreground/30' : 'text-muted-foreground'}`} />
                                               }
                                               <Switch
                                                 checked={edit.publishedForLive}
-                                                disabled={savingItem === d.id}
+                                                disabled={savingItem === d.id || !hasLiveUrl}
                                                 onCheckedChange={(val) => {
                                                   setDocEdits((prev) => ({
                                                     ...prev,
