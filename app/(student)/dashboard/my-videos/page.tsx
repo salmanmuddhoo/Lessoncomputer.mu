@@ -1,11 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { VideoCard } from '@/components/lc/video-card'
+import { VideoPackagesAccordion } from '@/components/lc/video-packages-accordion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import {
-  BookOpen, FileText, Download, FolderOpen,
-  Package, ArrowRight, ShoppingCart, Lock,
+  BookOpen, Package, ArrowRight, ShoppingCart, Lock,
 } from 'lucide-react'
 
 export const metadata = { title: 'My Video Packages' }
@@ -37,13 +36,26 @@ export default async function MyVideoPackagesPage() {
     )
   }
 
-  // All packages for the grade — no package_type filter (resilient if migration 015 not yet applied)
-  const { data: allVideoPackages } = await supabase
+  // Try to query with package_type='video' filter; fall back to all packages if column doesn't exist
+  const SELECT = 'id, name, description, price, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index))'
+
+  const { data: typedPackages, error: typeErr } = await supabase
     .from('subscription_packages')
-    .select('id, name, description, price, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index))')
+    .select(SELECT)
     .eq('grade_id', grade.id)
+    .eq('package_type', 'video')
     .eq('is_active', true)
     .order('name', { ascending: true })
+
+  const allVideoPackages = typeErr
+    ? ((await supabase
+        .from('subscription_packages')
+        .select(SELECT)
+        .eq('grade_id', grade.id)
+        .eq('is_active', true)
+        .order('name', { ascending: true })
+      ).data ?? [])
+    : (typedPackages ?? [])
 
   // All active subscriptions — no subscription_type filter
   const { data: subs } = await supabase
@@ -57,6 +69,13 @@ export default async function MyVideoPackagesPage() {
 
   const subscribedPackages = (allVideoPackages ?? []).filter((p: any) => subscribedPackageIds.has(p.id))
   const availablePackages = (allVideoPackages ?? []).filter((p: any) => !subscribedPackageIds.has(p.id))
+
+  function getChapters(pkg: any) {
+    return (pkg.subscription_package_chapters ?? [])
+      .map((c: any) => c.chapter)
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.order_index - b.order_index)
+  }
 
   // Get chapters for subscribed packages
   const subscribedChapterIds = subscribedPackages.flatMap((p: any) =>
@@ -81,12 +100,13 @@ export default async function MyVideoPackagesPage() {
     }
   }
 
-  function getChapters(pkg: any) {
-    return (pkg.subscription_package_chapters ?? [])
-      .map((c: any) => c.chapter)
-      .filter(Boolean)
-      .sort((a: any, b: any) => a.order_index - b.order_index)
-  }
+  // Shape subscribed packages for the accordion component
+  const accordionPackages = subscribedPackages.map((pkg: any) => ({
+    id: pkg.id,
+    name: pkg.name,
+    description: pkg.description ?? null,
+    chapters: getChapters(pkg),
+  }))
 
   const totalVideos = Object.values(videosByChapter).reduce((s, v) => s + v.length, 0)
   const totalDocs = Object.values(documentsByChapter).reduce((s, v) => s + v.length, 0)
@@ -105,105 +125,18 @@ export default async function MyVideoPackagesPage() {
         </p>
       </div>
 
-      {/* Subscribed packages with content */}
+      {/* Subscribed packages with collapsible content */}
       {subscribedPackages.length > 0 && (
         <section className="mb-10">
           <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
             <Package className="w-4 h-4 text-primary" /> Your Packages
           </h2>
-          <div className="space-y-6">
-            {subscribedPackages.map((pkg: any) => {
-              const chapters = getChapters(pkg)
-              const sub = subsByPackage.get(pkg.id)
-              return (
-                <div key={pkg.id} className="rounded-2xl border border-primary/20 overflow-hidden">
-                  <div className="px-5 py-4 bg-primary/5 border-b border-border/60 flex items-start justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <Package className="w-4 h-4 text-primary shrink-0" />
-                        <h2 className="font-bold">{pkg.name}</h2>
-                      </div>
-                      {pkg.description && (
-                        <p className="text-sm text-muted-foreground mb-1">{pkg.description}</p>
-                      )}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className="text-xs"
-                          style={{ borderColor: `${grade.color}40`, color: grade.color }}
-                        >
-                          {grade.name}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {chapters.length} chapter{chapters.length !== 1 ? 's' : ''}
-                        </span>
-                        {sub?.expires_at && (
-                          <span className="text-xs text-muted-foreground">
-                            · Expires {new Date(sub.expires_at).toLocaleDateString('en-MU', { dateStyle: 'medium' })}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="divide-y divide-border/40">
-                    {chapters.map((ch: any) => {
-                      const chVideos = videosByChapter[ch.id] ?? []
-                      const chDocs = documentsByChapter[ch.id] ?? []
-                      if (chVideos.length === 0 && chDocs.length === 0) return null
-
-                      return (
-                        <div key={ch.id} className="px-5 py-4">
-                          <div className="flex items-center gap-2 mb-4">
-                            <FolderOpen className="w-4 h-4 text-primary shrink-0" />
-                            <h3 className="font-semibold text-sm">{ch.title}</h3>
-                            <span className="text-xs text-muted-foreground ml-auto">
-                              {chVideos.length + chDocs.length} item{(chVideos.length + chDocs.length) !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          {chVideos.length > 0 && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-                              {chVideos.map((v: any) => <VideoCard key={v.id} video={v} />)}
-                            </div>
-                          )}
-                          {chDocs.length > 0 && (
-                            <div className="space-y-2">
-                              {chDocs.map((doc: any) => (
-                                <a
-                                  key={doc.id}
-                                  href={doc.file_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:bg-muted/30 transition-colors group"
-                                >
-                                  <FileText className="w-5 h-5 text-primary shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-sm truncate">{doc.title}</p>
-                                    {doc.description && (
-                                      <p className="text-xs text-muted-foreground truncate">{doc.description}</p>
-                                    )}
-                                  </div>
-                                  <Download className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                    {chapters.every((ch: any) =>
-                      (videosByChapter[ch.id]?.length ?? 0) === 0 &&
-                      (documentsByChapter[ch.id]?.length ?? 0) === 0
-                    ) && (
-                      <div className="px-5 py-6 text-center">
-                        <p className="text-sm text-muted-foreground">No content published in this package yet.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <VideoPackagesAccordion
+            packages={accordionPackages}
+            videosByChapter={videosByChapter}
+            documentsByChapter={documentsByChapter}
+            grade={grade}
+          />
         </section>
       )}
 
