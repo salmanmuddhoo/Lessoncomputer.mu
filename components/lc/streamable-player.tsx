@@ -22,7 +22,7 @@ export function StreamablePlayer({ url, title }: StreamablePlayerProps) {
   }
 
   return (
-    <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border/40 lc-glow">
+    <div className="aspect-video w-full bg-black">
       <iframe
         src={`https://streamable.com/e/${videoId}?autoplay=0`}
         title={title ?? 'Video lesson'}
