@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { StreamablePlayer } from '@/components/lc/streamable-player'
 import { VideoDescription } from '@/components/lc/video-description'
+import { VideoPlaylist, type PlaylistPackage } from '@/components/lc/video-playlist'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Clock, ArrowLeft, Lock, BookOpen, Package, Play } from 'lucide-react'
+import { Clock, ArrowLeft, Lock, BookOpen, Package } from 'lucide-react'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -68,18 +69,19 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
   const { data: { user } } = await supabase.auth.getUser()
 
   let hasAccess = video.is_free || video.is_demo
+  let pkgIds: string[] = []
 
-  if (!hasAccess && user && video.chapter_id) {
+  if (user && video.chapter_id) {
     const { data: subs } = await supabase
       .from('student_subscriptions')
-      .select('package_id')
+      .select('package_id, package:subscription_packages(package_type)')
       .eq('student_id', user.id)
       .eq('status', 'active')
       .not('package_id', 'is', null)
 
-    const pkgIds = (subs ?? []).map((s: any) => s.package_id).filter(Boolean)
+    pkgIds = (subs ?? []).map((s: any) => s.package_id).filter(Boolean)
 
-    if (pkgIds.length > 0) {
+    if (!hasAccess && pkgIds.length > 0) {
       const { data: link } = await supabase
         .from('subscription_package_chapters')
         .select('package_id')
@@ -92,19 +94,74 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
     }
   }
 
-  // Fetch related videos from same chapter
-  const relatedVideos: any[] = []
-  if (video.chapter_id) {
+  // Build playlist for authenticated users with subscriptions
+  let playlistData: PlaylistPackage[] = []
+  if (user && pkgIds.length > 0) {
     const publishedField = isLiveContext ? 'is_published_for_live' : 'is_published'
-    const { data: related } = await supabase
-      .from('videos')
-      .select('id, title, duration_minutes, streamable_url')
-      .eq('chapter_id', video.chapter_id)
-      .eq(publishedField as any, true)
-      .neq('id', id)
-      .order('created_at', { ascending: true })
-      .limit(20)
-    if (related) relatedVideos.push(...related)
+    const pkgType = isLiveContext ? 'live_month' : 'video'
+
+    const { data: packages } = await supabase
+      .from('subscription_packages')
+      .select('id, name, package_type, month, year')
+      .in('id', pkgIds)
+      .eq('package_type', pkgType)
+      .order('year', { ascending: true })
+      .order('month', { ascending: true, nullsFirst: false })
+
+    if (packages && packages.length > 0) {
+      const relevantPkgIds = packages.map((p: any) => p.id)
+
+      const { data: pkgChaptersData } = await supabase
+        .from('subscription_package_chapters')
+        .select('package_id, chapter:chapters(id, title, order_index)')
+        .in('package_id', relevantPkgIds)
+
+      const pkgChapters = pkgChaptersData ?? []
+      const chapterIds = pkgChapters
+        .map((pc: any) => (pc.chapter as any)?.id)
+        .filter(Boolean)
+
+      let allVideos: any[] = []
+      if (chapterIds.length > 0) {
+        const { data: vids } = await supabase
+          .from('videos')
+          .select('id, title, duration_minutes, chapter_id')
+          .in('chapter_id', chapterIds)
+          .eq(publishedField as any, true)
+          .order('created_at', { ascending: true })
+        allVideos = vids ?? []
+      }
+
+      playlistData = packages
+        .map((pkg: any) => {
+          const chapterLinks = pkgChapters
+            .filter((pc: any) => pc.package_id === pkg.id)
+            .map((pc: any) => pc.chapter as any)
+            .filter(Boolean)
+
+          const chapters = chapterLinks
+            .map((ch: any) => ({
+              id: ch.id,
+              title: ch.title,
+              order_index: ch.order_index ?? 0,
+              videos: allVideos
+                .filter(v => v.chapter_id === ch.id)
+                .map(v => ({ id: v.id, title: v.title, duration_minutes: v.duration_minutes })),
+            }))
+            .filter((ch: any) => ch.videos.length > 0)
+            .sort((a: any, b: any) => a.order_index - b.order_index)
+
+          return {
+            id: pkg.id,
+            name: pkg.name,
+            package_type: pkg.package_type,
+            month: pkg.month ?? null,
+            year: pkg.year ?? null,
+            chapters,
+          }
+        })
+        .filter((pkg: any) => pkg.chapters.length > 0)
+    }
   }
 
   const grade = video.grade as { name: string; color: string; slug: string } | null
@@ -210,88 +267,33 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
               </div>
             )}
 
-            {/* Mobile: related videos below description */}
-            {relatedVideos.length > 0 && (
-              <div className="lg:hidden mt-6">
-                <h2 className="text-sm font-semibold mb-3 uppercase tracking-wide text-muted-foreground">
-                  Up next
-                </h2>
-                <div className="space-y-2">
-                  {relatedVideos.map((v) => (
-                    <RelatedVideoCard
-                      key={v.id}
-                      video={v}
-                      gradeColor={grade?.color}
-                      isLiveContext={isLiveContext}
-                    />
-                  ))}
-                </div>
+            {/* Mobile: playlist below description */}
+            {playlistData.length > 0 && (
+              <div className="lg:hidden">
+                <VideoPlaylist
+                  playlist={playlistData}
+                  currentVideoId={id}
+                  isLiveContext={isLiveContext}
+                  gradeColor={grade?.color}
+                />
               </div>
             )}
           </div>
 
-          {/* ── Right: related videos sidebar (desktop only) ── */}
-          {relatedVideos.length > 0 && (
-            <div className="hidden lg:block w-[360px] shrink-0">
-              <h2 className="text-sm font-semibold mb-3 uppercase tracking-wide text-muted-foreground">
-                Up next
-              </h2>
-              <div className="space-y-2">
-                {relatedVideos.map((v) => (
-                  <RelatedVideoCard
-                    key={v.id}
-                    video={v}
-                    gradeColor={grade?.color}
-                    isLiveContext={isLiveContext}
-                  />
-                ))}
-              </div>
+          {/* ── Right: playlist sidebar (desktop only) ── */}
+          {playlistData.length > 0 && (
+            <div className="hidden lg:block">
+              <VideoPlaylist
+                playlist={playlistData}
+                currentVideoId={id}
+                isLiveContext={isLiveContext}
+                gradeColor={grade?.color}
+              />
             </div>
           )}
 
         </div>
       </div>
     </div>
-  )
-}
-
-function RelatedVideoCard({
-  video,
-  gradeColor,
-  isLiveContext,
-}: {
-  video: { id: string; title: string; duration_minutes: number | null }
-  gradeColor?: string
-  isLiveContext: boolean
-}) {
-  const href = `/videos/${video.id}${isLiveContext ? '?live=1' : ''}`
-  return (
-    <Link
-      href={href}
-      className="flex gap-3 p-2 rounded-xl hover:bg-muted/50 transition-colors group"
-    >
-      {/* Thumbnail placeholder */}
-      <div
-        className="w-40 aspect-video rounded-lg shrink-0 flex items-center justify-center relative overflow-hidden"
-        style={{ backgroundColor: gradeColor ? `${gradeColor}20` : undefined }}
-      >
-        <div className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center group-hover:bg-primary/80 transition-colors">
-          <Play className="w-4 h-4 text-white fill-white ml-0.5" />
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0 py-0.5">
-        <p className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-          {video.title}
-        </p>
-        {video.duration_minutes && (
-          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {video.duration_minutes} min
-          </p>
-        )}
-      </div>
-    </Link>
   )
 }
