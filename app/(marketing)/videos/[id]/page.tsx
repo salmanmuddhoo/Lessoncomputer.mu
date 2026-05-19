@@ -3,9 +3,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { StreamablePlayer } from '@/components/lc/streamable-player'
+import { VideoDescription } from '@/components/lc/video-description'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Clock, ArrowLeft, Lock, BookOpen, Package } from 'lucide-react'
+import { Clock, ArrowLeft, Lock, BookOpen, Package, Play } from 'lucide-react'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -43,7 +44,6 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
   const isLiveContext = live === '1'
   const supabase = await createClient()
 
-  // In live context, accept videos published for live OR for regular packages
   let video: any = null
   if (isLiveContext) {
     const { data } = await supabase
@@ -69,9 +69,7 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
 
   let hasAccess = video.is_free || video.is_demo
 
-  // Check subscription access for paid videos with a chapter
   if (!hasAccess && user && video.chapter_id) {
-    // Step 1: get the student's active subscribed package IDs (student can always read own rows)
     const { data: subs } = await supabase
       .from('student_subscriptions')
       .select('package_id')
@@ -81,7 +79,6 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
 
     const pkgIds = (subs ?? []).map((s: any) => s.package_id).filter(Boolean)
 
-    // Step 2: check if this chapter belongs to any of the student's packages
     if (pkgIds.length > 0) {
       const { data: link } = await supabase
         .from('subscription_package_chapters')
@@ -95,117 +92,206 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
     }
   }
 
+  // Fetch related videos from same chapter
+  const relatedVideos: any[] = []
+  if (video.chapter_id) {
+    const publishedField = isLiveContext ? 'is_published_for_live' : 'is_published'
+    const { data: related } = await supabase
+      .from('videos')
+      .select('id, title, duration_minutes, streamable_url')
+      .eq('chapter_id', video.chapter_id)
+      .eq(publishedField as any, true)
+      .neq('id', id)
+      .order('created_at', { ascending: true })
+      .limit(20)
+    if (related) relatedVideos.push(...related)
+  }
+
   const grade = video.grade as { name: string; color: string; slug: string } | null
   const chapter = video.chapter as { title: string } | null
   const playerUrl = (isLiveContext && video.streamable_url_live) ? video.streamable_url_live : video.streamable_url
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-5 flex-wrap">
-        {grade ? (
-          <>
-            <Link href={`/grades/${grade.slug}`} className="hover:text-primary transition-colors">
-              {grade.name}
-            </Link>
-            {chapter && (
-              <>
-                <span>/</span>
-                <span>{chapter.title}</span>
-              </>
-            )}
-            <span>/</span>
-            <span className="text-foreground truncate max-w-[200px]">{video.title}</span>
-          </>
-        ) : (
-          <Link href="/" className="hover:text-primary transition-colors flex items-center gap-1">
-            <ArrowLeft className="w-3.5 h-3.5" /> Home
-          </Link>
-        )}
-      </nav>
+    <div className="min-h-screen bg-background">
+      {/* Back nav */}
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-2 max-w-screen-2xl mx-auto">
+        <Link
+          href={grade ? `/grades/${grade.slug}` : '/'}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          {grade ? `Back to ${grade.name}` : 'Back'}
+        </Link>
+      </div>
 
-      {/* Player or paywall */}
-      {hasAccess ? (
-        <StreamablePlayer url={playerUrl} title={video.title} />
-      ) : (
-        <div className="aspect-video rounded-xl bg-secondary/50 border border-border/60 flex flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-            <Lock className="w-7 h-7 text-primary" />
-          </div>
-          <div>
-            <h3 className="font-semibold mb-1">Subscription required</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              {chapter
-                ? `Subscribe to a package that includes "${chapter.title}" to watch this video.`
-                : 'Subscribe to a package for this grade to watch this video.'}
-            </p>
-            {user ? (
-              grade && (
-                <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
-                  <Link href={`/grades/${grade.slug}`}>
-                    <Package className="w-4 h-4 mr-2" />
-                    View Subscription Packages
-                  </Link>
-                </Button>
-              )
+      {/* Main YouTube-style layout */}
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
+        <div className="flex flex-col lg:flex-row gap-6">
+
+          {/* ── Left: player + info ── */}
+          <div className="flex-1 min-w-0">
+
+            {/* Player */}
+            {hasAccess ? (
+              <div className="w-full rounded-xl overflow-hidden bg-black shadow-lg">
+                <StreamablePlayer url={playerUrl} title={video.title} />
+              </div>
             ) : (
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button variant="outline" asChild>
-                  <Link href={`/login?redirectTo=/videos/${video.id}`}>Log in</Link>
-                </Button>
-                <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
-                  <Link href="/register">Create Account</Link>
-                </Button>
+              <div className="aspect-video rounded-xl bg-zinc-900 border border-border/40 flex flex-col items-center justify-center gap-4 px-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <Lock className="w-8 h-8 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white mb-1">Subscription required</h3>
+                  <p className="text-sm text-zinc-400 mb-4">
+                    {chapter
+                      ? `Subscribe to a package that includes "${chapter.title}" to watch this video.`
+                      : 'Subscribe to a package for this grade to watch this video.'}
+                  </p>
+                  {user ? (
+                    grade && (
+                      <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
+                        <Link href={`/grades/${grade.slug}`}>
+                          <Package className="w-4 h-4 mr-2" />
+                          View Subscription Packages
+                        </Link>
+                      </Button>
+                    )
+                  ) : (
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <Button variant="outline" asChild className="border-zinc-600 text-white hover:bg-zinc-800">
+                        <Link href={`/login?redirectTo=/videos/${video.id}`}>Log in</Link>
+                      </Button>
+                      <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
+                        <Link href="/register">Create Account</Link>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Title */}
+            <div className="mt-4">
+              <h1 className="text-lg sm:text-xl font-bold leading-snug">{video.title}</h1>
+
+              {/* Meta row */}
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                {grade && (
+                  <Badge
+                    variant="outline"
+                    style={{ borderColor: `${grade.color}40`, color: grade.color, backgroundColor: `${grade.color}10` }}
+                  >
+                    {grade.name}
+                  </Badge>
+                )}
+                {chapter && (
+                  <Badge variant="secondary" className="gap-1 text-xs">
+                    <BookOpen className="w-3 h-3" />
+                    {chapter.title}
+                  </Badge>
+                )}
+                {video.duration_minutes && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5" />
+                    {video.duration_minutes} min
+                  </span>
+                )}
+                {video.is_free && (
+                  <Badge className="bg-primary/10 text-primary border-primary/20 text-xs" variant="outline">Free</Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Description box */}
+            {video.description && (
+              <div className="mt-4 p-4 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+                <VideoDescription description={video.description} />
+              </div>
+            )}
+
+            {/* Mobile: related videos below description */}
+            {relatedVideos.length > 0 && (
+              <div className="lg:hidden mt-6">
+                <h2 className="text-sm font-semibold mb-3 uppercase tracking-wide text-muted-foreground">
+                  Up next
+                </h2>
+                <div className="space-y-2">
+                  {relatedVideos.map((v) => (
+                    <RelatedVideoCard
+                      key={v.id}
+                      video={v}
+                      gradeColor={grade?.color}
+                      isLiveContext={isLiveContext}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
+
+          {/* ── Right: related videos sidebar (desktop only) ── */}
+          {relatedVideos.length > 0 && (
+            <div className="hidden lg:block w-[360px] shrink-0">
+              <h2 className="text-sm font-semibold mb-3 uppercase tracking-wide text-muted-foreground">
+                Up next
+              </h2>
+              <div className="space-y-2">
+                {relatedVideos.map((v) => (
+                  <RelatedVideoCard
+                    key={v.id}
+                    video={v}
+                    gradeColor={grade?.color}
+                    isLiveContext={isLiveContext}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
-      )}
-
-      {/* Info */}
-      <div className="mt-6">
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <h1 className="text-lg sm:text-xl font-bold flex-1 leading-snug">{video.title}</h1>
-          {video.is_free && (
-            <Badge className="bg-primary/10 text-primary border-primary/20 shrink-0" variant="outline">Free</Badge>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mb-4">
-          {grade && (
-            <Badge variant="outline" style={{ borderColor: `${grade.color}40`, color: grade.color }}>
-              {grade.name}
-            </Badge>
-          )}
-          {chapter && (
-            <Badge variant="secondary" className="gap-1">
-              <BookOpen className="w-3 h-3" />
-              {chapter.title}
-            </Badge>
-          )}
-          {video.duration_minutes && (
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              {video.duration_minutes} min
-            </span>
-          )}
-        </div>
-
-        {video.description && (
-          <p className="text-muted-foreground leading-relaxed text-sm sm:text-base">{video.description}</p>
-        )}
-
-        {grade && (
-          <div className="mt-6 pt-6 border-t border-border/40">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/grades/${grade.slug}`}>
-                <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-                More {grade.name} lessons
-              </Link>
-            </Button>
-          </div>
-        )}
       </div>
     </div>
+  )
+}
+
+function RelatedVideoCard({
+  video,
+  gradeColor,
+  isLiveContext,
+}: {
+  video: { id: string; title: string; duration_minutes: number | null }
+  gradeColor?: string
+  isLiveContext: boolean
+}) {
+  const href = `/videos/${video.id}${isLiveContext ? '?live=1' : ''}`
+  return (
+    <Link
+      href={href}
+      className="flex gap-3 p-2 rounded-xl hover:bg-muted/50 transition-colors group"
+    >
+      {/* Thumbnail placeholder */}
+      <div
+        className="w-40 aspect-video rounded-lg shrink-0 flex items-center justify-center relative overflow-hidden"
+        style={{ backgroundColor: gradeColor ? `${gradeColor}20` : undefined }}
+      >
+        <div className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center group-hover:bg-primary/80 transition-colors">
+          <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0 py-0.5">
+        <p className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+          {video.title}
+        </p>
+        {video.duration_minutes && (
+          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {video.duration_minutes} min
+          </p>
+        )}
+      </div>
+    </Link>
   )
 }
