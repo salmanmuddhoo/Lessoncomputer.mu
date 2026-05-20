@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Video, Users, BookOpen,
-  LogOut, Settings, ChevronRight, Radio, Menu, X, Package, CalendarDays,
+  LogOut, Settings, ChevronRight, ChevronDown, Radio, Menu, X, Package, CalendarDays,
+  BarChart2, ClipboardList,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { createClient } from '@/lib/supabase/client'
@@ -22,9 +23,14 @@ const NAV_ITEMS = [
   { label: 'Live Months',   href: '/admin/live-months',  icon: CalendarDays },
 ]
 
+const REPORT_ITEMS = [
+  { label: 'Attendance', href: '/admin/reports/attendance', icon: ClipboardList },
+]
+
 function NavContent({ onNav }: { onNav?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [reportsOpen, setReportsOpen] = useState(() => pathname.startsWith('/admin/reports'))
 
   function isActive(href: string, exact?: boolean) {
     if (exact) return pathname === href
@@ -60,6 +66,47 @@ function NavContent({ onNav }: { onNav?: () => void }) {
             )}
           </Link>
         ))}
+
+        {/* Reports group */}
+        <div>
+          <button
+            onClick={() => setReportsOpen((o) => !o)}
+            className={cn(
+              'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+              isActive('/admin/reports')
+                ? 'bg-primary/10 text-primary'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent'
+            )}
+          >
+            <BarChart2 className="w-4 h-4 shrink-0" />
+            Reports
+            {reportsOpen
+              ? <ChevronDown className="w-3 h-3 ml-auto" />
+              : <ChevronRight className="w-3 h-3 ml-auto" />
+            }
+          </button>
+          {reportsOpen && (
+            <div className="ml-5 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-3">
+              {REPORT_ITEMS.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNav}
+                  className={cn(
+                    'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors',
+                    isActive(item.href)
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                  )}
+                >
+                  <item.icon className="w-3.5 h-3.5 shrink-0" />
+                  {item.label}
+                  {isActive(item.href) && <ChevronRight className="w-3 h-3 ml-auto" />}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </nav>
 
       <div className="p-3 border-t border-sidebar-border space-y-0.5">
