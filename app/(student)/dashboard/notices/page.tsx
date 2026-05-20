@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import { Megaphone, Users, Radio, Video, Inbox } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
-export const metadata: Metadata = { title: 'Notices' }
+export const metadata: Metadata = { title: 'Messages' }
 
 const AUDIENCE_META: Record<string, { label: string; icon: React.ElementType; className: string }> = {
   all:   { label: 'All Students',        icon: Users,  className: 'bg-primary/10 text-primary border-primary/20' },
@@ -67,7 +67,7 @@ export default async function StudentNoticesPage() {
     <div>
       <div className="mb-6 flex items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Notices</h1>
+          <h1 className="text-2xl font-bold">Messages</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
             Homework, announcements and messages from your teacher
           </p>

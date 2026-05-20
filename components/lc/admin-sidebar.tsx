@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { label: 'Students',       href: '/admin/students',       icon: Users },
   { label: 'Subscriptions', href: '/admin/subscriptions', icon: Package },
   { label: 'Live Months',   href: '/admin/live-months',  icon: CalendarDays },
-  { label: 'Notices',       href: '/admin/broadcasts',    icon: Megaphone },
+  { label: 'Messages',      href: '/admin/broadcasts',    icon: Megaphone },
 ]
 
 const REPORT_ITEMS = [
