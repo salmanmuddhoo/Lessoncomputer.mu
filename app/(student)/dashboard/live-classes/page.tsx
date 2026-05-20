@@ -4,10 +4,11 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import {
-  Radio, ExternalLink, Calendar, ArrowRight, BookOpen,
+  Radio, Calendar, ArrowRight, BookOpen,
 } from 'lucide-react'
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { LiveMonthsList } from '@/components/lc/live-months-list'
+import { JoinLiveClassButton } from '@/components/lc/join-live-class-button'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Live Classes' }
@@ -192,15 +193,15 @@ export default async function StudentLiveClassesPage() {
           </div>
           {isSubscribedCurrentMonth ? (
             currentLiveClass?.meet_url ? (
-              <a
-                href={currentLiveClass.meet_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-accent text-sm font-semibold transition-colors shrink-0"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Join Live Class
-              </a>
+              <JoinLiveClassButton
+                liveClassId={currentLiveClass.id}
+                meetUrl={currentLiveClass.meet_url}
+                gradeId={grade.id}
+                scheduledAt={currentLiveClass.scheduled_at}
+                endTime={currentLiveClass.end_time ?? null}
+                isRecurring={currentLiveClass.is_recurring ?? false}
+                recurrenceDayOfWeek={currentLiveClass.recurrence_day_of_week ?? null}
+              />
             ) : (
               <Badge variant="secondary" className="shrink-0">Link coming soon</Badge>
             )
