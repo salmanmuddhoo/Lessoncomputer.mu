@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { StudentSidebar } from '@/components/lc/student-sidebar'
+import { WhatsAppButton } from '@/components/lc/whatsapp-button'
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -8,7 +9,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
   if (!user) redirect('/login')
 
-  const [{ data: profile }, { data: subs }] = await Promise.all([
+  const [{ data: profile }, { data: subs }, { data: siteSettingsRaw }] = await Promise.all([
     supabase
       .from('profiles')
       .select('role, full_name, grade:grades(name)')
@@ -19,12 +20,18 @@ export default async function StudentLayout({ children }: { children: React.Reac
       .select('package:subscription_packages(package_type)')
       .eq('student_id', user.id)
       .eq('status', 'active'),
+    (supabase as any)
+      .from('site_settings')
+      .select('whatsapp_number')
+      .eq('id', 1)
+      .single(),
   ])
 
   // Redirect admins to the admin panel
   if (profile?.role === 'admin') redirect('/admin')
 
   const gradeName = (profile?.grade as { name: string } | null)?.name ?? null
+  const whatsappNumber = (siteSettingsRaw as any)?.whatsapp_number ?? null
 
   const hasLiveSubscription = (subs ?? []).some(
     (s: any) => s.package?.package_type === 'live_month'
@@ -46,6 +53,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
           {children}
         </div>
       </main>
+      {whatsappNumber && <WhatsAppButton phoneNumber={whatsappNumber} />}
     </div>
   )
 }
