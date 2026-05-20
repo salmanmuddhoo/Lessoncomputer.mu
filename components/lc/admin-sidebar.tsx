@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Video, Users, BookOpen,
   LogOut, Settings, ChevronRight, ChevronDown, Radio, Menu, X, Package, CalendarDays,
-  BarChart2, ClipboardList,
+  BarChart2, ClipboardList, Megaphone,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { createClient } from '@/lib/supabase/client'
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { label: 'Students',       href: '/admin/students',       icon: Users },
   { label: 'Subscriptions', href: '/admin/subscriptions', icon: Package },
   { label: 'Live Months',   href: '/admin/live-months',  icon: CalendarDays },
+  { label: 'Notices',       href: '/admin/broadcasts',    icon: Megaphone },
 ]
 
 const REPORT_ITEMS = [
