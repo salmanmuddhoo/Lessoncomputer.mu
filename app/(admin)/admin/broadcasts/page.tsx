@@ -116,7 +116,7 @@ export default function AdminBroadcastsPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold">Notices &amp; Homework</h1>
+          <h1 className="text-2xl font-bold">Messages</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
             Send homework, reminders, or announcements to students by grade
           </p>

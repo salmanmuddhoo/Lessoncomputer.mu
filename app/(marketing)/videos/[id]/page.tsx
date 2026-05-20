@@ -173,11 +173,11 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
       {/* Back nav */}
       <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-2 max-w-screen-2xl mx-auto">
         <Link
-          href={grade ? `/grades/${grade.slug}` : '/'}
+          href={user ? '/dashboard' : (grade ? `/grades/${grade.slug}` : '/')}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          {grade ? `Back to ${grade.name}` : 'Back'}
+          {user ? 'Back to Dashboard' : (grade ? `Back to ${grade.name}` : 'Back')}
         </Link>
       </div>
 
