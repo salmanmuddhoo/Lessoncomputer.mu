@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Loader2, CalendarDays, Settings2, Video, FileText,
-  Eye, EyeOff, FolderOpen, ChevronDown, ChevronUp, Pencil, Radio, Clock,
+  Eye, EyeOff, FolderOpen, ChevronDown, ChevronUp, Pencil, Radio, Clock, GitMerge, CheckCheck,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -34,6 +34,7 @@ interface VideoItem {
   id: string
   title: string
   chapter_id: string
+  streamable_url: string | null
   streamable_url_live: string | null
   is_published_for_live: boolean
   is_published: boolean
@@ -44,6 +45,7 @@ interface DocItem {
   id: string
   title: string
   chapter_id: string
+  file_url: string | null
   file_url_live: string | null
   is_published_for_live: boolean
   is_published: boolean
@@ -64,6 +66,7 @@ export default function AdminLiveMonthsPage() {
   const [videoEdits, setVideoEdits] = useState<Record<string, { url: string; publishedForLive: boolean }>>({})
   const [docEdits, setDocEdits] = useState<Record<string, { url: string; publishedForLive: boolean }>>({})
   const [savingItem, setSavingItem] = useState<string | null>(null)
+  const [mergingChapter, setMergingChapter] = useState<string | null>(null)
 
   // Collapse state for months and chapters
   const [openMonths, setOpenMonths] = useState<Set<number>>(new Set())
@@ -126,11 +129,11 @@ export default function AdminLiveMonthsPage() {
     if (allChapterIds.length > 0) {
       const [{ data: vids, error: vErr }, { data: docs, error: dErr }] = await Promise.all([
         supabase.from('videos')
-          .select('id,title,chapter_id,streamable_url_live,is_published_for_live,is_published,duration_minutes')
+          .select('id,title,chapter_id,streamable_url,streamable_url_live,is_published_for_live,is_published,duration_minutes')
           .in('chapter_id', allChapterIds)
           .order('created_at', { ascending: false }),
         supabase.from('documents')
-          .select('id,title,chapter_id,file_url_live,is_published_for_live,is_published,file_name')
+          .select('id,title,chapter_id,file_url,file_url_live,is_published_for_live,is_published,file_name')
           .in('chapter_id', allChapterIds)
           .order('created_at', { ascending: false }),
       ])
@@ -138,22 +141,24 @@ export default function AdminLiveMonthsPage() {
       // If extended columns don't exist yet (migration not applied), fall back to base columns
       const [{ data: vidsBase }, { data: docsBase }] = vErr || dErr ? await Promise.all([
         supabase.from('videos')
-          .select('id,title,chapter_id,is_published,duration_minutes')
+          .select('id,title,chapter_id,streamable_url,is_published,duration_minutes')
           .in('chapter_id', allChapterIds)
           .order('created_at', { ascending: false }),
         supabase.from('documents')
-          .select('id,title,chapter_id,is_published,file_name')
+          .select('id,title,chapter_id,file_url,is_published,file_name')
           .in('chapter_id', allChapterIds)
           .order('created_at', { ascending: false }),
       ]) : [{ data: null }, { data: null }]
 
       const videos = ((vErr ? vidsBase : vids) ?? []).map((v: any) => ({
         ...v,
+        streamable_url: v.streamable_url ?? null,
         streamable_url_live: v.streamable_url_live ?? null,
         is_published_for_live: v.is_published_for_live ?? false,
       })) as VideoItem[]
       const documents = ((dErr ? docsBase : docs) ?? []).map((d: any) => ({
         ...d,
+        file_url: d.file_url ?? null,
         file_url_live: d.file_url_live ?? null,
         is_published_for_live: d.is_published_for_live ?? false,
       })) as DocItem[]
@@ -349,6 +354,53 @@ export default function AdminLiveMonthsPage() {
     setSavingItem(null)
   }
 
+  async function mergeChapterUrls(chapterId: string) {
+    setMergingChapter(chapterId)
+
+    const chVideos = allVideos.filter(
+      (v) => v.chapter_id === chapterId && v.streamable_url && v.streamable_url_live
+    )
+    const chDocs = allDocs.filter(
+      (d) => d.chapter_id === chapterId && d.file_url && d.file_url_live
+    )
+
+    const errors: string[] = []
+
+    await Promise.all([
+      ...chVideos.map(async (v) => {
+        const { error } = await supabase.from('videos')
+          .update({ streamable_url: v.streamable_url_live } as any)
+          .eq('id', v.id)
+        if (error) errors.push(error.message)
+        else {
+          setAllVideos((prev) =>
+            prev.map((x) => x.id === v.id ? { ...x, streamable_url: v.streamable_url_live } : x)
+          )
+        }
+      }),
+      ...chDocs.map(async (d) => {
+        const { error } = await supabase.from('documents')
+          .update({ file_url: d.file_url_live } as any)
+          .eq('id', d.id)
+        if (error) errors.push(error.message)
+        else {
+          setAllDocs((prev) =>
+            prev.map((x) => x.id === d.id ? { ...x, file_url: d.file_url_live } : x)
+          )
+        }
+      }),
+    ])
+
+    if (errors.length > 0) {
+      toast.error(`Merge failed for ${errors.length} item(s)`)
+    } else {
+      const count = chVideos.length + chDocs.length
+      toast.success(`Merged ${count} item${count !== 1 ? 's' : ''} — Video Package URL now matches Live Classes URL`)
+    }
+
+    setMergingChapter(null)
+  }
+
   return (
     <div>
       {/* Header */}
@@ -461,20 +513,54 @@ export default function AdminLiveMonthsPage() {
 
                       return (
                         <div key={ch.id}>
-                          <button
-                            onClick={() => toggleChapterOpen(chKey)}
-                            className="w-full flex items-center gap-2 px-5 py-2.5 bg-muted/10 hover:bg-muted/30 transition-colors text-left"
-                          >
-                            <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
-                            <span className="text-sm font-semibold flex-1">{ch.title}</span>
-                            <span className="text-xs text-muted-foreground mr-2">
-                              {total} item{total !== 1 ? 's' : ''}
-                            </span>
-                            {isChOpen
-                              ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                              : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                            }
-                          </button>
+                          {(() => {
+                            const mergeableVideos = chVideos.filter((v) => v.streamable_url && v.streamable_url_live)
+                            const mergeableDocs = chDocs.filter((d) => d.file_url && d.file_url_live)
+                            const mergeableCount = mergeableVideos.length + mergeableDocs.length
+                            const isMergingThis = mergingChapter === ch.id
+                            return (
+                              <div className="w-full flex items-center gap-2 px-5 py-2.5 bg-muted/10 border-b border-border/20">
+                                <button
+                                  onClick={() => toggleChapterOpen(chKey)}
+                                  className="flex items-center gap-2 flex-1 text-left min-w-0"
+                                >
+                                  <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
+                                  <span className="text-sm font-semibold truncate">{ch.title}</span>
+                                  <span className="text-xs text-muted-foreground shrink-0 ml-1">
+                                    {total} item{total !== 1 ? 's' : ''}
+                                  </span>
+                                </button>
+
+                                {mergeableCount > 0 && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isMergingThis}
+                                    onClick={() => mergeChapterUrls(ch.id)}
+                                    className="shrink-0 h-7 text-xs gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/20"
+                                    title={`Copy Live Classes URL → Video Package URL for ${mergeableCount} item${mergeableCount !== 1 ? 's' : ''}`}
+                                  >
+                                    {isMergingThis
+                                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                                      : <GitMerge className="w-3 h-3" />
+                                    }
+                                    Merge URLs
+                                    <span className="ml-0.5 text-[10px] opacity-70">({mergeableCount})</span>
+                                  </Button>
+                                )}
+
+                                <button
+                                  onClick={() => toggleChapterOpen(chKey)}
+                                  className="p-1 rounded hover:bg-muted/40 transition-colors shrink-0"
+                                >
+                                  {isChOpen
+                                    ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+                                    : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                                  }
+                                </button>
+                              </div>
+                            )
+                          })()}
 
                           {isChOpen && (
                             <div className="divide-y divide-border/20">
@@ -489,6 +575,7 @@ export default function AdminLiveMonthsPage() {
                                     const detectedId = edit.url ? extractStreamableId(edit.url) : null
                                     // Show badge when either the DB has a URL or the current input has one
                                     const hasLiveUrl = !!(detectedId || v.streamable_url_live)
+                                    const isMerged = !!(v.streamable_url && v.streamable_url_live && v.streamable_url === v.streamable_url_live)
 
                                     return (
                                       <div key={v.id} className="px-5 py-3 space-y-2">
@@ -498,6 +585,12 @@ export default function AdminLiveMonthsPage() {
                                             <Video className="w-2.5 h-2.5" /> Video
                                           </Badge>
                                           <span className="font-medium text-sm flex-1 min-w-0 truncate">{v.title}</span>
+
+                                          {isMerged && (
+                                            <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 shrink-0 text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400">
+                                              <CheckCheck className="w-2.5 h-2.5" /> Merged
+                                            </Badge>
+                                          )}
 
                                           {hasLiveUrl && (
                                             <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 shrink-0 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400">
@@ -575,6 +668,7 @@ export default function AdminLiveMonthsPage() {
                                   {chDocs.map((d) => {
                                     const edit = docEdits[d.id] ?? { url: d.file_url_live ?? '', publishedForLive: d.is_published_for_live }
                                     const hasLiveUrl = !!(edit.url || d.file_url_live)
+                                    const isMerged = !!(d.file_url && d.file_url_live && d.file_url === d.file_url_live)
                                     return (
                                       <div key={d.id} className="px-5 py-3 space-y-2">
                                         {/* Title row */}
@@ -583,6 +677,12 @@ export default function AdminLiveMonthsPage() {
                                             <FileText className="w-2.5 h-2.5" /> PDF
                                           </Badge>
                                           <span className="font-medium text-sm flex-1 min-w-0 truncate">{d.title}</span>
+
+                                          {isMerged && (
+                                            <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 shrink-0 text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400">
+                                              <CheckCheck className="w-2.5 h-2.5" /> Merged
+                                            </Badge>
+                                          )}
 
                                           {hasLiveUrl && (
                                             <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 shrink-0 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400">
