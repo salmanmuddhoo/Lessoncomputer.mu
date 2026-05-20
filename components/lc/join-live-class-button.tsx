@@ -83,8 +83,13 @@ export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt
             },
             { onConflict: 'live_class_id,student_id' }
           )
-        if (error) toast.error('Could not record attendance')
+        if (error) {
+          // Non-blocking: still open the meeting URL, but surface the real reason
+          toast.warning(`Attendance not recorded: ${error.message}`)
+        }
       }
+    } catch (err: any) {
+      toast.warning(`Attendance not recorded: ${err?.message ?? 'unknown error'}`)
     } finally {
       setLoading(false)
       window.open(meetUrl, '_blank', 'noopener,noreferrer')
