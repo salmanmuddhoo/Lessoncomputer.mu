@@ -1,44 +1,42 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Loader2, Clock } from 'lucide-react'
+import { CheckCircle2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Props {
-  sessionId: string
-  closesAt: string
+  liveClassId: string
+  gradeId: string
   alreadyMarked: boolean
   userId: string
 }
 
-export function AttendanceMarkButton({ sessionId, closesAt, alreadyMarked, userId }: Props) {
+export function AttendanceMarkButton({ liveClassId, gradeId, alreadyMarked, userId }: Props) {
   const [marked, setMarked] = useState(alreadyMarked)
   const [loading, setLoading] = useState(false)
-  const [secondsLeft, setSecondsLeft] = useState(() =>
-    Math.max(0, Math.floor((new Date(closesAt).getTime() - Date.now()) / 1000))
-  )
-
-  useEffect(() => {
-    if (secondsLeft <= 0) return
-    const interval = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) { clearInterval(interval); return 0 }
-        return s - 1
-      })
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
 
   async function handleMark() {
     setLoading(true)
     const supabase = createClient()
+    const now = new Date().toISOString()
+    // Upsert: if the student joined (entry_time exists) only update scheduled_end_time;
+    // if they somehow skipped joining, create the full row so they still get credit.
     const { error } = await (supabase as any)
-      .from('attendance_marks')
-      .insert({ session_id: sessionId, student_id: userId, marked_at: new Date().toISOString() })
+      .from('live_attendance')
+      .upsert(
+        {
+          live_class_id: liveClassId,
+          student_id: userId,
+          grade_id: gradeId,
+          entry_time: now,
+          scheduled_end_time: now,
+        },
+        { onConflict: 'live_class_id,student_id' }
+      )
     if (error) {
-      toast.error('Could not mark attendance. The window may have closed.')
+      toast.error('Could not mark attendance. Please try again.')
     } else {
       setMarked(true)
       toast.success('Attendance marked — you are present!')
@@ -55,33 +53,17 @@ export function AttendanceMarkButton({ sessionId, closesAt, alreadyMarked, userI
     )
   }
 
-  if (secondsLeft <= 0) {
-    return <p className="text-sm text-muted-foreground">The attendance window has closed.</p>
-  }
-
-  const min = Math.floor(secondsLeft / 60)
-  const sec = secondsLeft % 60
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Clock className="w-4 h-4" />
-        Closes in{' '}
-        <span className="font-mono font-bold text-foreground tabular-nums">
-          {min}:{sec.toString().padStart(2, '0')}
-        </span>
-      </div>
-      <Button
-        size="lg"
-        onClick={handleMark}
-        disabled={loading}
-        className="bg-green-600 hover:bg-green-700 text-white font-semibold px-10"
-      >
-        {loading
-          ? <Loader2 className="w-5 h-5 animate-spin mr-2" />
-          : <CheckCircle2 className="w-5 h-5 mr-2" />}
-        Mark Present
-      </Button>
-    </div>
+    <Button
+      size="lg"
+      onClick={handleMark}
+      disabled={loading}
+      className="bg-green-600 hover:bg-green-700 text-white font-semibold px-10"
+    >
+      {loading
+        ? <Loader2 className="w-5 h-5 animate-spin mr-2" />
+        : <CheckCircle2 className="w-5 h-5 mr-2" />}
+      Mark Present
+    </Button>
   )
 }
