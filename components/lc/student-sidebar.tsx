@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, BookOpen, LogOut,
-  ChevronRight, User, Menu, X, Package, Bell,
+  ChevronRight, User, Menu, X, Package, Bell, ClipboardList,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { createClient } from '@/lib/supabase/client'
@@ -40,6 +40,7 @@ function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscrip
     { label: 'Messages',          href: '/dashboard/notices',      icon: Bell,             show: true },
     { label: 'My Video Packages', href: '/dashboard/my-videos',   icon: BookOpen,         show: hasVideoSubscription },
     { label: 'Live Classes',      href: '/dashboard/live-classes', icon: Users,            show: hasLiveSubscription },
+    { label: 'Attendance',        href: '/dashboard/attendance',  icon: ClipboardList,    show: hasLiveSubscription },
     { label: 'Subscriptions',     href: '/dashboard/subscriptions',icon: Package,          show: true },
     { label: 'My Account',        href: '/dashboard/account',      icon: User,             show: true },
   ]
