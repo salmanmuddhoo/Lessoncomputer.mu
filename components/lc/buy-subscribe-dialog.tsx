@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ShoppingCart, Radio, Lock, RefreshCw, CheckCircle2, ArrowRight } from 'lucide-react'
+import { ShoppingCart, Radio, Lock, RefreshCw, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
+import { toast } from 'sonner'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -70,6 +71,10 @@ export function BuySubscribeDialog({
     () => new Set(mandatoryPackageId ? [mandatoryPackageId] : [])
   )
   const [selectedPastLive, setSelectedPastLive] = useState<Set<string>>(new Set())
+  const [paying, setPaying] = useState(false)
+  // Defer price rendering to client to avoid SSR/hydration mismatch on computed prices
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   function handleOpen() {
     setMode(defaultMode)
@@ -104,15 +109,43 @@ export function BuySubscribeDialog({
   const liveMonthCount = 1 + selectedPastLive.size
   const liveTotal = liveMonthCount * liveSubscriptionPrice
 
-  function buildLiveContactUrl() {
-    const allPkgIds = [liveMonthPackageId, ...Array.from(selectedPastLive)].filter(Boolean)
-    const allLabels = [
-      liveMonthLabel,
-      ...unsubscribedPastPackages
-        .filter((p) => selectedPastLive.has(p.id))
-        .map((p) => `${MONTHS[p.month - 1]} ${p.year}`),
-    ].filter(Boolean)
-    return `/contact?type=live&packages=${allPkgIds.join(',')}&months=${allLabels.map(encodeURIComponent).join(',')}&recurring=${isRecurring ? '1' : '0'}`
+  async function initiatePayment() {
+    if (paying) return
+    setPaying(true)
+    try {
+      const isVideo = mode === 'video'
+      const packageIds = isVideo
+        ? Array.from(selected)
+        : [liveMonthPackageId, ...Array.from(selectedPastLive)].filter(Boolean) as string[]
+      const amount = isVideo ? total : liveTotal
+      const description = isVideo
+        ? `Video package(s): ${selectedPackages.map((p) => p.name).join(', ')}`
+        : `Live classes: ${[liveMonthLabel, ...unsubscribedPastPackages.filter((p) => selectedPastLive.has(p.id)).map((p) => `${MONTHS[p.month - 1]} ${p.year}`)].filter(Boolean).join(', ')}`
+
+      const res = await fetch('/api/payment/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderType: isVideo ? 'video' : 'live',
+          packageIds,
+          amount,
+          description,
+          isRecurring: !isVideo && isRecurring,
+        }),
+      })
+
+      const data = await res.json() as { paymentUrl?: string; error?: string }
+      if (!res.ok || !data.paymentUrl) {
+        toast.error(data.error ?? 'Failed to initiate payment. Please try again.')
+        return
+      }
+
+      window.location.href = data.paymentUrl
+    } catch {
+      toast.error('Network error. Please try again.')
+    } finally {
+      setPaying(false)
+    }
   }
 
   const label = triggerLabel ?? (defaultMode === 'live' ? 'Subscribe' : 'Buy')
@@ -132,7 +165,7 @@ export function BuySubscribeDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <div className="flex gap-2 mb-1">
               <button
@@ -351,15 +384,21 @@ export function BuySubscribeDialog({
               {mode === 'live' && isCurrentMonthSubscribed ? 'Close' : 'Cancel'}
             </Button>
             {!(mode === 'live' && isCurrentMonthSubscribed) && (
-              <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
-                <Link href={
-                  mode === 'live'
-                    ? buildLiveContactUrl()
-                    : '/contact'
-                }>
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  {mode === 'video' ? 'Contact to Buy' : 'Contact to Subscribe'}
-                </Link>
+              <Button
+                onClick={initiatePayment}
+                disabled={!mounted || paying || (mode === 'video' ? selected.size === 0 : !liveMonthPackageId)}
+                className="bg-primary text-primary-foreground hover:bg-accent"
+              >
+                {paying
+                  ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  : <CheckCircle2 className="w-4 h-4 mr-2" />
+                }
+                {!mounted
+                  ? 'Loading…'
+                  : paying
+                    ? 'Redirecting…'
+                    : `Pay Rs ${(mode === 'video' ? total : liveTotal).toFixed(2)}`
+                }
               </Button>
             )}
           </DialogFooter>
