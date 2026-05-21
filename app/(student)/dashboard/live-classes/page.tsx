@@ -123,11 +123,13 @@ export default async function StudentLiveClassesPage() {
 
   const videosByChapter: Record<string, any[]> = {}
   const documentsByChapter: Record<string, any[]> = {}
+  const notesByChapter: Record<string, any[]> = {}
 
   if (subscribedChapterIds.length > 0) {
-    const [{ data: videos }, { data: docs }] = await Promise.all([
+    const [{ data: videos }, { data: docs }, { data: notes }] = await Promise.all([
       supabase.from('videos').select('*').in('chapter_id', subscribedChapterIds).eq('is_published_for_live' as any, true),
       supabase.from('documents').select('*').in('chapter_id', subscribedChapterIds).eq('is_published_for_live' as any, true),
+      (supabase as any).from('revision_notes').select('id, title, content, content_live, chapter_id').in('chapter_id', subscribedChapterIds).eq('is_published_for_live', true),
     ])
     for (const v of videos ?? []) {
       videosByChapter[v.chapter_id] ??= []
@@ -136,6 +138,10 @@ export default async function StudentLiveClassesPage() {
     for (const d of docs ?? []) {
       documentsByChapter[d.chapter_id] ??= []
       documentsByChapter[d.chapter_id].push(d)
+    }
+    for (const n of notes ?? []) {
+      notesByChapter[n.chapter_id] ??= []
+      notesByChapter[n.chapter_id].push(n)
     }
   }
 
@@ -223,6 +229,7 @@ export default async function StudentLiveClassesPage() {
           subscribedPackageIds={[...subscribedPackageIds] as string[]}
           videosByChapter={videosByChapter}
           documentsByChapter={documentsByChapter}
+          notesByChapter={notesByChapter}
           currentMonth={currentMonth}
           currentYear={currentYear}
           liveSubscriptionPrice={grade.live_subscription_price}

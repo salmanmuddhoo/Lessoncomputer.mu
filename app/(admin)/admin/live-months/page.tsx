@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Loader2, CalendarDays, Settings2, Video, FileText,
-  Eye, EyeOff, FolderOpen, ChevronDown, ChevronUp, Pencil, Radio, Clock, GitMerge, CheckCheck,
+  Eye, EyeOff, FolderOpen, ChevronDown, ChevronUp, Pencil, Radio, Clock, GitMerge, CheckCheck, BookMarked,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -52,6 +52,16 @@ interface DocItem {
   file_name: string | null
 }
 
+interface NoteItem {
+  id: string
+  title: string
+  chapter_id: string
+  content: string | null
+  content_live: string | null
+  is_published_for_live: boolean
+  is_published: boolean
+}
+
 export default function AdminLiveMonthsPage() {
   const [grades, setGrades] = useState<Grade[]>([])
   const [selectedGradeId, setSelectedGradeId] = useState<string>('')
@@ -63,8 +73,10 @@ export default function AdminLiveMonthsPage() {
   // Page-level content
   const [allVideos, setAllVideos] = useState<VideoItem[]>([])
   const [allDocs, setAllDocs] = useState<DocItem[]>([])
+  const [allNotes, setAllNotes] = useState<NoteItem[]>([])
   const [videoEdits, setVideoEdits] = useState<Record<string, { url: string; publishedForLive: boolean }>>({})
   const [docEdits, setDocEdits] = useState<Record<string, { url: string; publishedForLive: boolean }>>({})
+  const [noteEdits, setNoteEdits] = useState<Record<string, { content: string; publishedForLive: boolean }>>({})
   const [savingItem, setSavingItem] = useState<string | null>(null)
   const [mergingChapter, setMergingChapter] = useState<string | null>(null)
 
@@ -127,13 +139,17 @@ export default function AdminLiveMonthsPage() {
     // Load all content for chapters assigned to any month this year
     const allChapterIds = allMonths.flatMap((p) => p.chapterIds)
     if (allChapterIds.length > 0) {
-      const [{ data: vids, error: vErr }, { data: docs, error: dErr }] = await Promise.all([
+      const [{ data: vids, error: vErr }, { data: docs, error: dErr }, { data: noteData }] = await Promise.all([
         supabase.from('videos')
           .select('id,title,chapter_id,streamable_url,streamable_url_live,is_published_for_live,is_published,duration_minutes')
           .in('chapter_id', allChapterIds)
           .order('created_at', { ascending: false }),
         supabase.from('documents')
           .select('id,title,chapter_id,file_url,file_url_live,is_published_for_live,is_published,file_name')
+          .in('chapter_id', allChapterIds)
+          .order('created_at', { ascending: false }),
+        (supabase as any).from('revision_notes')
+          .select('id,title,chapter_id,content,content_live,is_published_for_live,is_published')
           .in('chapter_id', allChapterIds)
           .order('created_at', { ascending: false }),
       ])
@@ -162,20 +178,32 @@ export default function AdminLiveMonthsPage() {
         file_url_live: d.file_url_live ?? null,
         is_published_for_live: d.is_published_for_live ?? false,
       })) as DocItem[]
+      const notesArr = (noteData ?? []).map((n: any) => ({
+        ...n,
+        content: n.content ?? null,
+        content_live: n.content_live ?? null,
+        is_published_for_live: n.is_published_for_live ?? false,
+      })) as NoteItem[]
       setAllVideos(videos)
       setAllDocs(documents)
+      setAllNotes(notesArr)
 
       const vEdits: Record<string, { url: string; publishedForLive: boolean }> = {}
       for (const v of videos) vEdits[v.id] = { url: v.streamable_url_live ?? '', publishedForLive: v.is_published_for_live }
       const dEdits: Record<string, { url: string; publishedForLive: boolean }> = {}
       for (const d of documents) dEdits[d.id] = { url: d.file_url_live ?? '', publishedForLive: d.is_published_for_live }
+      const nEdits: Record<string, { content: string; publishedForLive: boolean }> = {}
+      for (const n of notesArr) nEdits[n.id] = { content: n.content_live ?? '', publishedForLive: n.is_published_for_live }
       setVideoEdits(vEdits)
       setDocEdits(dEdits)
+      setNoteEdits(nEdits)
     } else {
       setAllVideos([])
       setAllDocs([])
+      setAllNotes([])
       setVideoEdits({})
       setDocEdits({})
+      setNoteEdits({})
     }
 
     setLoading(false)
@@ -354,6 +382,18 @@ export default function AdminLiveMonthsPage() {
     setSavingItem(null)
   }
 
+  async function autoSaveNoteToggle(noteId: string, val: boolean) {
+    setSavingItem(noteId)
+    const { error } = await (supabase as any).from('revision_notes')
+      .update({ is_published_for_live: val })
+      .eq('id', noteId)
+    if (error) {
+      toast.error(`Save failed: ${error.message}`)
+      setNoteEdits((prev) => ({ ...prev, [noteId]: { ...prev[noteId]!, publishedForLive: !val } }))
+    }
+    setSavingItem(null)
+  }
+
   async function mergeChapterUrls(chapterId: string) {
     setMergingChapter(chapterId)
 
@@ -362,6 +402,9 @@ export default function AdminLiveMonthsPage() {
     )
     const chDocs = allDocs.filter(
       (d) => d.chapter_id === chapterId && d.file_url && d.file_url_live
+    )
+    const chNotes = allNotes.filter(
+      (n) => n.chapter_id === chapterId && n.content_live && n.content !== n.content_live
     )
 
     const errors: string[] = []
@@ -389,13 +432,24 @@ export default function AdminLiveMonthsPage() {
           )
         }
       }),
+      ...chNotes.map(async (n) => {
+        const { error } = await (supabase as any).from('revision_notes')
+          .update({ content: n.content_live })
+          .eq('id', n.id)
+        if (error) errors.push(error.message)
+        else {
+          setAllNotes((prev) =>
+            prev.map((x) => x.id === n.id ? { ...x, content: n.content_live } : x)
+          )
+        }
+      }),
     ])
 
     if (errors.length > 0) {
       toast.error(`Merge failed for ${errors.length} item(s)`)
     } else {
-      const count = chVideos.length + chDocs.length
-      toast.success(`Merged ${count} item${count !== 1 ? 's' : ''} — Video Package URL now matches Live Classes URL`)
+      const count = chVideos.length + chDocs.length + chNotes.length
+      toast.success(`Merged ${count} item${count !== 1 ? 's' : ''} — Video Package content now matches Live Classes content`)
     }
 
     setMergingChapter(null)
@@ -509,14 +563,16 @@ export default function AdminLiveMonthsPage() {
                       const isChOpen = openChapters.has(chKey)
                       const chVideos = allVideos.filter((v) => v.chapter_id === ch.id)
                       const chDocs = allDocs.filter((d) => d.chapter_id === ch.id)
-                      const total = chVideos.length + chDocs.length
+                      const chNotes = allNotes.filter((n) => n.chapter_id === ch.id)
+                      const total = chVideos.length + chDocs.length + chNotes.length
 
                       return (
                         <div key={ch.id}>
                           {(() => {
                             const mergeableVideos = chVideos.filter((v) => v.streamable_url && v.streamable_url_live)
                             const mergeableDocs = chDocs.filter((d) => d.file_url && d.file_url_live)
-                            const mergeableCount = mergeableVideos.length + mergeableDocs.length
+                            const mergeableNotes = chNotes.filter((n) => n.content_live && n.content !== n.content_live)
+                            const mergeableCount = mergeableVideos.length + mergeableDocs.length + mergeableNotes.length
                             const isMergingThis = mergingChapter === ch.id
                             return (
                               <div className="w-full flex items-center gap-2 px-5 py-2.5 bg-muted/10 border-b border-border/20">
@@ -566,7 +622,7 @@ export default function AdminLiveMonthsPage() {
                             <div className="divide-y divide-border/20">
                               {total === 0 ? (
                                 <p className="px-5 py-4 text-xs text-muted-foreground">
-                                  No videos or documents in this chapter yet.
+                                  No content in this chapter yet.
                                 </p>
                               ) : (
                                 <>
@@ -743,6 +799,73 @@ export default function AdminLiveMonthsPage() {
                                               />
                                             </div>
                                           </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+
+                                  {chNotes.map((n) => {
+                                    const edit = noteEdits[n.id] ?? { content: n.content_live ?? '', publishedForLive: n.is_published_for_live }
+                                    const hasLiveContent = !!(edit.content || n.content_live)
+                                    const isMerged = !!(n.content_live && n.content === n.content_live)
+                                    return (
+                                      <div key={n.id} className="px-5 py-3 space-y-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <Badge variant="outline" className="text-[10px] gap-0.5 px-1.5 py-0 h-4 shrink-0 text-violet-600 border-violet-300 bg-violet-50 dark:bg-violet-950/20 dark:border-violet-800 dark:text-violet-400">
+                                            <BookMarked className="w-2.5 h-2.5" /> Notes
+                                          </Badge>
+                                          <span className="font-medium text-sm flex-1 min-w-0 truncate">{n.title}</span>
+
+                                          {isMerged && (
+                                            <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 shrink-0 text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 dark:text-green-400">
+                                              <CheckCheck className="w-2.5 h-2.5" /> Merged
+                                            </Badge>
+                                          )}
+
+                                          {hasLiveContent && (
+                                            <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 shrink-0 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400">
+                                              <Radio className="w-2.5 h-2.5" /> Live ✓
+                                            </Badge>
+                                          )}
+
+                                          <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0 h-4 rounded-full shrink-0 ${n.is_published ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+                                            {n.is_published ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                            {n.is_published ? 'Published' : 'Draft'}
+                                          </span>
+
+                                          <Button variant="ghost" size="sm" asChild className="shrink-0 h-6 w-6 p-0 ml-auto">
+                                            <Link href={`/admin/videos/revision-notes/${n.id}/edit`} title="Edit revision notes">
+                                              <Pencil className="w-3.5 h-3.5" />
+                                            </Link>
+                                          </Button>
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                          <div className="shrink-0 flex flex-col items-center gap-1">
+                                            <Label className={`text-[10px] whitespace-nowrap ${!hasLiveContent ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}>Published for Live</Label>
+                                            <div className="flex items-center gap-1" title={!hasLiveContent ? 'Add live content first' : undefined}>
+                                              {savingItem === n.id
+                                                ? <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                                                : edit.publishedForLive
+                                                  ? <Eye className="w-3 h-3 text-primary" />
+                                                  : <EyeOff className={`w-3 h-3 ${!hasLiveContent ? 'text-muted-foreground/30' : 'text-muted-foreground'}`} />
+                                              }
+                                              <Switch
+                                                checked={edit.publishedForLive}
+                                                disabled={savingItem === n.id || !hasLiveContent}
+                                                onCheckedChange={(val) => {
+                                                  setNoteEdits((prev) => ({
+                                                    ...prev,
+                                                    [n.id]: { ...prev[n.id]!, publishedForLive: val },
+                                                  }))
+                                                  autoSaveNoteToggle(n.id, val)
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                          <p className="text-[10px] text-muted-foreground">
+                                            Edit live content via the <Link href={`/admin/videos/revision-notes/${n.id}/edit`} className="underline">edit page</Link>.
+                                          </p>
                                         </div>
                                       </div>
                                     )

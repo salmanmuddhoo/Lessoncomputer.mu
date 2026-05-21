@@ -85,11 +85,13 @@ export default async function MyVideoPackagesPage() {
 
   const videosByChapter: Record<string, any[]> = {}
   const documentsByChapter: Record<string, any[]> = {}
+  const notesByChapter: Record<string, any[]> = {}
 
   if (subscribedChapterIds.length > 0) {
-    const [{ data: videos }, { data: docs }] = await Promise.all([
+    const [{ data: videos }, { data: docs }, { data: notes }] = await Promise.all([
       supabase.from('videos').select('*, grade:grades(name, color, slug)').in('chapter_id', subscribedChapterIds).eq('is_published', true),
       supabase.from('documents').select('*').in('chapter_id', subscribedChapterIds).eq('is_published', true),
+      (supabase as any).from('revision_notes').select('id, title, content, chapter_id').in('chapter_id', subscribedChapterIds).eq('is_published', true),
     ])
     for (const v of videos ?? []) {
       videosByChapter[v.chapter_id] ??= []
@@ -98,6 +100,10 @@ export default async function MyVideoPackagesPage() {
     for (const d of docs ?? []) {
       documentsByChapter[d.chapter_id] ??= []
       documentsByChapter[d.chapter_id].push(d)
+    }
+    for (const n of notes ?? []) {
+      notesByChapter[n.chapter_id] ??= []
+      notesByChapter[n.chapter_id].push(n)
     }
   }
 
@@ -111,6 +117,7 @@ export default async function MyVideoPackagesPage() {
 
   const totalVideos = Object.values(videosByChapter).reduce((s, v) => s + v.length, 0)
   const totalDocs = Object.values(documentsByChapter).reduce((s, v) => s + v.length, 0)
+  const totalNotes = Object.values(notesByChapter).reduce((s, v) => s + v.length, 0)
 
   return (
     <div>
@@ -118,7 +125,7 @@ export default async function MyVideoPackagesPage() {
         <h1 className="text-2xl font-bold">My Video Packages</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
           {subscribedPackages.length > 0
-            ? `${totalVideos} video${totalVideos !== 1 ? 's' : ''}${totalDocs > 0 ? ` · ${totalDocs} doc${totalDocs !== 1 ? 's' : ''}` : ''} across ${subscribedPackages.length} package${subscribedPackages.length !== 1 ? 's' : ''}`
+            ? `${totalVideos} video${totalVideos !== 1 ? 's' : ''}${totalDocs > 0 ? ` · ${totalDocs} doc${totalDocs !== 1 ? 's' : ''}` : ''}${totalNotes > 0 ? ` · ${totalNotes} note${totalNotes !== 1 ? 's' : ''}` : ''} across ${subscribedPackages.length} package${subscribedPackages.length !== 1 ? 's' : ''}`
             : `Video packages for `}
           {subscribedPackages.length === 0 && (
             <span className="font-medium" style={{ color: grade.color }}>{grade.name}</span>
@@ -136,6 +143,7 @@ export default async function MyVideoPackagesPage() {
             packages={accordionPackages}
             videosByChapter={videosByChapter}
             documentsByChapter={documentsByChapter}
+            notesByChapter={notesByChapter}
             grade={grade}
           />
         </section>
