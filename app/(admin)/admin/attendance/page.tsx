@@ -18,6 +18,8 @@ interface LiveClass {
   scheduled_at: string
   is_published: boolean
   attendance_open: boolean
+  is_recurring: boolean
+  recurrence_day_of_week: number | null
   grade: { name: string; color: string } | null
 }
 interface AttendeeRow {
@@ -37,6 +39,24 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-GB', { timeStyle: 'short' })
 }
 
+/** Returns true if the class has started (based on scheduled time and recurrence). */
+function hasStarted(cls: LiveClass): boolean {
+  const now = new Date()
+  const scheduled = new Date(cls.scheduled_at)
+
+  if (!cls.is_recurring || cls.recurrence_day_of_week === null) {
+    return scheduled <= now
+  }
+
+  // Recurring: check if today is the correct day AND time has passed
+  const today = now.getDay()
+  if (today !== cls.recurrence_day_of_week) return false
+
+  const todayOccurrence = new Date(now)
+  todayOccurrence.setHours(scheduled.getHours(), scheduled.getMinutes(), 0, 0)
+  return now >= todayOccurrence
+}
+
 export default function AdminAttendancePage() {
   const [grades, setGrades] = useState<Grade[]>([])
   const [classes, setClasses] = useState<LiveClass[]>([])
@@ -47,32 +67,44 @@ export default function AdminAttendancePage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedRows, setExpandedRows] = useState<AttendeeRow[]>([])
   const [expandLoading, setExpandLoading] = useState(false)
+  const [now, setNow] = useState(() => new Date())
 
   const supabase = createClient()
 
+  // Refresh "now" every minute so button disabled state stays accurate
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+
   const load = useCallback(async (gid?: string) => {
+    const currentDate = new Date()
+    const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString()
+    const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1).toISOString()
+
     const [{ data: gData }, { data: cData }] = await Promise.all([
       supabase.from('grades').select('id, name, color').eq('is_active', true).order('order_index'),
       gid
         ? (supabase as any)
             .from('live_classes')
-            .select('id, title, grade_id, scheduled_at, is_published, attendance_open, grade:grades(name, color)')
+            .select('id, title, grade_id, scheduled_at, is_published, attendance_open, is_recurring, recurrence_day_of_week, grade:grades(name, color)')
             .eq('grade_id', gid)
             .eq('is_published', true)
-            .order('scheduled_at', { ascending: false })
-            .limit(100)
+            .gte('scheduled_at', monthStart)
+            .lt('scheduled_at', monthEnd)
+            .order('scheduled_at', { ascending: true })
         : (supabase as any)
             .from('live_classes')
-            .select('id, title, grade_id, scheduled_at, is_published, attendance_open, grade:grades(name, color)')
+            .select('id, title, grade_id, scheduled_at, is_published, attendance_open, is_recurring, recurrence_day_of_week, grade:grades(name, color)')
             .eq('is_published', true)
-            .order('scheduled_at', { ascending: false })
-            .limit(100),
+            .gte('scheduled_at', monthStart)
+            .lt('scheduled_at', monthEnd)
+            .order('scheduled_at', { ascending: true }),
     ])
     setGrades((gData ?? []) as Grade[])
     const cs = (cData ?? []) as LiveClass[]
     setClasses(cs)
 
-    // Count marks (students who clicked Mark Present = scheduled_end_time is not null)
     if (cs.length > 0) {
       const ids = cs.map((c) => c.id)
       const { data: marks } = await (supabase as any)
@@ -120,20 +152,21 @@ export default function AdminAttendancePage() {
     setExpandLoading(false)
   }
 
-  // Group classes by month/year
+  const openCount = classes.filter((c) => c.attendance_open).length
+
+  // Group by grade for display when no grade filter
   const grouped: Array<{ key: string; label: string; items: LiveClass[] }> = []
   const seenKeys = new Set<string>()
   for (const cls of classes) {
-    const d = new Date(cls.scheduled_at)
-    const key = `${d.getFullYear()}-${d.getMonth() + 1}`
-    if (!seenKeys.has(key)) {
-      seenKeys.add(key)
-      grouped.push({ key, label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, items: [] })
+    const gradeKey = cls.grade_id
+    if (!seenKeys.has(gradeKey)) {
+      seenKeys.add(gradeKey)
+      grouped.push({ key: gradeKey, label: cls.grade?.name ?? 'Unknown Grade', items: [] })
     }
     grouped[grouped.length - 1].items.push(cls)
   }
 
-  const openCount = classes.filter((c) => c.attendance_open).length
+  const currentMonthLabel = `${MONTHS[new Date().getMonth()]} ${new Date().getFullYear()}`
 
   return (
     <div>
@@ -141,7 +174,7 @@ export default function AdminAttendancePage() {
         <div>
           <h1 className="text-2xl font-bold">Attendance</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Open attendance on a live class so students can mark present
+            Open attendance on a live class so students can mark present · <span className="font-medium">{currentMonthLabel}</span>
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={() => load(gradeFilter || undefined)}>
@@ -149,7 +182,6 @@ export default function AdminAttendancePage() {
         </Button>
       </div>
 
-      {/* Active attendance banner */}
       {openCount > 0 && (
         <div className="mb-6 rounded-xl border-2 border-green-500/40 bg-green-50 dark:bg-green-950/20 px-5 py-3 flex items-center gap-3">
           <span className="relative flex h-3 w-3 shrink-0">
@@ -162,7 +194,6 @@ export default function AdminAttendancePage() {
         </div>
       )}
 
-      {/* Grade filter */}
       <div className="mb-6">
         <Select value={gradeFilter || 'all'} onValueChange={(v) => setGradeFilter(v === 'all' ? '' : v)}>
           <SelectTrigger className="w-44">
@@ -184,24 +215,26 @@ export default function AdminAttendancePage() {
       ) : classes.length === 0 ? (
         <div className="py-20 text-center rounded-xl border border-border/60">
           <ClipboardList className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">No published live classes found.</p>
+          <p className="text-muted-foreground">No live classes scheduled for {currentMonthLabel}.</p>
           <p className="text-xs text-muted-foreground mt-1">Schedule and publish live classes to manage attendance.</p>
         </div>
       ) : (
         <div className="space-y-8">
           {grouped.map((group) => (
             <div key={group.key}>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-                <Radio className="w-3.5 h-3.5" /> {group.label}
-              </h2>
+              {!gradeFilter && (
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <Radio className="w-3.5 h-3.5" /> {group.label}
+                </h2>
+              )}
               <div className="rounded-xl border border-border/60 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm min-w-[640px]">
                     <thead className="bg-muted/30 border-b border-border/60">
                       <tr>
                         <th className="text-left px-4 py-3 font-medium text-muted-foreground">Class</th>
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grade</th>
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date / Time</th>
+                        {!gradeFilter && <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grade</th>}
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Scheduled</th>
                         <th className="text-left px-4 py-3 font-medium text-muted-foreground">Present</th>
                         <th className="text-left px-4 py-3 font-medium text-muted-foreground">Attendance</th>
                         <th className="text-right px-4 py-3 font-medium text-muted-foreground">Details</th>
@@ -213,11 +246,14 @@ export default function AdminAttendancePage() {
                         const count = markCounts[cls.id] ?? 0
                         const isExpanded = expandedId === cls.id
                         const isToggling = togglingId === cls.id
+                        const started = hasStarted(cls)
                         return (
                           <>
                             <tr
                               key={cls.id}
-                              className={cls.attendance_open ? 'bg-green-50/50 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors' : 'hover:bg-muted/20 transition-colors'}
+                              className={cls.attendance_open
+                                ? 'bg-green-50/50 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors'
+                                : 'hover:bg-muted/20 transition-colors'}
                             >
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2">
@@ -228,15 +264,20 @@ export default function AdminAttendancePage() {
                                     </span>
                                   )}
                                   <span className="font-medium">{cls.title}</span>
+                                  {cls.is_recurring && (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">Weekly</Badge>
+                                  )}
                                 </div>
                               </td>
-                              <td className="px-4 py-3">
-                                {grade && (
-                                  <Badge variant="outline" style={{ borderColor: `${grade.color}40`, color: grade.color, backgroundColor: `${grade.color}10` }}>
-                                    {grade.name}
-                                  </Badge>
-                                )}
-                              </td>
+                              {!gradeFilter && (
+                                <td className="px-4 py-3">
+                                  {grade && (
+                                    <Badge variant="outline" style={{ borderColor: `${grade.color}40`, color: grade.color, backgroundColor: `${grade.color}10` }}>
+                                      {grade.name}
+                                    </Badge>
+                                  )}
+                                </td>
+                              )}
                               <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
                                 {fmt(cls.scheduled_at)}
                               </td>
@@ -247,20 +288,22 @@ export default function AdminAttendancePage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <Button
-                                  size="sm"
-                                  variant={cls.attendance_open ? 'default' : 'outline'}
-                                  className={cls.attendance_open
-                                    ? 'bg-green-600 hover:bg-green-700 text-white h-7 text-xs'
-                                    : 'h-7 text-xs'}
-                                  disabled={isToggling}
-                                  onClick={() => toggleAttendance(cls)}
-                                >
-                                  {isToggling
-                                    ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                                    : null}
-                                  {cls.attendance_open ? 'Close' : 'Open Attendance'}
-                                </Button>
+                                {!started && !cls.attendance_open ? (
+                                  <span className="text-xs text-muted-foreground italic">Not started yet</span>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant={cls.attendance_open ? 'default' : 'outline'}
+                                    className={cls.attendance_open
+                                      ? 'bg-green-600 hover:bg-green-700 text-white h-7 text-xs'
+                                      : 'h-7 text-xs'}
+                                    disabled={isToggling}
+                                    onClick={() => toggleAttendance(cls)}
+                                  >
+                                    {isToggling && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
+                                    {cls.attendance_open ? 'Close' : 'Open Attendance'}
+                                  </Button>
+                                )}
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <Button
@@ -276,11 +319,9 @@ export default function AdminAttendancePage() {
                             </tr>
                             {isExpanded && (
                               <tr key={`${cls.id}-exp`}>
-                                <td colSpan={6} className="px-4 pb-4 pt-2 bg-muted/10">
+                                <td colSpan={gradeFilter ? 5 : 6} className="px-4 pb-4 pt-2 bg-muted/10">
                                   {expandLoading ? (
-                                    <div className="flex justify-center py-4">
-                                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                                    </div>
+                                    <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
                                   ) : expandedRows.length === 0 ? (
                                     <p className="text-sm text-muted-foreground text-center py-3">No attendance records yet.</p>
                                   ) : (
@@ -297,21 +338,15 @@ export default function AdminAttendancePage() {
                                         <tbody className="divide-y divide-border/20">
                                           {expandedRows.map((row) => (
                                             <tr key={row.id}>
-                                              <td className="py-1.5 font-medium pr-4">
-                                                {row.profile?.full_name ?? 'Unknown'}
-                                              </td>
-                                              <td className="py-1.5 text-muted-foreground pr-4">
-                                                {fmtTime(row.entry_time)}
-                                              </td>
+                                              <td className="py-1.5 font-medium pr-4">{row.profile?.full_name ?? 'Unknown'}</td>
+                                              <td className="py-1.5 text-muted-foreground pr-4">{fmtTime(row.entry_time)}</td>
                                               <td className="py-1.5 text-muted-foreground pr-4">
                                                 {row.scheduled_end_time ? fmtTime(row.scheduled_end_time) : '—'}
                                               </td>
                                               <td className="py-1.5">
-                                                {row.scheduled_end_time ? (
-                                                  <span className="text-green-600 dark:text-green-400 font-semibold">Present</span>
-                                                ) : (
-                                                  <span className="text-orange-500 font-semibold">Joined only</span>
-                                                )}
+                                                {row.scheduled_end_time
+                                                  ? <span className="text-green-600 dark:text-green-400 font-semibold">Present</span>
+                                                  : <span className="text-orange-500 font-semibold">Joined only</span>}
                                               </td>
                                             </tr>
                                           ))}

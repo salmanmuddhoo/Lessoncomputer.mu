@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Badge } from '@/components/ui/badge'
 import { ClipboardList, Clock, Users } from 'lucide-react'
+import { AttendanceReportFilters } from '@/components/lc/attendance-report-filters'
 
 export const metadata: Metadata = { title: 'Attendance Report | Admin' }
 
@@ -23,10 +23,7 @@ function formatDuration(entryIso: string, endIso: string | null): string {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-GB', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
+  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 export default async function AttendanceReportPage({ searchParams }: PageProps) {
@@ -62,7 +59,6 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
 
   const grades = (gradesRaw ?? []) as Array<{ id: string; name: string; color: string }>
 
-  // Fetch profiles for students in this attendance set
   const studentIds = [...new Set(attendance.map((a) => a.student_id))]
   const profileMap: Record<string, { full_name: string | null }> = {}
   if (studentIds.length > 0) {
@@ -76,10 +72,7 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
   }
 
   const selectedGrade = grades.find((g) => g.id === grade_id)
-
-  // Build year options
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
-
   const uniqueStudents = new Set(attendance.map((a) => a.student_id)).size
   const uniqueClasses = new Set(attendance.map((a) => a.live_class_id)).size
 
@@ -90,49 +83,13 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
         <p className="text-muted-foreground text-sm mt-0.5">Live class attendance per student</p>
       </div>
 
-      {/* Filters */}
-      <form method="GET" className="flex flex-wrap gap-3 mb-6">
-        {/* Grade */}
-        <select
-          name="grade_id"
-          defaultValue={grade_id ?? ''}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          <option value="">Select grade…</option>
-          {(grades ?? []).map((g) => (
-            <option key={g.id} value={g.id}>{g.name}</option>
-          ))}
-        </select>
-
-        {/* Month */}
-        <select
-          name="month"
-          defaultValue={selectedMonth}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          {MONTHS.map((m, i) => (
-            <option key={i + 1} value={i + 1}>{m}</option>
-          ))}
-        </select>
-
-        {/* Year */}
-        <select
-          name="year"
-          defaultValue={selectedYear}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          {years.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-
-        <button
-          type="submit"
-          className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-accent transition-colors"
-        >
-          Apply
-        </button>
-      </form>
+      <AttendanceReportFilters
+        grades={grades}
+        selectedGradeId={grade_id ?? ''}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
+        years={years}
+      />
 
       {!grade_id ? (
         <div className="py-20 text-center rounded-xl border border-border/60">
@@ -141,7 +98,6 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
         </div>
       ) : (
         <>
-          {/* Summary row */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             <div className="rounded-xl border border-border/60 p-4">
               <p className="text-xs text-muted-foreground mb-1">Total Records</p>
@@ -157,7 +113,6 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
             </div>
           </div>
 
-          {/* Filter summary */}
           <div className="flex items-center gap-2 mb-4">
             {selectedGrade && (
               <Badge
@@ -185,33 +140,24 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Student</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Live Class</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Entry Time</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Scheduled End</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Mark Present Time</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Duration</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {attendance.map((row) => {
                       const profile = profileMap[row.student_id]
-                      const duration = row.scheduled_end_time
-                        ? formatDuration(row.entry_time, row.scheduled_end_time)
-                        : '—'
                       return (
                         <tr key={row.id} className="hover:bg-muted/20 transition-colors">
-                          <td className="px-4 py-3">
-                            <span className="font-medium">{profile?.full_name ?? 'Unknown'}</span>
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">
-                            {row.live_class?.title ?? '—'}
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                            {formatTime(row.entry_time)}
-                          </td>
+                          <td className="px-4 py-3 font-medium">{profile?.full_name ?? 'Unknown'}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{row.live_class?.title ?? '—'}</td>
+                          <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatTime(row.entry_time)}</td>
                           <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                             {row.scheduled_end_time ? formatTime(row.scheduled_end_time) : '—'}
                           </td>
                           <td className="px-4 py-3">
                             <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                              {duration}
+                              {formatDuration(row.entry_time, row.scheduled_end_time)}
                             </span>
                           </td>
                         </tr>
