@@ -70,7 +70,6 @@ export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const scheduledEndTime = computeScheduledEndTime(scheduledAt, endTime, isRecurring, recurrenceDayOfWeek)
         const { error } = await (supabase as any)
           .from('live_attendance')
           .upsert(
@@ -79,12 +78,10 @@ export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt
               student_id: user.id,
               grade_id: gradeId,
               entry_time: new Date().toISOString(),
-              scheduled_end_time: scheduledEndTime,
             },
-            { onConflict: 'live_class_id,student_id' }
+            { onConflict: 'live_class_id,student_id', ignoreDuplicates: true }
           )
         if (error) {
-          // Non-blocking: still open the meeting URL, but surface the real reason
           toast.warning(`Attendance not recorded: ${error.message}`)
         }
       }

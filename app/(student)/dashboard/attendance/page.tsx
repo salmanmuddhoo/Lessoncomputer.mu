@@ -44,42 +44,48 @@ export default async function StudentAttendancePage() {
     )
   }
 
-  // Fetch all sessions for this grade
-  const { data: sessionsRaw } = await (supabase as any)
-    .from('attendance_sessions')
-    .select('id, label, opens_at, closes_at')
+  // Fetch all published live classes for this grade (most recent first)
+  const { data: classesRaw } = await (supabase as any)
+    .from('live_classes')
+    .select('id, title, scheduled_at, attendance_open')
     .eq('grade_id', gradeId)
-    .order('opens_at', { ascending: false })
+    .eq('is_published', true)
+    .order('scheduled_at', { ascending: false })
     .limit(200)
 
-  const sessions = (sessionsRaw ?? []) as Array<{
+  const classes = (classesRaw ?? []) as Array<{
     id: string
-    label: string | null
-    opens_at: string
-    closes_at: string
+    title: string
+    scheduled_at: string
+    attendance_open: boolean
   }>
 
-  // Fetch student's marks
-  const sessionIds = sessions.map((s) => s.id)
-  const marksBySession: Record<string, string> = {}
-  if (sessionIds.length > 0) {
-    const { data: marksRaw } = await (supabase as any)
-      .from('attendance_marks')
-      .select('session_id, marked_at')
+  // Fetch student's attendance records
+  const classIds = classes.map((c) => c.id)
+  const attendanceByClass: Record<string, { entry_time: string; scheduled_end_time: string | null }> = {}
+  if (classIds.length > 0) {
+    const { data: records } = await (supabase as any)
+      .from('live_attendance')
+      .select('live_class_id, entry_time, scheduled_end_time')
       .eq('student_id', user.id)
-      .in('session_id', sessionIds)
-    for (const m of (marksRaw ?? []) as any[]) {
-      marksBySession[m.session_id] = m.marked_at
+      .in('live_class_id', classIds)
+    for (const r of (records ?? []) as any[]) {
+      attendanceByClass[r.live_class_id] = {
+        entry_time: r.entry_time,
+        scheduled_end_time: r.scheduled_end_time,
+      }
     }
   }
 
-  const now = new Date()
-  const activeSession = sessions.find(
-    (s) => new Date(s.opens_at) <= now && new Date(s.closes_at) > now
-  )
-  const pastSessions = sessions.filter((s) => new Date(s.closes_at) <= now)
+  // Active session = a class with attendance_open = true
+  const activeClass = classes.find((c) => c.attendance_open)
+  const activeRecord = activeClass ? attendanceByClass[activeClass.id] : null
 
-  const presentCount = pastSessions.filter((s) => marksBySession[s.id]).length
+  // History = past classes (scheduled_at in the past)
+  const now = new Date()
+  const pastClasses = classes.filter((c) => new Date(c.scheduled_at) < now && !c.attendance_open)
+
+  const presentCount = pastClasses.filter((c) => !!attendanceByClass[c.id]?.scheduled_end_time).length
 
   return (
     <div className="space-y-8">
@@ -90,43 +96,46 @@ export default async function StudentAttendancePage() {
         </p>
       </div>
 
-      {/* Summary */}
-      {pastSessions.length > 0 && (
+      {/* Summary stats */}
+      {pastClasses.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl border border-border/60 p-4 text-center">
-            <p className="text-2xl font-bold">{pastSessions.length}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Total Sessions</p>
+            <p className="text-2xl font-bold">{pastClasses.length}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Total Classes</p>
           </div>
           <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 p-4 text-center">
             <p className="text-2xl font-bold text-green-600 dark:text-green-400">{presentCount}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Present</p>
           </div>
           <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 p-4 text-center">
-            <p className="text-2xl font-bold text-red-500">{pastSessions.length - presentCount}</p>
+            <p className="text-2xl font-bold text-red-500">{pastClasses.length - presentCount}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Absent</p>
           </div>
         </div>
       )}
 
-      {/* Active session */}
-      {activeSession ? (
+      {/* Active attendance session */}
+      {activeClass ? (
         <div className="rounded-2xl border-2 border-green-500/40 bg-green-50 dark:bg-green-950/20 p-6">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-1">
             <span className="relative flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
             </span>
             <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-              Attendance is open now!
+              Attendance is open!
             </span>
           </div>
-          {activeSession.label && (
-            <p className="text-sm text-muted-foreground mb-4">{activeSession.label}</p>
+          <p className="text-sm font-medium mb-4">{activeClass.title}</p>
+          {activeRecord?.entry_time && (
+            <p className="text-xs text-muted-foreground mb-3">
+              You joined at {new Date(activeRecord.entry_time).toLocaleTimeString('en-GB', { timeStyle: 'short' })}
+            </p>
           )}
           <AttendanceMarkButton
-            sessionId={activeSession.id}
-            closesAt={activeSession.closes_at}
-            alreadyMarked={!!marksBySession[activeSession.id]}
+            liveClassId={activeClass.id}
+            gradeId={gradeId}
+            alreadyMarked={!!activeRecord?.scheduled_end_time}
             userId={user.id}
           />
         </div>
@@ -134,36 +143,34 @@ export default async function StudentAttendancePage() {
         <div className="rounded-2xl border border-border/60 p-6 text-center">
           <ClipboardList className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">No attendance session is currently open.</p>
-          <p className="text-xs text-muted-foreground mt-1">Your teacher will open one during class.</p>
+          <p className="text-xs text-muted-foreground mt-1">Your teacher will open it during class.</p>
         </div>
       )}
 
       {/* History */}
-      {pastSessions.length > 0 && (
+      {pastClasses.length > 0 && (
         <div>
           <h2 className="text-base font-semibold mb-3">Attendance History</h2>
           <div className="rounded-xl border border-border/60 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[420px]">
+              <table className="w-full text-sm min-w-[440px]">
                 <thead className="bg-muted/30 border-b border-border/60">
                   <tr>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Class</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Session</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Marked at</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
-                  {pastSessions.map((s) => {
-                    const present = !!marksBySession[s.id]
-                    const markedAt = marksBySession[s.id]
+                  {pastClasses.map((cls) => {
+                    const record = attendanceByClass[cls.id]
+                    const present = !!record?.scheduled_end_time
                     return (
-                      <tr key={s.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3 whitespace-nowrap text-sm">
-                          {new Date(s.opens_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground text-sm">
-                          {s.label || new Date(s.opens_at).toLocaleTimeString('en-GB', { timeStyle: 'short' })}
+                      <tr key={cls.id} className="hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3 font-medium text-sm max-w-[180px] truncate">{cls.title}</td>
+                        <td className="px-4 py-3 text-muted-foreground text-sm whitespace-nowrap">
+                          {new Date(cls.scheduled_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                         </td>
                         <td className="px-4 py-3">
                           {present ? (
@@ -177,8 +184,8 @@ export default async function StudentAttendancePage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">
-                          {markedAt
-                            ? new Date(markedAt).toLocaleTimeString('en-GB', { timeStyle: 'short' })
+                          {record?.scheduled_end_time
+                            ? new Date(record.scheduled_end_time).toLocaleTimeString('en-GB', { timeStyle: 'short' })
                             : '—'}
                         </td>
                       </tr>

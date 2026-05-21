@@ -1,187 +1,139 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Loader2, Plus, ClipboardList, Users, Clock, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
+import { Loader2, ClipboardList, Users, ChevronDown, ChevronUp, RefreshCw, Radio } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Grade { id: string; name: string; color: string }
-interface Session {
+interface LiveClass {
   id: string
+  title: string
   grade_id: string
-  label: string | null
-  opens_at: string
-  closes_at: string
+  scheduled_at: string
+  is_published: boolean
+  attendance_open: boolean
   grade: { name: string; color: string } | null
 }
-interface Mark {
+interface AttendeeRow {
   id: string
   student_id: string
-  marked_at: string
+  entry_time: string
+  scheduled_end_time: string | null
   profile: { full_name: string | null } | null
 }
 
-function Countdown({ closesAt }: { closesAt: string }) {
-  const [secs, setSecs] = useState(() =>
-    Math.max(0, Math.floor((new Date(closesAt).getTime() - Date.now()) / 1000))
-  )
-  useEffect(() => {
-    if (secs <= 0) return
-    const t = setInterval(() => setSecs((s) => (s <= 1 ? (clearInterval(t), 0) : s - 1)), 1000)
-    return () => clearInterval(t)
-  }, [])
-  const m = Math.floor(secs / 60)
-  const s = secs % 60
-  if (secs <= 0) return <span className="text-muted-foreground">Closed</span>
-  return (
-    <span className="font-mono font-bold tabular-nums">
-      {m}:{s.toString().padStart(2, '0')}
-    </span>
-  )
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function fmt(iso: string) {
+  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+}
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-GB', { timeStyle: 'short' })
 }
 
 export default function AdminAttendancePage() {
   const [grades, setGrades] = useState<Grade[]>([])
-  const [sessions, setSessions] = useState<Session[]>([])
+  const [classes, setClasses] = useState<LiveClass[]>([])
   const [markCounts, setMarkCounts] = useState<Record<string, number>>({})
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [expandedMarks, setExpandedMarks] = useState<Mark[]>([])
-  const [expandLoading, setExpandLoading] = useState(false)
   const [gradeFilter, setGradeFilter] = useState('')
   const [loading, setLoading] = useState(true)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  // Form
-  const [formGrade, setFormGrade] = useState('')
-  const [formLabel, setFormLabel] = useState('')
-  const [formDuration, setFormDuration] = useState('5')
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedRows, setExpandedRows] = useState<AttendeeRow[]>([])
+  const [expandLoading, setExpandLoading] = useState(false)
 
   const supabase = createClient()
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(async (gid?: string) => {
-    const [{ data: gData }, { data: sData }] = await Promise.all([
+    const [{ data: gData }, { data: cData }] = await Promise.all([
       supabase.from('grades').select('id, name, color').eq('is_active', true).order('order_index'),
       gid
         ? (supabase as any)
-            .from('attendance_sessions')
-            .select('id, grade_id, label, opens_at, closes_at, grade:grades(name, color)')
+            .from('live_classes')
+            .select('id, title, grade_id, scheduled_at, is_published, attendance_open, grade:grades(name, color)')
             .eq('grade_id', gid)
-            .order('opens_at', { ascending: false })
+            .eq('is_published', true)
+            .order('scheduled_at', { ascending: false })
             .limit(100)
         : (supabase as any)
-            .from('attendance_sessions')
-            .select('id, grade_id, label, opens_at, closes_at, grade:grades(name, color)')
-            .order('opens_at', { ascending: false })
+            .from('live_classes')
+            .select('id, title, grade_id, scheduled_at, is_published, attendance_open, grade:grades(name, color)')
+            .eq('is_published', true)
+            .order('scheduled_at', { ascending: false })
             .limit(100),
     ])
-    const gs = (gData ?? []) as Grade[]
-    setGrades(gs)
-    if (gs.length > 0 && !formGrade) setFormGrade(gs[0].id)
-    const ss = (sData ?? []) as Session[]
-    setSessions(ss)
+    setGrades((gData ?? []) as Grade[])
+    const cs = (cData ?? []) as LiveClass[]
+    setClasses(cs)
 
-    // Fetch mark counts
-    if (ss.length > 0) {
-      const ids = ss.map((s) => s.id)
-      const { data: mData } = await (supabase as any)
-        .from('attendance_marks')
-        .select('session_id')
-        .in('session_id', ids)
+    // Count marks (students who clicked Mark Present = scheduled_end_time is not null)
+    if (cs.length > 0) {
+      const ids = cs.map((c) => c.id)
+      const { data: marks } = await (supabase as any)
+        .from('live_attendance')
+        .select('live_class_id')
+        .in('live_class_id', ids)
+        .not('scheduled_end_time', 'is', null)
       const counts: Record<string, number> = {}
-      for (const row of (mData ?? []) as any[]) {
-        counts[row.session_id] = (counts[row.session_id] ?? 0) + 1
+      for (const row of (marks ?? []) as any[]) {
+        counts[row.live_class_id] = (counts[row.live_class_id] ?? 0) + 1
       }
       setMarkCounts(counts)
     }
     setLoading(false)
   }, [gradeFilter])
 
-  useEffect(() => {
-    load(gradeFilter || undefined)
-  }, [gradeFilter])
+  useEffect(() => { load(gradeFilter || undefined) }, [gradeFilter])
 
-  // Auto-refresh mark counts every 15s if there's an active session
-  useEffect(() => {
-    const hasActive = sessions.some((s) => new Date(s.closes_at) > new Date())
-    if (!hasActive) {
-      if (pollRef.current) clearInterval(pollRef.current)
-      return
-    }
-    pollRef.current = setInterval(async () => {
-      const ids = sessions.map((s) => s.id)
-      if (!ids.length) return
-      const { data: mData } = await (supabase as any)
-        .from('attendance_marks')
-        .select('session_id')
-        .in('session_id', ids)
-      const counts: Record<string, number> = {}
-      for (const row of (mData ?? []) as any[]) {
-        counts[row.session_id] = (counts[row.session_id] ?? 0) + 1
-      }
-      setMarkCounts(counts)
-    }, 15_000)
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [sessions])
-
-  async function handleOpen() {
-    if (!formGrade) return
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const durationMs = Number(formDuration) * 60 * 1000
-    const opensAt = new Date()
-    const closesAt = new Date(opensAt.getTime() + durationMs)
+  async function toggleAttendance(cls: LiveClass) {
+    setTogglingId(cls.id)
+    const next = !cls.attendance_open
     const { error } = await (supabase as any)
-      .from('attendance_sessions')
-      .insert({
-        grade_id: formGrade,
-        label: formLabel.trim() || null,
-        opened_by: user!.id,
-        opens_at: opensAt.toISOString(),
-        closes_at: closesAt.toISOString(),
-      })
+      .from('live_classes')
+      .update({ attendance_open: next })
+      .eq('id', cls.id)
     if (error) {
       toast.error(error.message)
     } else {
-      toast.success(`Attendance opened for ${formDuration} minute${Number(formDuration) !== 1 ? 's' : ''}`)
-      setDialogOpen(false)
-      setFormLabel('')
-      load(gradeFilter || undefined)
+      toast.success(next ? 'Attendance opened — students can now mark present' : 'Attendance closed')
+      setClasses((prev) => prev.map((c) => c.id === cls.id ? { ...c, attendance_open: next } : c))
     }
-    setSaving(false)
+    setTogglingId(null)
   }
 
-  async function handleExpand(sessionId: string) {
-    if (expandedId === sessionId) { setExpandedId(null); return }
-    setExpandedId(sessionId)
+  async function handleExpand(classId: string) {
+    if (expandedId === classId) { setExpandedId(null); return }
+    setExpandedId(classId)
     setExpandLoading(true)
-    const { data: marksRaw } = await (supabase as any)
-      .from('attendance_marks')
-      .select('id, student_id, marked_at, profile:profiles(full_name)')
-      .eq('session_id', sessionId)
-      .order('marked_at', { ascending: true })
-    setExpandedMarks((marksRaw ?? []) as Mark[])
+    const { data } = await (supabase as any)
+      .from('live_attendance')
+      .select('id, student_id, entry_time, scheduled_end_time, profile:profiles(full_name)')
+      .eq('live_class_id', classId)
+      .order('entry_time', { ascending: true })
+    setExpandedRows((data ?? []) as AttendeeRow[])
     setExpandLoading(false)
   }
 
-  const activeSessions = sessions.filter((s) => new Date(s.closes_at) > new Date())
-  const pastSessions = sessions.filter((s) => new Date(s.closes_at) <= new Date())
-
-  function formatWindow(s: Session) {
-    const diffMin = Math.round((new Date(s.closes_at).getTime() - new Date(s.opens_at).getTime()) / 60_000)
-    return `${diffMin} min`
+  // Group classes by month/year
+  const grouped: Array<{ key: string; label: string; items: LiveClass[] }> = []
+  const seenKeys = new Set<string>()
+  for (const cls of classes) {
+    const d = new Date(cls.scheduled_at)
+    const key = `${d.getFullYear()}-${d.getMonth() + 1}`
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key)
+      grouped.push({ key, label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, items: [] })
+    }
+    grouped[grouped.length - 1].items.push(cls)
   }
+
+  const openCount = classes.filter((c) => c.attendance_open).length
 
   return (
     <div>
@@ -189,29 +141,29 @@ export default function AdminAttendancePage() {
         <div>
           <h1 className="text-2xl font-bold">Attendance</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Open attendance windows and track student presence
+            Open attendance on a live class so students can mark present
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => load(gradeFilter || undefined)}
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </Button>
-          <Button
-            size="sm"
-            className="bg-primary text-primary-foreground hover:bg-accent"
-            onClick={() => setDialogOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-1" /> Open Attendance
-          </Button>
-        </div>
+        <Button size="sm" variant="outline" onClick={() => load(gradeFilter || undefined)}>
+          <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh
+        </Button>
       </div>
 
+      {/* Active attendance banner */}
+      {openCount > 0 && (
+        <div className="mb-6 rounded-xl border-2 border-green-500/40 bg-green-50 dark:bg-green-950/20 px-5 py-3 flex items-center gap-3">
+          <span className="relative flex h-3 w-3 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+          </span>
+          <p className="text-sm font-semibold text-green-700 dark:text-green-400">
+            {openCount} class{openCount !== 1 ? 'es have' : ' has'} attendance open right now
+          </p>
+        </div>
+      )}
+
       {/* Grade filter */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="mb-6">
         <Select value={gradeFilter || 'all'} onValueChange={(v) => setGradeFilter(v === 'all' ? '' : v)}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="All Grades" />
@@ -229,108 +181,54 @@ export default function AdminAttendancePage() {
         <div className="flex justify-center py-16">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
+      ) : classes.length === 0 ? (
+        <div className="py-20 text-center rounded-xl border border-border/60">
+          <ClipboardList className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground">No published live classes found.</p>
+          <p className="text-xs text-muted-foreground mt-1">Schedule and publish live classes to manage attendance.</p>
+        </div>
       ) : (
-        <div className="space-y-6">
-          {/* Active sessions */}
-          {activeSessions.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Live Now</h2>
-              {activeSessions.map((s) => {
-                const grade = s.grade
-                const count = markCounts[s.id] ?? 0
-                const isExpanded = expandedId === s.id
-                return (
-                  <div key={s.id} className="rounded-2xl border-2 border-green-500/40 bg-green-50 dark:bg-green-950/20 overflow-hidden">
-                    <button
-                      onClick={() => handleExpand(s.id)}
-                      className="w-full flex items-center gap-4 p-5 text-left"
-                    >
-                      <span className="relative flex h-3 w-3 shrink-0">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {grade && (
-                            <Badge variant="outline" style={{ borderColor: `${grade.color}40`, color: grade.color, backgroundColor: `${grade.color}10` }}>
-                              {grade.name}
-                            </Badge>
-                          )}
-                          {s.label && <span className="text-sm font-medium">{s.label}</span>}
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(s.opens_at).toLocaleTimeString('en-GB', { timeStyle: 'short' })}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4 shrink-0">
-                        <div className="text-right">
-                          <div className="flex items-center gap-1.5 text-green-700 dark:text-green-400 font-semibold text-sm">
-                            <Users className="w-4 h-4" />
-                            {count} present
-                          </div>
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                            <Clock className="w-3 h-3" />
-                            <Countdown closesAt={s.closes_at} />
-                          </div>
-                        </div>
-                        {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-                      </div>
-                    </button>
-                    {isExpanded && (
-                      <div className="border-t border-green-200 dark:border-green-800 px-5 pb-4 pt-3 bg-green-50/50 dark:bg-green-950/10">
-                        {expandLoading ? (
-                          <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
-                        ) : expandedMarks.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-3">No students have marked present yet.</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {expandedMarks.map((m) => (
-                              <div key={m.id} className="flex items-center justify-between text-sm">
-                                <span className="font-medium">{m.profile?.full_name ?? 'Unknown'}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(m.marked_at).toLocaleTimeString('en-GB', { timeStyle: 'short' })}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Past sessions */}
-          {pastSessions.length > 0 && (
-            <div>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Past Sessions
+        <div className="space-y-8">
+          {grouped.map((group) => (
+            <div key={group.key}>
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                <Radio className="w-3.5 h-3.5" /> {group.label}
               </h2>
               <div className="rounded-xl border border-border/60 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[560px]">
+                  <table className="w-full text-sm min-w-[640px]">
                     <thead className="bg-muted/30 border-b border-border/60">
                       <tr>
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date / Time</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Class</th>
                         <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grade</th>
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Label</th>
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Window</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date / Time</th>
                         <th className="text-left px-4 py-3 font-medium text-muted-foreground">Present</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Attendance</th>
                         <th className="text-right px-4 py-3 font-medium text-muted-foreground">Details</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/40">
-                      {pastSessions.map((s) => {
-                        const grade = s.grade
-                        const count = markCounts[s.id] ?? 0
-                        const isExpanded = expandedId === s.id
+                      {group.items.map((cls) => {
+                        const grade = cls.grade
+                        const count = markCounts[cls.id] ?? 0
+                        const isExpanded = expandedId === cls.id
+                        const isToggling = togglingId === cls.id
                         return (
                           <>
-                            <tr key={s.id} className="hover:bg-muted/20 transition-colors">
-                              <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
-                                {new Date(s.opens_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
+                            <tr
+                              key={cls.id}
+                              className={cls.attendance_open ? 'bg-green-50/50 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors' : 'hover:bg-muted/20 transition-colors'}
+                            >
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  {cls.attendance_open && (
+                                    <span className="relative flex h-2 w-2 shrink-0">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                                    </span>
+                                  )}
+                                  <span className="font-medium">{cls.title}</span>
+                                </div>
                               </td>
                               <td className="px-4 py-3">
                                 {grade && (
@@ -339,20 +237,37 @@ export default function AdminAttendancePage() {
                                   </Badge>
                                 )}
                               </td>
-                              <td className="px-4 py-3 text-muted-foreground">{s.label ?? '—'}</td>
-                              <td className="px-4 py-3 text-muted-foreground">{formatWindow(s)}</td>
+                              <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
+                                {fmt(cls.scheduled_at)}
+                              </td>
                               <td className="px-4 py-3">
-                                <span className="flex items-center gap-1 font-medium">
+                                <span className="flex items-center gap-1 font-medium text-sm">
                                   <Users className="w-3.5 h-3.5 text-primary" />
                                   {count}
                                 </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <Button
+                                  size="sm"
+                                  variant={cls.attendance_open ? 'default' : 'outline'}
+                                  className={cls.attendance_open
+                                    ? 'bg-green-600 hover:bg-green-700 text-white h-7 text-xs'
+                                    : 'h-7 text-xs'}
+                                  disabled={isToggling}
+                                  onClick={() => toggleAttendance(cls)}
+                                >
+                                  {isToggling
+                                    ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                    : null}
+                                  {cls.attendance_open ? 'Close' : 'Open Attendance'}
+                                </Button>
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 text-xs gap-1"
-                                  onClick={() => handleExpand(s.id)}
+                                  onClick={() => handleExpand(cls.id)}
                                 >
                                   {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                   {isExpanded ? 'Hide' : 'View'}
@@ -360,22 +275,48 @@ export default function AdminAttendancePage() {
                               </td>
                             </tr>
                             {isExpanded && (
-                              <tr key={`${s.id}-expanded`}>
+                              <tr key={`${cls.id}-exp`}>
                                 <td colSpan={6} className="px-4 pb-4 pt-2 bg-muted/10">
                                   {expandLoading ? (
-                                    <div className="flex justify-center py-3"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
-                                  ) : expandedMarks.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground text-center py-2">No students marked present.</p>
+                                    <div className="flex justify-center py-4">
+                                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                                    </div>
+                                  ) : expandedRows.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground text-center py-3">No attendance records yet.</p>
                                   ) : (
-                                    <div className="flex flex-wrap gap-3">
-                                      {expandedMarks.map((m) => (
-                                        <div key={m.id} className="flex items-center gap-2 text-sm bg-background rounded-lg border border-border/60 px-3 py-1.5">
-                                          <span className="font-medium">{m.profile?.full_name ?? 'Unknown'}</span>
-                                          <span className="text-xs text-muted-foreground">
-                                            {new Date(m.marked_at).toLocaleTimeString('en-GB', { timeStyle: 'short' })}
-                                          </span>
-                                        </div>
-                                      ))}
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-xs min-w-[400px]">
+                                        <thead>
+                                          <tr className="text-muted-foreground">
+                                            <th className="text-left pb-1 font-medium">Student</th>
+                                            <th className="text-left pb-1 font-medium">Joined at</th>
+                                            <th className="text-left pb-1 font-medium">Marked present at</th>
+                                            <th className="text-left pb-1 font-medium">Status</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border/20">
+                                          {expandedRows.map((row) => (
+                                            <tr key={row.id}>
+                                              <td className="py-1.5 font-medium pr-4">
+                                                {row.profile?.full_name ?? 'Unknown'}
+                                              </td>
+                                              <td className="py-1.5 text-muted-foreground pr-4">
+                                                {fmtTime(row.entry_time)}
+                                              </td>
+                                              <td className="py-1.5 text-muted-foreground pr-4">
+                                                {row.scheduled_end_time ? fmtTime(row.scheduled_end_time) : '—'}
+                                              </td>
+                                              <td className="py-1.5">
+                                                {row.scheduled_end_time ? (
+                                                  <span className="text-green-600 dark:text-green-400 font-semibold">Present</span>
+                                                ) : (
+                                                  <span className="text-orange-500 font-semibold">Joined only</span>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
                                     </div>
                                   )}
                                 </td>
@@ -389,72 +330,9 @@ export default function AdminAttendancePage() {
                 </div>
               </div>
             </div>
-          )}
-
-          {activeSessions.length === 0 && pastSessions.length === 0 && (
-            <div className="py-20 text-center rounded-xl border border-border/60">
-              <ClipboardList className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">No attendance sessions yet.</p>
-              <Button size="sm" className="bg-primary text-primary-foreground hover:bg-accent" onClick={() => setDialogOpen(true)}>
-                <Plus className="w-4 h-4 mr-1" /> Open First Session
-              </Button>
-            </div>
-          )}
+          ))}
         </div>
       )}
-
-      {/* Open attendance dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Open Attendance</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Grade *</Label>
-              <Select value={formGrade} onValueChange={setFormGrade}>
-                <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
-                <SelectContent>
-                  {grades.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Duration *</Label>
-              <Select value={formDuration} onValueChange={setFormDuration}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 minute</SelectItem>
-                  <SelectItem value="2">2 minutes</SelectItem>
-                  <SelectItem value="5">5 minutes</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Label (optional)</Label>
-              <Input
-                value={formLabel}
-                onChange={(e) => setFormLabel(e.target.value)}
-                placeholder="e.g. Tuesday Algebra, Chapter 4 class…"
-                className="text-sm"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleOpen}
-              disabled={saving || !formGrade}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Open Now
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
