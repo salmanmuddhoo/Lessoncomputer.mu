@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ShoppingCart, Radio, Lock, RefreshCw, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -72,6 +72,9 @@ export function BuySubscribeDialog({
   )
   const [selectedPastLive, setSelectedPastLive] = useState<Set<string>>(new Set())
   const [paying, setPaying] = useState(false)
+  // Defer price rendering to client to avoid SSR/hydration mismatch on computed prices
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   function handleOpen() {
     setMode(defaultMode)
@@ -162,7 +165,7 @@ export function BuySubscribeDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <div className="flex gap-2 mb-1">
               <button
@@ -383,14 +386,19 @@ export function BuySubscribeDialog({
             {!(mode === 'live' && isCurrentMonthSubscribed) && (
               <Button
                 onClick={initiatePayment}
-                disabled={paying || (mode === 'video' ? selected.size === 0 : !liveMonthPackageId)}
+                disabled={!mounted || paying || (mode === 'video' ? selected.size === 0 : !liveMonthPackageId)}
                 className="bg-primary text-primary-foreground hover:bg-accent"
               >
                 {paying
                   ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   : <CheckCircle2 className="w-4 h-4 mr-2" />
                 }
-                {paying ? 'Redirecting…' : mode === 'video' ? `Pay Rs ${total.toFixed(2)}` : `Pay Rs ${liveTotal.toFixed(2)}`}
+                {!mounted
+                  ? 'Loading…'
+                  : paying
+                    ? 'Redirecting…'
+                    : `Pay Rs ${(mode === 'video' ? total : liveTotal).toFixed(2)}`
+                }
               </Button>
             )}
           </DialogFooter>
