@@ -21,13 +21,9 @@ function getCredentials() {
 }
 
 function getMipsHeaders(): Record<string, string> {
-  const username = process.env.MIPS_AUTH_USERNAME ?? ''
-  const password = process.env.MIPS_AUTH_PASSWORD ?? ''
-  const token = Buffer.from(`${username}:${password}`).toString('base64')
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'Authorization': `Basic ${token}`,
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.78 Safari/537.36',
   }
 }
