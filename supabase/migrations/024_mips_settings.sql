@@ -31,5 +31,9 @@ create policy "Students view own orders"
   on public.mips_orders for select
   using (auth.uid() = student_id);
 
+create policy "Students insert own orders"
+  on public.mips_orders for insert
+  with check (auth.uid() = student_id);
+
 create index if not exists mips_orders_student_id_idx on public.mips_orders(student_id);
 create index if not exists mips_orders_status_idx on public.mips_orders(status);
