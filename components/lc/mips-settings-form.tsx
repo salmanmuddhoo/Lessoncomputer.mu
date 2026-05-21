@@ -75,6 +75,7 @@ export function MipsSettingsForm({ initialEnvironment }: Props) {
       <div className="text-xs text-muted-foreground space-y-1">
         <p className="font-medium">Required Vercel env vars:</p>
         <ul className="font-mono space-y-0.5 text-[11px] pl-2">
+          <li>MIPS_AUTH_USERNAME / MIPS_AUTH_PASSWORD</li>
           <li>MIPS_ID_MERCHANT / MIPS_ID_ENTITY</li>
           <li>MIPS_ID_OPERATOR / MIPS_OPERATOR_PASSWORD</li>
           <li>MIPS_HASH_SALT / MIPS_CIPHER_KEY</li>
