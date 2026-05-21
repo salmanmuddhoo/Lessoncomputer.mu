@@ -98,7 +98,13 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
 
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(`MIPS API error ${response.status}: ${text}`)
+    // Detect HTML error pages (e.g. Apache 401/403) and give a cleaner message
+    const isHtml = text.trimStart().startsWith('<')
+    throw new Error(
+      isHtml
+        ? `MIPS API returned HTTP ${response.status}. Check credentials or contact MIPS support.`
+        : `MIPS API error ${response.status}: ${text}`
+    )
   }
 
   const data = await response.json() as {
