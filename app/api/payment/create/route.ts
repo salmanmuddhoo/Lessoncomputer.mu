@@ -65,6 +65,15 @@ export async function POST(req: NextRequest) {
     const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_SITE_URL ?? ''
     const orderId = (order as { id: string }).id
 
+    // Debug: confirm env vars are present (lengths only, never log values)
+    console.log('[payment/create] env check', {
+      MIPS_AUTH_USERNAME: process.env.MIPS_AUTH_USERNAME ? `set(${process.env.MIPS_AUTH_USERNAME.length})` : 'MISSING',
+      MIPS_AUTH_PASSWORD: process.env.MIPS_AUTH_PASSWORD ? `set(${process.env.MIPS_AUTH_PASSWORD.length})` : 'MISSING',
+      MIPS_ID_MERCHANT:   process.env.MIPS_ID_MERCHANT   ? `set(${process.env.MIPS_ID_MERCHANT.length})`   : 'MISSING',
+      MIPS_ID_ENTITY:     process.env.MIPS_ID_ENTITY     ? `set(${process.env.MIPS_ID_ENTITY.length})`     : 'MISSING',
+      MIPS_ID_OPERATOR:   process.env.MIPS_ID_OPERATOR   ? `set(${process.env.MIPS_ID_OPERATOR.length})`   : 'MISSING',
+    })
+
     const result = await createMipsPayment({
       env,
       orderId,
