@@ -24,7 +24,7 @@ function getMipsHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.78 Safari/537.36',
+    'user-agent': '',
   }
 }
 
