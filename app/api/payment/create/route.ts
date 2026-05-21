@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     const orderId = (order as { id: string }).id
 
     // Debug: confirm env vars are present (lengths only, never log values)
-    console.log('[payment/create] env check', {
+    console.error('[payment/create] env check', {
       MIPS_AUTH_USERNAME: process.env.MIPS_AUTH_USERNAME ? `set(${process.env.MIPS_AUTH_USERNAME.length})` : 'MISSING',
       MIPS_AUTH_PASSWORD: process.env.MIPS_AUTH_PASSWORD ? `set(${process.env.MIPS_AUTH_PASSWORD.length})` : 'MISSING',
       MIPS_ID_MERCHANT:   process.env.MIPS_ID_MERCHANT   ? `set(${process.env.MIPS_ID_MERCHANT.length})`   : 'MISSING',
