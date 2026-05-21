@@ -4,9 +4,9 @@ export type MipsEnvironment = 'test' | 'production'
 
 function getBaseUrl(env: MipsEnvironment): string {
   if (env === 'production') {
-    return process.env.MIPS_PROD_URL ?? 'https://mips.mu'
+    return process.env.MIPS_PROD_URL ?? 'https://api.mips.mu'
   }
-  return process.env.MIPS_TEST_URL ?? 'https://sandbox.mips.mu'
+  return process.env.MIPS_TEST_URL ?? 'https://api.mips.mu'
 }
 
 function getCredentials() {
@@ -62,7 +62,7 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
     mode:             'simple',
   }
 
-  const response = await fetch(`${baseUrl}/marchands/api/`, {
+  const response = await fetch(`${baseUrl}/api/claim_payment_request`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
