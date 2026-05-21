@@ -50,8 +50,16 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (orderError || !order) {
-      console.error('[payment/create] Failed to create order:', orderError)
-      return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
+      const msg = orderError?.message ?? 'unknown'
+      console.error('[payment/create] Failed to create order:', msg)
+      // Most likely cause: migration 024 not applied in production DB
+      if (msg.includes('does not exist') || msg.includes('relation')) {
+        return NextResponse.json(
+          { error: 'Database migration 024 not applied. Run the migration in Supabase SQL Editor.' },
+          { status: 500 }
+        )
+      }
+      return NextResponse.json({ error: `Failed to create order: ${msg}` }, { status: 500 })
     }
 
     const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_SITE_URL ?? ''
@@ -74,7 +82,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ paymentUrl: result.paymentUrl })
   } catch (err) {
-    console.error('[payment/create]', err)
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    const msg = String(err)
+    console.error('[payment/create]', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
