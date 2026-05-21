@@ -257,13 +257,15 @@ export function RevisionNotesForm({ grades, packages, note, initialGradeId = '',
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="<h2>Topic</h2><p>Your revision notes here...</p>"
-                  className="font-mono text-xs min-h-[200px] resize-y"
+                  className="font-mono text-xs h-[220px] overflow-y-auto resize-none"
                 />
               </TabsContent>
               <TabsContent value="preview" className="mt-2">
-                <div
-                  className="min-h-[200px] p-4 rounded-lg border border-border/60 bg-background prose prose-sm max-w-none dark:prose-invert overflow-auto"
-                  dangerouslySetInnerHTML={{ __html: content || '<p class="text-muted-foreground">No content yet.</p>' }}
+                <iframe
+                  srcDoc={content || '<p style="color:#999;font-family:system-ui">No content yet.</p>'}
+                  className="w-full h-[220px] rounded-lg border border-border/60 bg-background"
+                  title="Video package preview"
+                  sandbox="allow-same-origin"
                 />
               </TabsContent>
             </Tabs>
@@ -297,13 +299,15 @@ export function RevisionNotesForm({ grades, packages, note, initialGradeId = '',
                   value={contentLive}
                   onChange={(e) => setContentLive(e.target.value)}
                   placeholder="<h2>Topic</h2><p>Live class revision notes...</p>"
-                  className="font-mono text-xs min-h-[200px] resize-y"
+                  className="font-mono text-xs h-[220px] overflow-y-auto resize-none"
                 />
               </TabsContent>
               <TabsContent value="preview" className="mt-2">
-                <div
-                  className="min-h-[200px] p-4 rounded-lg border border-border/60 bg-background prose prose-sm max-w-none dark:prose-invert overflow-auto"
-                  dangerouslySetInnerHTML={{ __html: contentLive || '<p class="text-muted-foreground">No content yet.</p>' }}
+                <iframe
+                  srcDoc={contentLive || '<p style="color:#999;font-family:system-ui">No content yet.</p>'}
+                  className="w-full h-[220px] rounded-lg border border-border/60 bg-background"
+                  title="Live classes preview"
+                  sandbox="allow-same-origin"
                 />
               </TabsContent>
             </Tabs>

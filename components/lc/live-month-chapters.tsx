@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { FolderOpen, ChevronDown, ChevronUp, FileText, Download, Play, BookMarked } from 'lucide-react'
+import { FolderOpen, ChevronDown, ChevronUp, FileText, Download, Play, BookMarked, ExternalLink } from 'lucide-react'
 
 interface Chapter {
   id: string
@@ -16,6 +16,13 @@ interface Props {
   videosByChapter: Record<string, any[]>
   documentsByChapter: Record<string, any[]>
   notesByChapter?: Record<string, any[]>
+}
+
+function openNoteInNewTab(html: string, title: string) {
+  const full = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:system-ui,sans-serif;line-height:1.6;max-width:860px;margin:2rem auto;padding:0 1rem;}</style></head><body>${html}</body></html>`
+  const url = URL.createObjectURL(new Blob([full], { type: 'text/html' }))
+  const w = window.open(url, '_blank')
+  if (w) setTimeout(() => URL.revokeObjectURL(url), 30000)
 }
 
 export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapter, notesByChapter = {} }: Props) {
@@ -102,21 +109,20 @@ export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapte
                   </div>
                 )}
                 {chNotes.length > 0 && (
-                  <div className="space-y-3 mt-2">
+                  <div className="space-y-2 mt-2">
                     {chNotes.map((note: any) => {
                       const html = note.content_live || note.content
                       if (!html) return null
                       return (
-                        <div key={note.id} className="rounded-lg border border-violet-200 dark:border-violet-800 overflow-hidden">
-                          <div className="flex items-center gap-2 px-4 py-2 bg-violet-50 dark:bg-violet-950/20 border-b border-violet-200 dark:border-violet-800">
-                            <BookMarked className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
-                            <span className="font-semibold text-sm text-violet-700 dark:text-violet-300">{note.title}</span>
-                          </div>
-                          <div
-                            className="p-4 prose prose-sm max-w-none dark:prose-invert"
-                            dangerouslySetInnerHTML={{ __html: html }}
-                          />
-                        </div>
+                        <button
+                          key={note.id}
+                          onClick={() => openNoteInNewTab(html, note.title)}
+                          className="w-full flex items-center gap-3 p-3 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-950/40 transition-colors text-left"
+                        >
+                          <BookMarked className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
+                          <span className="flex-1 font-medium text-sm text-violet-700 dark:text-violet-300 truncate">{note.title}</span>
+                          <ExternalLink className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+                        </button>
                       )
                     })}
                   </div>
