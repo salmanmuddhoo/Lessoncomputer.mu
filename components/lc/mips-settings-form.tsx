@@ -75,12 +75,13 @@ export function MipsSettingsForm({ initialEnvironment }: Props) {
       <div className="text-xs text-muted-foreground space-y-1">
         <p className="font-medium">Required Vercel env vars:</p>
         <ul className="font-mono space-y-0.5 text-[11px] pl-2">
-          <li>MIPS_AUTH_USERNAME / MIPS_AUTH_PASSWORD</li>
-          <li>MIPS_ID_MERCHANT / MIPS_ID_ENTITY / MIPS_ID_OPERATOR</li>
-          <li>MIPS_OPERATOR_PASSWORD / MIPS_HASH_SALT</li>
-          <li>MIPS_PROD_URL / MIPS_TEST_URL (optional overrides)</li>
-          <li>NEXT_PUBLIC_SITE_URL (your domain)</li>
+          <li>MIPS_ID_MERCHANT / MIPS_ID_ENTITY</li>
+          <li>MIPS_ID_OPERATOR / MIPS_OPERATOR_PASSWORD</li>
+          <li>MIPS_HASH_SALT / NEXT_PUBLIC_SITE_URL</li>
         </ul>
+        <p className="mt-1">Also configure the IMN callback URL in the MiPS merchant back office:<br/>
+          <span className="font-mono">{'{your-domain}'}/api/payment/callback</span>
+        </p>
       </div>
 
       <Button

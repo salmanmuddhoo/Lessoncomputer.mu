@@ -32,24 +32,25 @@ export async function POST(req: NextRequest) {
       .single()
     const env: MipsEnvironment = (settings?.mips_environment as MipsEnvironment) ?? 'test'
 
-    // Create order record
+    // Create pending order record first to get the UUID (used to derive MIPS id_order)
     const { data: order, error: orderError } = await (supabase as any)
       .from('mips_orders')
       .insert({
-        student_id: user.id,
-        order_type: orderType,
+        student_id:  user.id,
+        order_type:  orderType,
         package_ids: packageIds,
         is_recurring: isRecurring,
         amount,
-        currency: 'MUR',
+        currency:    'MUR',
         description,
-        status: 'pending',
-        metadata: { env },
+        status:      'pending',
+        metadata:    { env },
       })
       .select('id')
       .single()
 
     if (orderError || !order) {
+      console.error('[payment/create] Failed to create order:', orderError)
       return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
     }
 
@@ -62,15 +63,13 @@ export async function POST(req: NextRequest) {
       amount,
       currency: 'MUR',
       description,
-      returnUrl:   `${origin}/payment/result?orderId=${orderId}`,
-      cancelUrl:   `${origin}/payment/result?orderId=${orderId}&cancelled=1`,
-      callbackUrl: `${origin}/api/payment/callback`,
+      returnUrl: `${origin}/payment/result?orderId=${orderId}`,
     })
 
-    // Store MIPS transaction ID
+    // Store the MIPS id_order so the IMN callback can look up this order
     await (supabase as any)
       .from('mips_orders')
-      .update({ mips_transaction_id: result.transactionId })
+      .update({ mips_transaction_id: result.mipsOrderId })
       .eq('id', orderId)
 
     return NextResponse.json({ paymentUrl: result.paymentUrl })
