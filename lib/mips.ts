@@ -20,10 +20,16 @@ function getCredentials() {
   }
 }
 
-const MIPS_HEADERS = {
-  'Content-Type': 'application/json',
-  'Accept': 'application/json',
-  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.78 Safari/537.36',
+function getMipsHeaders(): Record<string, string> {
+  const username = process.env.MIPS_AUTH_USERNAME ?? ''
+  const password = process.env.MIPS_AUTH_PASSWORD ?? ''
+  const token = Buffer.from(`${username}:${password}`).toString('base64')
+  return {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Authorization': `Basic ${token}`,
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.78 Safari/537.36',
+  }
 }
 
 // MIPS id_order: 5–25 alphanumeric chars — strip hyphens from UUID and truncate
@@ -76,11 +82,17 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
   }
 
   const url = `${baseUrl}/api/create_payment_request`
-  console.error('[mips] POST', url, { idMerchant: creds.idMerchant ? `set(${creds.idMerchant.length})` : 'MISSING', mipsOrderId, amount })
+  const headers = getMipsHeaders()
+  console.error('[mips] POST', url, {
+    idMerchant: creds.idMerchant ? `set(${creds.idMerchant.length})` : 'MISSING',
+    mipsOrderId,
+    amount,
+    authHeader: headers['Authorization'] ? `Basic set(${headers['Authorization'].length})` : 'MISSING',
+  })
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: MIPS_HEADERS,
+    headers,
     body: JSON.stringify(body),
   })
 
@@ -141,7 +153,7 @@ export async function decryptImnCallback(
 
   const response = await fetch(`${baseUrl}/api/decrypt_imn_data`, {
     method: 'POST',
-    headers: MIPS_HEADERS,
+    headers: getMipsHeaders(),
     body: JSON.stringify(body),
   })
 
