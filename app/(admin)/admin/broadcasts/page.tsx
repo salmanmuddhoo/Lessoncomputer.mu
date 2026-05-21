@@ -17,7 +17,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Loader2, Plus, Trash2, Megaphone, Users, Radio, Video } from 'lucide-react'
+import { Loader2, Plus, Trash2, Megaphone, Users, Radio, Video, FolderOpen } from 'lucide-react'
 import { toast } from 'sonner'
 
 const AUDIENCE_LABELS: Record<string, { label: string; icon: React.ElementType; className: string }> = {
@@ -27,19 +27,23 @@ const AUDIENCE_LABELS: Record<string, { label: string; icon: React.ElementType; 
 }
 
 interface Grade { id: string; name: string; color: string }
+interface Chapter { id: string; title: string }
 interface Broadcast {
   id: string
   title: string
   body: string
   grade_id: string
+  chapter_id: string | null
   target_audience: string
   created_at: string
   grade: { name: string; color: string } | null
+  chapter: { title: string } | null
 }
 
 export default function AdminBroadcastsPage() {
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
   const [grades, setGrades] = useState<Grade[]>([])
+  const [chapters, setChapters] = useState<Chapter[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -49,6 +53,7 @@ export default function AdminBroadcastsPage() {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [gradeId, setGradeId] = useState('')
+  const [chapterId, setChapterId] = useState('')
   const [audience, setAudience] = useState('all')
 
   const supabase = createClient()
@@ -58,7 +63,7 @@ export default function AdminBroadcastsPage() {
     const [{ data: bData }, { data: gData }] = await Promise.all([
       (supabase as any)
         .from('broadcasts')
-        .select('id, title, body, grade_id, target_audience, created_at, grade:grades(name, color)')
+        .select('id, title, body, grade_id, chapter_id, target_audience, created_at, grade:grades(name, color), chapter:chapters(title)')
         .order('created_at', { ascending: false }),
       supabase.from('grades').select('id, name, color').eq('is_active', true).order('order_index'),
     ])
@@ -71,10 +76,41 @@ export default function AdminBroadcastsPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Fetch chapters whenever gradeId changes
+  useEffect(() => {
+    if (!gradeId) { setChapters([]); return }
+    async function fetchChapters() {
+      const { data: pkgs } = await supabase
+        .from('subscription_packages')
+        .select('id')
+        .eq('grade_id', gradeId)
+        .eq('is_active', true)
+      const pkgIds = (pkgs ?? []).map((p: any) => p.id)
+      if (pkgIds.length === 0) { setChapters([]); return }
+      const { data: spcData } = await supabase
+        .from('subscription_package_chapters')
+        .select('chapter_id, chapter:chapters(id, title)')
+        .in('package_id', pkgIds)
+      const seen = new Set<string>()
+      const unique: Chapter[] = []
+      for (const row of (spcData ?? []) as any[]) {
+        const ch = row.chapter
+        if (ch && !seen.has(ch.id)) {
+          seen.add(ch.id)
+          unique.push({ id: ch.id, title: ch.title })
+        }
+      }
+      unique.sort((a, b) => a.title.localeCompare(b.title))
+      setChapters(unique)
+    }
+    fetchChapters()
+  }, [gradeId])
+
   function openNew() {
     setTitle('')
     setBody('')
     setAudience('all')
+    setChapterId('')
     if (grades.length > 0) setGradeId(grades[0].id)
     setDialogOpen(true)
   }
@@ -89,6 +125,7 @@ export default function AdminBroadcastsPage() {
         title: title.trim(),
         body: body.trim(),
         grade_id: gradeId,
+        chapter_id: chapterId || null,
         target_audience: audience,
         created_by: user!.id,
       })
@@ -141,11 +178,12 @@ export default function AdminBroadcastsPage() {
       ) : (
         <div className="rounded-xl border border-border/60 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px]">
+            <table className="w-full text-sm min-w-[620px]">
               <thead className="bg-muted/30 border-b border-border/60">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Title</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grade</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Chapter</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Audience</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Sent</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Actions</th>
@@ -170,6 +208,16 @@ export default function AdminBroadcastsPage() {
                           >
                             {grade.name}
                           </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {b.chapter ? (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <FolderOpen className="w-3 h-3" />
+                            {b.chapter.title}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">General</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -210,7 +258,7 @@ export default function AdminBroadcastsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Grade *</Label>
-                <Select value={gradeId} onValueChange={setGradeId}>
+                <Select value={gradeId} onValueChange={(v) => { setGradeId(v); setChapterId('') }}>
                   <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
                   <SelectContent>
                     {grades.map((g) => (
@@ -230,6 +278,19 @@ export default function AdminBroadcastsPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Chapter (optional)</Label>
+              <Select value={chapterId || 'none'} onValueChange={(v) => setChapterId(v === 'none' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="General (no chapter)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">General (no chapter)</SelectItem>
+                  {chapters.map((ch) => (
+                    <SelectItem key={ch.id} value={ch.id}>{ch.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">
