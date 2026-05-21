@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
 import { AccountForm } from './account-form'
 import { SiteSettingsForm } from '@/components/lc/site-settings-form'
+import { MipsSettingsForm } from '@/components/lc/mips-settings-form'
 
 export const metadata: Metadata = { title: 'Admin Settings' }
 
@@ -17,7 +18,7 @@ export default async function AdminSettingsPage() {
       .single(),
     (supabase as any)
       .from('site_settings')
-      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number')
+      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment')
       .eq('id', 1)
       .single(),
   ])
@@ -27,6 +28,7 @@ export default async function AdminSettingsPage() {
     instagram_url: string | null
     tiktok_url: string | null
     whatsapp_number: string | null
+    mips_environment: string | null
   }
 
   return (
@@ -50,6 +52,10 @@ export default async function AdminSettingsPage() {
             tiktok_url: ss.tiktok_url ?? '',
             whatsapp_number: ss.whatsapp_number ?? '',
           }}
+        />
+
+        <MipsSettingsForm
+          initialEnvironment={(ss.mips_environment as 'test' | 'production') ?? 'test'}
         />
       </div>
     </div>
