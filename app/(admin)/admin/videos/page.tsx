@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Loader2, Plus, Pencil, Trash2, Clock, Eye, EyeOff, Video,
-  FolderOpen, ChevronDown, ChevronUp, Package, FileText, Radio,
+  FolderOpen, ChevronDown, ChevronUp, Package, FileText, Radio, BookMarked,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -58,13 +58,23 @@ interface DocumentRow {
   is_published: boolean
 }
 
+interface NoteRow {
+  id: string
+  title: string
+  grade_id: string
+  chapter_id: string | null
+  is_published: boolean
+}
+
 type ContentItem =
   | { type: 'video'; data: VideoRow }
   | { type: 'document'; data: DocumentRow }
+  | { type: 'note'; data: NoteRow }
 
 export default function AdminVideosPage() {
   const [videos, setVideos] = useState<VideoRow[]>([])
   const [documents, setDocuments] = useState<DocumentRow[]>([])
+  const [notes, setNotes] = useState<NoteRow[]>([])
   const [grades, setGrades] = useState<Grade[]>([])
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [pkgInfos, setPkgInfos] = useState<PkgInfo[]>([])
@@ -90,6 +100,7 @@ export default function AdminVideosPage() {
     const [
       { data: videoData },
       { data: documentData },
+      { data: noteData },
       { data: gradeData },
       { data: chapterData },
       { data: pkgData },
@@ -102,6 +113,10 @@ export default function AdminVideosPage() {
         .from('documents')
         .select('id, title, grade_id, chapter_id, file_name, is_published')
         .order('created_at', { ascending: false }),
+      (supabase as any)
+        .from('revision_notes')
+        .select('id, title, grade_id, chapter_id, is_published')
+        .order('created_at', { ascending: false }),
       supabase.from('grades').select('id,name,color').eq('is_active', true).order('order_index'),
       supabase.from('chapters').select('id,grade_id,title,order_index').order('order_index'),
       supabase.from('subscription_packages')
@@ -112,6 +127,7 @@ export default function AdminVideosPage() {
     ])
     setVideos((videoData ?? []) as VideoRow[])
     setDocuments((documentData ?? []) as DocumentRow[])
+    setNotes((noteData ?? []) as NoteRow[])
     setGrades(gradeData ?? [])
     setChapters(chapterData ?? [])
     setPkgInfos((pkgData ?? []).map((p: any) => ({
@@ -149,13 +165,26 @@ export default function AdminVideosPage() {
     load()
   }
 
+  async function handleDeleteNote(note: NoteRow) {
+    if (!confirm(`Delete "${note.title}" permanently?`)) return
+    setDeleting(note.id)
+    const supabase = createClient()
+    const { error } = await (supabase as any).from('revision_notes').delete().eq('id', note.id)
+    if (error) { toast.error(error.message); setDeleting(null); return }
+    toast.success('Revision notes deleted')
+    setDeleting(null)
+    load()
+  }
+
   const filteredVideos = gradeFilter === 'all' ? videos : videos.filter((v) => v.grade_id === gradeFilter)
   const filteredDocuments = gradeFilter === 'all' ? documents : documents.filter((d) => d.grade_id === gradeFilter)
+  const filteredNotes = gradeFilter === 'all' ? notes : notes.filter((n) => n.grade_id === gradeFilter)
 
   const activeGrades = gradeFilter === 'all'
     ? grades.filter((g) =>
         filteredVideos.some((v) => v.grade_id === g.id) ||
-        filteredDocuments.some((d) => d.grade_id === g.id)
+        filteredDocuments.some((d) => d.grade_id === g.id) ||
+        filteredNotes.some((n) => n.grade_id === g.id)
       )
     : grades.filter((g) => g.id === gradeFilter)
 
@@ -172,7 +201,10 @@ export default function AdminVideosPage() {
     const docs = filteredDocuments
       .filter((d) => d.grade_id === gradeId && d.chapter_id === chapterId)
       .map((d): ContentItem => ({ type: 'document', data: d }))
-    return [...vids, ...docs]
+    const nts = filteredNotes
+      .filter((n) => n.grade_id === gradeId && n.chapter_id === chapterId)
+      .map((n): ContentItem => ({ type: 'note', data: n }))
+    return [...vids, ...docs, ...nts]
   }
 
   function getPackageTags(gradeId: string, chapterId: string): { inVideo: boolean; inLive: boolean } {
@@ -182,7 +214,7 @@ export default function AdminVideosPage() {
     return { inVideo, inLive }
   }
 
-  const totalCount = filteredVideos.length + filteredDocuments.length
+  const totalCount = filteredVideos.length + filteredDocuments.length + filteredNotes.length
 
   return (
     <div>
@@ -190,7 +222,7 @@ export default function AdminVideosPage() {
         <div>
           <h1 className="text-2xl font-bold">Tuition</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            {filteredVideos.length} video{filteredVideos.length !== 1 ? 's' : ''} · {filteredDocuments.length} document{filteredDocuments.length !== 1 ? 's' : ''}
+            {filteredVideos.length} video{filteredVideos.length !== 1 ? 's' : ''} · {filteredDocuments.length} document{filteredDocuments.length !== 1 ? 's' : ''} · {filteredNotes.length} note{filteredNotes.length !== 1 ? 's' : ''}
           </p>
         </div>
         <DropdownMenu>
@@ -210,6 +242,11 @@ export default function AdminVideosPage() {
                 <FileText className="w-4 h-4" /> Add Document
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/videos/revision-notes/new" className="flex items-center gap-2">
+                <BookMarked className="w-4 h-4" /> Add Revision Notes
+              </Link>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -220,7 +257,7 @@ export default function AdminVideosPage() {
           onClick={() => setGradeFilter('all')}
           className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${gradeFilter === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/40'}`}
         >
-          All ({videos.length + documents.length})
+          All ({videos.length + documents.length + notes.length})
         </button>
         {grades.map((g) => (
           <button
@@ -228,7 +265,7 @@ export default function AdminVideosPage() {
             onClick={() => setGradeFilter(g.id)}
             className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${gradeFilter === g.id ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/40'}`}
           >
-            {g.name} ({videos.filter((v) => v.grade_id === g.id).length + documents.filter((d) => d.grade_id === g.id).length})
+            {g.name} ({videos.filter((v) => v.grade_id === g.id).length + documents.filter((d) => d.grade_id === g.id).length + notes.filter((n) => n.grade_id === g.id).length})
           </button>
         ))}
       </div>
@@ -258,6 +295,11 @@ export default function AdminVideosPage() {
                   <FileText className="w-4 h-4" /> Add Document
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/admin/videos/revision-notes/new" className="flex items-center gap-2">
+                  <BookMarked className="w-4 h-4" /> Add Revision Notes
+                </Link>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -266,9 +308,10 @@ export default function AdminVideosPage() {
           {activeGrades.map((grade) => {
             const gradeVideos = filteredVideos.filter((v) => v.grade_id === grade.id)
             const gradeDocuments = filteredDocuments.filter((d) => d.grade_id === grade.id)
-            if (!gradeVideos.length && !gradeDocuments.length) return null
+            const gradeNotes = filteredNotes.filter((n) => n.grade_id === grade.id)
+            if (!gradeVideos.length && !gradeDocuments.length && !gradeNotes.length) return null
             const isGradeCollapsed = collapsedGrades.has(grade.id)
-            const gradeTotal = gradeVideos.length + gradeDocuments.length
+            const gradeTotal = gradeVideos.length + gradeDocuments.length + gradeNotes.length
             const gradeChapters = getChaptersForGrade(grade.id)
 
             return (
@@ -312,6 +355,7 @@ export default function AdminVideosPage() {
                               items={chContent}
                               onDeleteVideo={handleDeleteVideo}
                               onDeleteDocument={handleDeleteDocument}
+                              onDeleteNote={handleDeleteNote}
                               deleting={deleting}
                               pkgInfos={pkgInfos}
                             />
@@ -334,6 +378,7 @@ export default function AdminVideosPage() {
                             items={uncategorized}
                             onDeleteVideo={handleDeleteVideo}
                             onDeleteDocument={handleDeleteDocument}
+                            onDeleteNote={handleDeleteNote}
                             deleting={deleting}
                             pkgInfos={pkgInfos}
                           />
@@ -364,12 +409,14 @@ function ContentTable({
   items,
   onDeleteVideo,
   onDeleteDocument,
+  onDeleteNote,
   deleting,
   pkgInfos,
 }: {
   items: ContentItem[]
   onDeleteVideo: (v: VideoRow) => void
   onDeleteDocument: (d: DocumentRow) => void
+  onDeleteNote: (n: NoteRow) => void
   deleting: string | null
   pkgInfos: PkgInfo[]
 }) {
@@ -439,6 +486,7 @@ function ContentTable({
               )
             }
 
+          if (item.type === 'document') {
             const d = item.data
             const { inVideo: dInVideo, inLive: dInLive } = getItemTags(pkgInfos, d.grade_id, d.chapter_id)
             return (
@@ -487,7 +535,58 @@ function ContentTable({
                 </td>
               </tr>
             )
-          })}
+          }
+
+          if (item.type === 'note') {
+            const n = item.data
+            const { inVideo: nInVideo, inLive: nInLive } = getItemTags(pkgInfos, n.grade_id, n.chapter_id)
+            return (
+              <tr key={`n-${n.id}`} className="hover:bg-muted/20 transition-colors">
+                <td className="px-4 py-2.5 w-full">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="text-xs gap-1 shrink-0 text-violet-600 border-violet-300 bg-violet-50 dark:bg-violet-950/20 dark:border-violet-800 dark:text-violet-400">
+                      <BookMarked className="w-2.5 h-2.5" /> Notes
+                    </Badge>
+                    <span className="font-medium line-clamp-1 max-w-[180px] block">{n.title}</span>
+                    {nInVideo && (
+                      <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 text-primary border-primary/30 bg-primary/5 shrink-0">
+                        <Package className="w-2.5 h-2.5" /> Video Pkg
+                      </Badge>
+                    )}
+                    {nInLive && (
+                      <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-4 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400 shrink-0">
+                        <Radio className="w-2.5 h-2.5" /> Live
+                      </Badge>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-2.5 whitespace-nowrap text-xs text-muted-foreground" colSpan={2}>—</td>
+                <td className="px-4 py-2.5 whitespace-nowrap">
+                  <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${n.is_published ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+                    {n.is_published ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    {n.is_published ? 'Published' : 'Draft'}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/admin/videos/revision-notes/${n.id}/edit`}><Pencil className="w-3.5 h-3.5" /></Link>
+                    </Button>
+                    <Button
+                      variant="ghost" size="sm"
+                      className="text-destructive hover:bg-destructive/10"
+                      onClick={() => onDeleteNote(n)}
+                      disabled={deleting === n.id}
+                    >
+                      {deleting === n.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            )
+          }
+          return null
+        })}
         </tbody>
       </table>
     </div>

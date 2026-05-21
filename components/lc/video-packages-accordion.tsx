@@ -5,7 +5,7 @@ import { VideoCard } from '@/components/lc/video-card'
 import { Badge } from '@/components/ui/badge'
 import {
   Package, FolderOpen, FileText, Download,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, BookMarked,
 } from 'lucide-react'
 
 interface Chapter {
@@ -26,10 +26,11 @@ interface Props {
   packages: VideoPackage[]
   videosByChapter: Record<string, any[]>
   documentsByChapter: Record<string, any[]>
+  notesByChapter?: Record<string, any[]>
   grade: { name: string; color: string }
 }
 
-export function VideoPackagesAccordion({ packages, videosByChapter, documentsByChapter, grade }: Props) {
+export function VideoPackagesAccordion({ packages, videosByChapter, documentsByChapter, notesByChapter = {}, grade }: Props) {
   const [openPackages, setOpenPackages] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(packages.map(p => [p.id, true]))
   )
@@ -49,6 +50,7 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
         const isPkgOpen = openPackages[pkg.id] ?? true
         const totalVideos = pkg.chapters.reduce((s, ch) => s + (videosByChapter[ch.id]?.length ?? 0), 0)
         const totalDocs = pkg.chapters.reduce((s, ch) => s + (documentsByChapter[ch.id]?.length ?? 0), 0)
+        const totalNotes = pkg.chapters.reduce((s, ch) => s + (notesByChapter[ch.id]?.length ?? 0), 0)
 
         return (
           <div key={pkg.id} className="rounded-2xl border border-primary/20 overflow-hidden">
@@ -86,6 +88,11 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
                       · {totalDocs} doc{totalDocs !== 1 ? 's' : ''}
                     </span>
                   )}
+                  {totalNotes > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      · {totalNotes} note{totalNotes !== 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
               </div>
               {isPkgOpen
@@ -100,7 +107,8 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
                 {pkg.chapters.map(ch => {
                   const chVideos = videosByChapter[ch.id] ?? []
                   const chDocs = documentsByChapter[ch.id] ?? []
-                  if (chVideos.length === 0 && chDocs.length === 0) return null
+                  const chNotes = notesByChapter[ch.id] ?? []
+                  if (chVideos.length === 0 && chDocs.length === 0 && chNotes.length === 0) return null
                   const isChOpen = openChapters[ch.id] ?? false
 
                   return (
@@ -112,7 +120,7 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
                         <FolderOpen className="w-4 h-4 text-primary shrink-0" />
                         <span className="flex-1 font-semibold text-sm">{ch.title}</span>
                         <span className="text-xs text-muted-foreground mr-1">
-                          {chVideos.length + chDocs.length} item{(chVideos.length + chDocs.length) !== 1 ? 's' : ''}
+                          {chVideos.length + chDocs.length + chNotes.length} item{(chVideos.length + chDocs.length + chNotes.length) !== 1 ? 's' : ''}
                         </span>
                         {isChOpen
                           ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -151,6 +159,22 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
                               ))}
                             </div>
                           )}
+                          {chNotes.length > 0 && (
+                            <div className="space-y-3 mt-2">
+                              {chNotes.map((note: any) => (
+                                <div key={note.id} className="rounded-lg border border-violet-200 dark:border-violet-800 overflow-hidden">
+                                  <div className="flex items-center gap-2 px-4 py-2 bg-violet-50 dark:bg-violet-950/20 border-b border-violet-200 dark:border-violet-800">
+                                    <BookMarked className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
+                                    <span className="font-semibold text-sm text-violet-700 dark:text-violet-300">{note.title}</span>
+                                  </div>
+                                  <div
+                                    className="p-4 prose prose-sm max-w-none dark:prose-invert"
+                                    dangerouslySetInnerHTML={{ __html: note.content ?? '' }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -158,7 +182,8 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
                 })}
                 {pkg.chapters.every(ch =>
                   (videosByChapter[ch.id]?.length ?? 0) === 0 &&
-                  (documentsByChapter[ch.id]?.length ?? 0) === 0
+                  (documentsByChapter[ch.id]?.length ?? 0) === 0 &&
+                  (notesByChapter[ch.id]?.length ?? 0) === 0
                 ) && (
                   <div className="px-5 py-6 text-center">
                     <p className="text-sm text-muted-foreground">No content published in this package yet.</p>

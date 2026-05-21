@@ -41,6 +41,7 @@ interface Props {
   subscribedPackageIds: string[]
   videosByChapter: Record<string, any[]>
   documentsByChapter: Record<string, any[]>
+  notesByChapter?: Record<string, any[]>
   currentMonth: number
   currentYear: number
   liveSubscriptionPrice: number
@@ -54,6 +55,7 @@ export function LiveMonthsList({
   subscribedPackageIds,
   videosByChapter,
   documentsByChapter,
+  notesByChapter = {},
   currentMonth,
   currentYear,
   liveSubscriptionPrice,
@@ -201,6 +203,7 @@ export function LiveMonthsList({
                     chapters={pkg.chapters}
                     videosByChapter={videosByChapter}
                     documentsByChapter={documentsByChapter}
+                    notesByChapter={notesByChapter}
                   />
                 </div>
               )}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { FolderOpen, ChevronDown, ChevronUp, FileText, Download, Play } from 'lucide-react'
+import { FolderOpen, ChevronDown, ChevronUp, FileText, Download, Play, BookMarked } from 'lucide-react'
 
 interface Chapter {
   id: string
@@ -15,9 +15,10 @@ interface Props {
   chapters: Chapter[]
   videosByChapter: Record<string, any[]>
   documentsByChapter: Record<string, any[]>
+  notesByChapter?: Record<string, any[]>
 }
 
-export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapter }: Props) {
+export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapter, notesByChapter = {} }: Props) {
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
 
   function toggle(id: string) {
@@ -38,7 +39,8 @@ export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapte
         const isOpen = openChapters[ch.id] ?? false
         const chVideos = videosByChapter[ch.id] ?? []
         const chDocs = documentsByChapter[ch.id] ?? []
-        const itemCount = chVideos.length + chDocs.length
+        const chNotes = notesByChapter[ch.id] ?? []
+        const itemCount = chVideos.length + chDocs.length + chNotes.length
 
         return (
           <div key={ch.id} className="rounded-xl border border-border/60 overflow-hidden">
@@ -99,7 +101,27 @@ export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapte
                     ))}
                   </div>
                 )}
-                {chVideos.length === 0 && chDocs.length === 0 && (
+                {chNotes.length > 0 && (
+                  <div className="space-y-3 mt-2">
+                    {chNotes.map((note: any) => {
+                      const html = note.content_live || note.content
+                      if (!html) return null
+                      return (
+                        <div key={note.id} className="rounded-lg border border-violet-200 dark:border-violet-800 overflow-hidden">
+                          <div className="flex items-center gap-2 px-4 py-2 bg-violet-50 dark:bg-violet-950/20 border-b border-violet-200 dark:border-violet-800">
+                            <BookMarked className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
+                            <span className="font-semibold text-sm text-violet-700 dark:text-violet-300">{note.title}</span>
+                          </div>
+                          <div
+                            className="p-4 prose prose-sm max-w-none dark:prose-invert"
+                            dangerouslySetInnerHTML={{ __html: html }}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {chVideos.length === 0 && chDocs.length === 0 && chNotes.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     No content in this chapter yet.
                   </p>
