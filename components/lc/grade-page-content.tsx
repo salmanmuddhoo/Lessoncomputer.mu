@@ -182,7 +182,6 @@ export function GradePageContent({
                     {pkgChapters.length} chapter{pkgChapters.length !== 1 ? 's' : ''}
                     {' · '}{totalVideos} video{totalVideos !== 1 ? 's' : ''}
                     {totalDocs > 0 ? ` · ${totalDocs} doc${totalDocs !== 1 ? 's' : ''}` : ''}
-                    {' · '}Rs {pkg.price.toFixed(2)}
                   </p>
                 </div>
 
