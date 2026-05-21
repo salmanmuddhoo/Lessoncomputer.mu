@@ -18,13 +18,6 @@ interface Props {
   notesByChapter?: Record<string, any[]>
 }
 
-function openNoteInNewTab(html: string, title: string) {
-  const full = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:system-ui,sans-serif;line-height:1.6;max-width:860px;margin:2rem auto;padding:0 1rem;}</style></head><body>${html}</body></html>`
-  const url = URL.createObjectURL(new Blob([full], { type: 'text/html' }))
-  const w = window.open(url, '_blank')
-  if (w) setTimeout(() => URL.revokeObjectURL(url), 30000)
-}
-
 export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapter, notesByChapter = {} }: Props) {
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
 
@@ -99,11 +92,11 @@ export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapte
                         href={doc.file_url_live || doc.file_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:bg-muted/30 transition-colors group"
+                        className="flex items-center gap-3 p-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors group"
                       >
-                        <FileText className="w-4 h-4 text-primary shrink-0" />
-                        <span className="flex-1 text-sm font-medium truncate">{doc.title}</span>
-                        <Download className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                        <FileText className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                        <span className="flex-1 text-sm font-medium text-red-700 dark:text-red-300 truncate">{doc.title}</span>
+                        <Download className="w-3.5 h-3.5 text-red-400 group-hover:text-red-600 dark:group-hover:text-red-300 transition-colors shrink-0" />
                       </a>
                     ))}
                   </div>
@@ -111,18 +104,21 @@ export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapte
                 {chNotes.length > 0 && (
                   <div className="space-y-2 mt-2">
                     {chNotes.map((note: any) => {
-                      const html = note.content_live || note.content
-                      if (!html) return null
+                      const hasContent = !!(note.content_live || note.content)
+                      if (!hasContent) return null
+                      const isLive = !!note.content_live
                       return (
-                        <button
+                        <a
                           key={note.id}
-                          onClick={() => openNoteInNewTab(html, note.title)}
-                          className="w-full flex items-center gap-3 p-3 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-950/40 transition-colors text-left"
+                          href={`/api/notes/${note.id}${isLive ? '?live=1' : ''}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-950/40 transition-colors"
                         >
                           <BookMarked className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
                           <span className="flex-1 font-medium text-sm text-violet-700 dark:text-violet-300 truncate">{note.title}</span>
                           <ExternalLink className="w-3.5 h-3.5 text-violet-500 shrink-0" />
-                        </button>
+                        </a>
                       )
                     })}
                   </div>
