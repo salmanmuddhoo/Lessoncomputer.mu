@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Video, Users, BookOpen,
   LogOut, Settings, ChevronRight, ChevronDown, Radio, Menu, X, Package, CalendarDays,
-  BarChart2, ClipboardList, Megaphone,
+  BarChart2, ClipboardList, Megaphone, UserCheck,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { createClient } from '@/lib/supabase/client'
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { label: 'Dashboard',    href: '/admin',              icon: LayoutDashboard, exact: true },
   { label: 'Tuition',       href: '/admin/videos',       icon: Video },
   { label: 'Live Classes', href: '/admin/live-classes', icon: Radio },
+  { label: 'Attendance',   href: '/admin/attendance',   icon: UserCheck },
   { label: 'Grades',       href: '/admin/grades',       icon: BookOpen },
   { label: 'Students',       href: '/admin/students',       icon: Users },
   { label: 'Subscriptions', href: '/admin/subscriptions', icon: Package },
