@@ -16,13 +16,21 @@ function getCredentials() {
     idOperator:       process.env.MIPS_ID_OPERATOR ?? '',
     operatorPassword: process.env.MIPS_OPERATOR_PASSWORD ?? '',
     hashSalt:         process.env.MIPS_HASH_SALT ?? '',
+    cipherKey:        process.env.MIPS_CIPHER_KEY ?? '',
   }
+}
+
+const MIPS_HEADERS = {
+  'Content-Type': 'application/json',
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.78 Safari/537.36',
 }
 
 // MIPS id_order: 5–25 alphanumeric chars — strip hyphens from UUID and truncate
 export function toMipsOrderId(uuid: string): string {
   return uuid.replace(/-/g, '').slice(0, 25)
 }
+
+// ─── Create payment request ───────────────────────────────────────────────────
 
 export interface CreatePaymentParams {
   env: MipsEnvironment
@@ -68,10 +76,7 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
 
   const response = await fetch(`${baseUrl}/api/create_payment_request`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.78 Safari/537.36',
-    },
+    headers: MIPS_HEADERS,
     body: JSON.stringify(body),
   })
 
@@ -90,24 +95,67 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
     throw new Error(`MIPS payment request failed: ${data.operation_details ?? JSON.stringify(data)}`)
   }
 
-  return {
-    paymentUrl: data.payment_link.url,
-    mipsOrderId,
-  }
+  return { paymentUrl: data.payment_link.url, mipsOrderId }
 }
 
-// Verify HMAC hash from MIPS IMN callback
-// Adjust the payload format if MIPS documentation specifies a different hash scheme
-export function verifyMipsCallback(params: {
-  mipsOrderId: string
-  amount: string | number
-  status: string
-  receivedHash: string
-}): boolean {
-  const { mipsOrderId, amount, status, receivedHash } = params
-  const hashSalt = process.env.MIPS_HASH_SALT ?? ''
-  if (!hashSalt) return true // skip verification if salt not configured
-  const payload = `${mipsOrderId}|${amount}|${status}|${hashSalt}`
+// ─── Decrypt IMN callback ─────────────────────────────────────────────────────
+
+export interface ImnTransactionDetails {
+  amount: string        // in cents, e.g. "1025" = Rs 10.25
+  currency: string
+  status: 'success' | 'fail'
+  id_order: string
+  transaction_id: string
+  type: string
+  payment_method: string
+  checksum: string
+  reason_fail?: string
+}
+
+export interface DecryptImnResult {
+  transaction_details: ImnTransactionDetails
+}
+
+export async function decryptImnCallback(
+  cryptedData: string,
+  env: MipsEnvironment,
+): Promise<DecryptImnResult> {
+  const creds = getCredentials()
+  const baseUrl = getBaseUrl(env)
+
+  const body = {
+    authentify: {
+      id_merchant:       creds.idMerchant,
+      id_entity:         creds.idEntity,
+      id_operator:       creds.idOperator,
+      operator_password: creds.operatorPassword,
+    },
+    salt:                  creds.hashSalt,
+    cipher_key:            creds.cipherKey,
+    received_crypted_data: cryptedData,
+  }
+
+  const response = await fetch(`${baseUrl}/api/decrypt_imn_data`, {
+    method: 'POST',
+    headers: MIPS_HEADERS,
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`MIPS decrypt error ${response.status}: ${text}`)
+  }
+
+  return response.json() as Promise<DecryptImnResult>
+}
+
+// ─── Checksum verification ────────────────────────────────────────────────────
+
+// Checksum = SHA256(amount.currency.status.id_order.transaction_id.type.payment_method.salt)
+export function verifyImnChecksum(details: ImnTransactionDetails): boolean {
+  const salt = process.env.MIPS_HASH_SALT ?? ''
+  const { amount, currency, status, id_order, transaction_id, type, payment_method, checksum } = details
+  const payload = `${amount}.${currency}.${status}.${id_order}.${transaction_id}.${type}.${payment_method}.${salt}`
   const computed = crypto.createHash('sha256').update(payload).digest('hex')
-  return computed === receivedHash
+  return computed === checksum
 }

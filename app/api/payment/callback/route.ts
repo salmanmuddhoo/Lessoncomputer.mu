@@ -1,71 +1,79 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { verifyMipsCallback } from '@/lib/mips'
+import { decryptImnCallback, verifyImnChecksum, type MipsEnvironment } from '@/lib/mips'
 
 // MIPS IMN (Instant Merchant Notification) callback
-// MIPS POSTs this to the callback URL configured in the MiPS merchant back office
+// MIPS POSTs encrypted data here — we decrypt via the MIPS API then verify checksum
 export async function POST(req: NextRequest) {
   try {
-    // MIPS sends the callback as JSON; field names based on MiPS IMN spec
     const body = await req.json() as Record<string, unknown>
 
-    // MIPS identifies the order by id_order (the value we passed in the payment request)
-    const mipsOrderId = (body.id_order ?? body.order_id ?? body.transactionId ?? '') as string
-    const status      = (body.status ?? body.payment_status ?? '') as string
-    const amount      = body.amount ?? body.payment_amount ?? ''
-    const hash        = (body.hash ?? body.signature ?? '') as string
+    // MIPS sends the callback as { received_crypted_data: '...' }
+    const cryptedData = (body.received_crypted_data ?? body.crypted_data ?? '') as string
 
-    if (!mipsOrderId) {
-      console.error('[payment/callback] Missing id_order in body:', body)
-      return NextResponse.json({ error: 'Missing id_order' }, { status: 400 })
-    }
-
-    // Verify HMAC signature when hash salt is configured
-    if (hash) {
-      const valid = verifyMipsCallback({ mipsOrderId, amount: String(amount), status, receivedHash: hash })
-      if (!valid) {
-        console.error('[payment/callback] Invalid hash for order', mipsOrderId)
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 403 })
-      }
+    if (!cryptedData) {
+      console.error('[payment/callback] Missing received_crypted_data in body:', body)
+      return NextResponse.json({ error: 'Missing received_crypted_data' }, { status: 400 })
     }
 
     const supabase = await createClient()
 
-    // Look up the order by MIPS id_order stored in mips_transaction_id
+    // Determine which MIPS environment this order belongs to
+    // (read from site_settings; the order metadata also stores it but settings is simpler)
+    const { data: settings } = await (supabase as any)
+      .from('site_settings')
+      .select('mips_environment')
+      .eq('id', 1)
+      .single()
+    const env: MipsEnvironment = (settings?.mips_environment as MipsEnvironment) ?? 'test'
+
+    // Decrypt the callback data via MIPS API
+    const decrypted = await decryptImnCallback(cryptedData, env)
+    const details = decrypted.transaction_details
+
+    if (!details?.id_order) {
+      console.error('[payment/callback] Decrypted data missing id_order:', decrypted)
+      return NextResponse.json({ error: 'Invalid decrypted data' }, { status: 400 })
+    }
+
+    // Verify checksum: SHA256(amount.currency.status.id_order.transaction_id.type.payment_method.salt)
+    const checksumValid = verifyImnChecksum(details)
+    if (!checksumValid) {
+      console.error('[payment/callback] Checksum mismatch for order:', details.id_order)
+      return NextResponse.json({ error: 'Checksum mismatch' }, { status: 403 })
+    }
+
+    // Look up the order by MIPS id_order
     const { data: orderRaw } = await (supabase as any)
       .from('mips_orders')
-      .select('id, student_id, order_type, package_ids, is_recurring, status')
-      .eq('mips_transaction_id', mipsOrderId)
+      .select('id, student_id, package_ids, is_recurring, status')
+      .eq('mips_transaction_id', details.id_order)
       .single()
 
     const order = orderRaw as {
       id: string
       student_id: string
-      order_type: string
       package_ids: string[]
       is_recurring: boolean
       status: string
     } | null
 
     if (!order) {
-      console.error('[payment/callback] Order not found for mips_transaction_id:', mipsOrderId)
+      console.error('[payment/callback] Order not found for id_order:', details.id_order)
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
     if (order.status === 'paid') {
-      // Already processed — idempotent
-      return NextResponse.json({ ok: true })
+      return NextResponse.json({ ok: true }) // idempotent
     }
 
-    const isPaid = ['success', 'paid', 'approved'].includes(status.toLowerCase())
-
-    if (isPaid) {
-      // Activate all packages for this order
+    if (details.status === 'success') {
+      // Activate subscriptions for all packages
       const subscriptionRows = order.package_ids.map((packageId: string) => ({
-        student_id:  order.student_id,
-        package_id:  packageId,
+        student_id:   order.student_id,
+        package_id:   packageId,
         is_recurring: order.is_recurring,
-        status:      'active',
+        status:       'active',
       }))
 
       const { error: subError } = await (supabase as any)
@@ -79,15 +87,18 @@ export async function POST(req: NextRequest) {
 
       await (supabase as any)
         .from('mips_orders')
-        .update({ status: 'paid', updated_at: new Date().toISOString() })
+        .update({
+          status:         'paid',
+          metadata:       { transaction_id: details.transaction_id, payment_method: details.payment_method },
+          updated_at:     new Date().toISOString(),
+        })
         .eq('id', order.id)
 
-      console.log('[payment/callback] Order paid, subscriptions activated:', mipsOrderId)
+      console.log('[payment/callback] Paid & subscriptions activated:', details.id_order)
     } else {
-      const newStatus = ['cancel', 'cancelled'].includes(status.toLowerCase()) ? 'cancelled' : 'failed'
       await (supabase as any)
         .from('mips_orders')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({ status: 'failed', updated_at: new Date().toISOString() })
         .eq('id', order.id)
     }
 

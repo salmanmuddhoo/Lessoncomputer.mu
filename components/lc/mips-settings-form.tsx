@@ -77,7 +77,8 @@ export function MipsSettingsForm({ initialEnvironment }: Props) {
         <ul className="font-mono space-y-0.5 text-[11px] pl-2">
           <li>MIPS_ID_MERCHANT / MIPS_ID_ENTITY</li>
           <li>MIPS_ID_OPERATOR / MIPS_OPERATOR_PASSWORD</li>
-          <li>MIPS_HASH_SALT / NEXT_PUBLIC_SITE_URL</li>
+          <li>MIPS_HASH_SALT / MIPS_CIPHER_KEY</li>
+          <li>NEXT_PUBLIC_SITE_URL</li>
         </ul>
         <p className="mt-1">Also configure the IMN callback URL in the MiPS merchant back office:<br/>
           <span className="font-mono">{'{your-domain}'}/api/payment/callback</span>
