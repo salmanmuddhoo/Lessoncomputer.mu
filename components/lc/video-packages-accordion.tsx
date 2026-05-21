@@ -30,12 +30,6 @@ interface Props {
   grade: { name: string; color: string }
 }
 
-function openNoteInNewTab(html: string, title: string) {
-  const full = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:system-ui,sans-serif;line-height:1.6;max-width:860px;margin:2rem auto;padding:0 1rem;}</style></head><body>${html}</body></html>`
-  const url = URL.createObjectURL(new Blob([full], { type: 'text/html' }))
-  const w = window.open(url, '_blank')
-  if (w) setTimeout(() => URL.revokeObjectURL(url), 30000)
-}
 
 export function VideoPackagesAccordion({ packages, videosByChapter, documentsByChapter, notesByChapter = {}, grade }: Props) {
   const [openPackages, setOpenPackages] = useState<Record<string, boolean>>(() =>
@@ -152,16 +146,16 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
                                   href={doc.file_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:bg-muted/30 transition-colors group"
+                                  className="flex items-center gap-3 p-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors group"
                                 >
-                                  <FileText className="w-5 h-5 text-primary shrink-0" />
+                                  <FileText className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-sm truncate">{doc.title}</p>
+                                    <p className="font-medium text-sm text-red-700 dark:text-red-300 truncate">{doc.title}</p>
                                     {doc.description && (
-                                      <p className="text-xs text-muted-foreground truncate">{doc.description}</p>
+                                      <p className="text-xs text-red-500 dark:text-red-400 truncate">{doc.description}</p>
                                     )}
                                   </div>
-                                  <Download className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
+                                  <Download className="w-4 h-4 text-red-400 shrink-0 group-hover:text-red-600 dark:group-hover:text-red-300 transition-colors" />
                                 </a>
                               ))}
                             </div>
@@ -169,15 +163,17 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
                           {chNotes.length > 0 && (
                             <div className="space-y-2 mt-2">
                               {chNotes.map((note: any) => (
-                                <button
+                                <a
                                   key={note.id}
-                                  onClick={() => openNoteInNewTab(note.content ?? '', note.title)}
-                                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-950/40 transition-colors text-left"
+                                  href={`/api/notes/${note.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-3 p-3 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-950/40 transition-colors"
                                 >
                                   <BookMarked className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
                                   <span className="flex-1 font-medium text-sm text-violet-700 dark:text-violet-300 truncate">{note.title}</span>
                                   <ExternalLink className="w-3.5 h-3.5 text-violet-500 shrink-0" />
-                                </button>
+                                </a>
                               ))}
                             </div>
                           )}
