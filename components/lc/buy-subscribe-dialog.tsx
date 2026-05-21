@@ -383,7 +383,7 @@ export function BuySubscribeDialog({
             {!(mode === 'live' && isCurrentMonthSubscribed) && (
               <Button
                 onClick={initiatePayment}
-                disabled={paying || (mode === 'video' ? selected.size === 0 : false)}
+                disabled={paying || (mode === 'video' ? selected.size === 0 : !liveMonthPackageId)}
                 className="bg-primary text-primary-foreground hover:bg-accent"
               >
                 {paying
