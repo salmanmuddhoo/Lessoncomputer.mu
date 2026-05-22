@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle2, XCircle, Clock, ArrowRight, ShoppingCart } from 'lucide-react'
 import type { Metadata } from 'next'
+import { PaymentPendingPoller } from '@/components/lc/payment-pending-poller'
 
 export const metadata: Metadata = { title: 'Payment Result' }
 
@@ -65,6 +66,7 @@ export default async function PaymentResultPage({ searchParams }: PageProps) {
           </div>
         ) : status === 'pending' ? (
           <div className="text-center space-y-4">
+            <PaymentPendingPoller orderId={orderId} />
             <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-950/30 rounded-full flex items-center justify-center mx-auto">
               <Clock className="w-9 h-9 text-yellow-600 dark:text-yellow-400" />
             </div>

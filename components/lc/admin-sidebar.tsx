@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Video, Users, BookOpen,
   LogOut, Settings, ChevronRight, ChevronDown, Radio, Menu, X, Package, CalendarDays,
-  BarChart2, ClipboardList, Megaphone, UserCheck,
+  BarChart2, ClipboardList, Megaphone, UserCheck, CreditCard,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { createClient } from '@/lib/supabase/client'
@@ -27,6 +27,7 @@ const NAV_ITEMS = [
 
 const REPORT_ITEMS = [
   { label: 'Attendance', href: '/admin/reports/attendance', icon: ClipboardList },
+  { label: 'Payments',   href: '/admin/payments',           icon: CreditCard },
 ]
 
 function NavContent({ onNav }: { onNav?: () => void }) {
