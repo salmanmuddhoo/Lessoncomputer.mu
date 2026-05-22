@@ -24,6 +24,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // Video packages are always one-off; only live subscriptions can be recurring
+    const effectiveRecurring = orderType === 'live' ? isRecurring : false
+
     // Read MIPS environment from site_settings
     const { data: settings } = await (supabase as any)
       .from('site_settings')
@@ -39,7 +42,7 @@ export async function POST(req: NextRequest) {
         student_id:  user.id,
         order_type:  orderType,
         package_ids: packageIds,
-        is_recurring: isRecurring,
+        is_recurring: effectiveRecurring,
         amount,
         currency:    'MUR',
         description,
