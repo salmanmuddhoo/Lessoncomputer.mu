@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Package, Radio, RefreshCw, XCircle, Receipt } from 'lucide-react'
+import { Package, Radio, RefreshCw, XCircle, Receipt, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,6 +38,13 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, purchasedA
 
   const isLive = subscriptionType === 'live' || (pkg?.month != null && pkg?.year != null)
   const monthLabel = pkg?.month && pkg?.year ? `${MONTHS[pkg.month - 1]} ${pkg.year}` : null
+
+  // True when this subscription is for a future month (e.g. billed on 29th for next month)
+  const now = new Date()
+  const isUpcoming = isLive && pkg?.month != null && pkg?.year != null && (
+    pkg.year > now.getFullYear() ||
+    (pkg.year === now.getFullYear() && pkg.month > now.getMonth() + 1)
+  )
 
   async function handleCancelRecurring() {
     setCancelling(true)
@@ -89,10 +96,21 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, purchasedA
                 Recurring
               </Badge>
             )}
+            {isUpcoming && (
+              <Badge variant="outline" className="text-xs shrink-0 text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400 gap-1">
+                <Clock className="w-2.5 h-2.5" />
+                Upcoming
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
             {monthLabel && <span>{monthLabel}</span>}
-            <span>Purchased {new Date(purchasedAt).toLocaleDateString('en-MU', { dateStyle: 'medium' })}</span>
+            <span>Paid {new Date(purchasedAt).toLocaleDateString('en-MU', { dateStyle: 'medium' })}</span>
+            {isUpcoming && (
+              <span className="text-blue-500 dark:text-blue-400">
+                Access starts {pkg?.month && pkg?.year ? `1 ${MONTHS[pkg.month - 1]} ${pkg.year}` : 'next month'}
+              </span>
+            )}
           </div>
         </div>
 
