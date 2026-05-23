@@ -70,11 +70,14 @@ export async function POST(req: NextRequest) {
 
     // Debug: confirm env vars are present (lengths only, never log values)
     console.error('[payment/create] env check', {
-      MIPS_AUTH_USERNAME: process.env.MIPS_AUTH_USERNAME ? `set(${process.env.MIPS_AUTH_USERNAME.length})` : 'MISSING',
-      MIPS_AUTH_PASSWORD: process.env.MIPS_AUTH_PASSWORD ? `set(${process.env.MIPS_AUTH_PASSWORD.length})` : 'MISSING',
-      MIPS_ID_MERCHANT:   process.env.MIPS_ID_MERCHANT   ? `set(${process.env.MIPS_ID_MERCHANT.length})`   : 'MISSING',
-      MIPS_ID_ENTITY:     process.env.MIPS_ID_ENTITY     ? `set(${process.env.MIPS_ID_ENTITY.length})`     : 'MISSING',
-      MIPS_ID_OPERATOR:   process.env.MIPS_ID_OPERATOR   ? `set(${process.env.MIPS_ID_OPERATOR.length})`   : 'MISSING',
+      MIPS_ID_MERCHANT:        process.env.MIPS_ID_MERCHANT        ? `set(${process.env.MIPS_ID_MERCHANT.length})`        : 'MISSING',
+      MIPS_ID_ENTITY:          process.env.MIPS_ID_ENTITY          ? `set(${process.env.MIPS_ID_ENTITY.length})`          : 'MISSING',
+      MIPS_ID_OPERATOR:        process.env.MIPS_ID_OPERATOR        ? `set(${process.env.MIPS_ID_OPERATOR.length})`        : 'MISSING',
+      MIPS_OPERATOR_PASSWORD:  process.env.MIPS_OPERATOR_PASSWORD  ? `set(${process.env.MIPS_OPERATOR_PASSWORD.length})`  : 'MISSING',
+      MIPS_HASH_SALT:          process.env.MIPS_HASH_SALT          ? `set(${process.env.MIPS_HASH_SALT.length})`          : 'MISSING',
+      MIPS_CIPHER_KEY:         process.env.MIPS_CIPHER_KEY         ? `set(${process.env.MIPS_CIPHER_KEY.length})`         : 'MISSING',
+      NEXT_PUBLIC_SITE_URL:    process.env.NEXT_PUBLIC_SITE_URL    ?? 'MISSING',
+      env,
     })
 
     const result = await createMipsPayment({
