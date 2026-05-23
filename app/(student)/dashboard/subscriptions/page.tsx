@@ -13,24 +13,40 @@ export default async function StudentSubscriptionsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: subs } = await supabase
-    .from('student_subscriptions')
-    .select(`
-      id,
-      package_id,
-      subscription_type,
-      is_recurring,
-      purchased_at,
-      package:subscription_packages(
-        id, name, month, year, price,
-        grade:grades(slug, name, color)
-      )
-    `)
-    .eq('student_id', user.id)
-    .eq('status', 'active')
-    .order('purchased_at', { ascending: false })
+  const [subsResult, ordersResult] = await Promise.all([
+    supabase
+      .from('student_subscriptions')
+      .select(`
+        id,
+        package_id,
+        subscription_type,
+        is_recurring,
+        purchased_at,
+        package:subscription_packages(
+          id, name, month, year, price,
+          grade:grades(slug, name, color)
+        )
+      `)
+      .eq('student_id', user.id)
+      .eq('status', 'active')
+      .order('purchased_at', { ascending: false }),
 
-  const activeSubs = (subs ?? []).filter((s: any) => s.package_id && s.package)
+    (supabase as any)
+      .from('mips_orders')
+      .select('id, package_ids, created_at')
+      .eq('student_id', user.id)
+      .eq('status', 'paid')
+      .order('created_at', { ascending: false }),
+  ])
+
+  const activeSubs = ((subsResult.data ?? []) as any[]).filter((s) => s.package_id && s.package)
+  const paidOrders = (ordersResult.data ?? []) as { id: string; package_ids: string[] }[]
+
+  // For each subscription, find its most recent paid order
+  function findOrderId(packageId: string): string | null {
+    const order = paidOrders.find((o) => Array.isArray(o.package_ids) && o.package_ids.includes(packageId))
+    return order?.id ?? null
+  }
 
   return (
     <div>
@@ -61,6 +77,7 @@ export default async function StudentSubscriptionsPage() {
               isRecurring={sub.is_recurring ?? false}
               purchasedAt={sub.purchased_at}
               pkg={sub.package}
+              orderId={findOrderId(sub.package_id)}
             />
           ))}
         </div>

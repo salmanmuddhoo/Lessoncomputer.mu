@@ -96,20 +96,21 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', order.id)
 
-      // Store MIPS token for future recurring claims (live subscriptions only)
+      // Store MIPS ODRP token for future recurring claims (live subscriptions only)
       if (order.is_recurring && details.id_token) {
         await (supabase as any)
           .from('student_payment_tokens')
           .upsert({
-            student_id:      order.student_id,
-            id_token:        details.id_token,
-            max_amount:      Number(details.amount) / 100,  // callback amount is in cents
-            currency:        details.currency,
-            is_active:       true,
-            source_order_id: order.id,
-            updated_at:      new Date().toISOString(),
+            student_id:           order.student_id,
+            id_token:             details.id_token,
+            card_last_four_digit: details.card_last_four_digit ?? null,
+            max_amount:           Number(details.amount) / 100,
+            currency:             details.currency,
+            is_active:            true,
+            source_order_id:      order.id,
+            updated_at:           new Date().toISOString(),
           }, { onConflict: 'student_id' })
-        console.log('[payment/callback] Recurring token stored for student:', order.student_id)
+        console.log('[payment/callback] ODRP token stored for student:', order.student_id)
       }
 
       console.log('[payment/callback] Paid & subscriptions activated:', details.id_order)

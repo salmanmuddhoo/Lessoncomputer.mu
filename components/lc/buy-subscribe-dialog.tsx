@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ShoppingCart, Radio, Lock, RefreshCw, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react'
+import { ShoppingCart, Radio, Lock, RefreshCw, CheckCircle2, ArrowRight, Loader2, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
@@ -66,7 +66,8 @@ export function BuySubscribeDialog({
 
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'video' | 'live'>(defaultMode)
-  const [isRecurring, setIsRecurring] = useState(true)
+  // Live subscriptions are always recurring; student can cancel from the subscriptions page
+  const isRecurring = true
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(mandatoryPackageId ? [mandatoryPackageId] : [])
   )
@@ -351,23 +352,14 @@ export function BuySubscribeDialog({
                 </div>
               )}
 
-              {/* Recurring toggle */}
-              <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                <Checkbox
-                  id="live-recurring"
-                  checked={isRecurring}
-                  onCheckedChange={(v) => setIsRecurring(!!v)}
-                />
-                <div>
-                  <span className="text-sm font-medium flex items-center gap-1.5">
-                    <RefreshCw className="w-3.5 h-3.5 text-primary" />
-                    Recurring subscription
-                  </span>
-                  <p className="text-xs text-muted-foreground">
-                    {isRecurring ? 'Auto-renews each month' : 'One-off — you will need to manually renew'}
-                  </p>
+              {/* Recurring info */}
+              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <RefreshCw className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                <div className="text-xs text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground">Auto-renewing subscription</span> — your live classes renew automatically each month.
+                  You can cancel anytime from your <span className="font-medium">Subscriptions</span> page.
                 </div>
-              </label>
+              </div>
 
               {/* Total */}
               {liveMonthCount > 1 && (

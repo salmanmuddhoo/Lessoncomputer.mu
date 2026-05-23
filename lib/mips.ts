@@ -24,7 +24,6 @@ function getMipsHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    // MIPS docs require a non-empty user-agent
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.78 Safari/537.36',
   }
 }
@@ -43,13 +42,13 @@ export interface CreatePaymentParams {
   currency?: string
   description: string
   returnUrl: string
-  // For recurring live subscriptions: enable MIPS tokenization so subsequent
-  // months can be claimed without the student re-entering card details.
-  // Requires MIPS to have tokenization enabled on the merchant account.
-  recurring?: {
-    maxAmount: number       // max Rs amount claimable per claim
-    maxClaims: number       // max number of recurring claims (e.g. 12 for annual)
-    maxDate: string         // ISO date string — MIPS will reject claims after this
+  // For recurring live subscriptions: use ODRP mode to tokenize the card.
+  // The student is informed on the MIPS page that future claims may be taken.
+  odrp?: {
+    maxAmountTotal:    number   // total claimable across all claims
+    maxAmountPerClaim: number   // max per individual claim
+    maxFrequency:      number   // max claims per period
+    maxDate:           string   // ISO date string (YYYY-MM-DD)
   }
 }
 
@@ -59,7 +58,7 @@ export interface CreatePaymentResult {
 }
 
 export async function createMipsPayment(params: CreatePaymentParams): Promise<CreatePaymentResult> {
-  const { env, orderId, amount, currency = 'MUR', description, returnUrl, recurring } = params
+  const { env, orderId, amount, currency = 'MUR', description, returnUrl, odrp } = params
   const creds = getCredentials()
   const baseUrl = getBaseUrl(env)
   const mipsOrderId = toMipsOrderId(orderId)
@@ -72,9 +71,15 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
       operator_password: creds.operatorPassword,
     },
     request: {
-      request_mode:  recurring ? 'recurring' : 'simple',
+      request_mode:  odrp ? 'odrp' : 'simple',
       sending_mode:  'link',
       request_title: description.slice(0, 200),
+      ...(odrp && {
+        max_amount_total:    odrp.maxAmountTotal,
+        max_amount_per_claim: odrp.maxAmountPerClaim,
+        max_frequency:       odrp.maxFrequency,
+        max_date:            odrp.maxDate,
+      }),
     },
     initial_payment: {
       id_order:  mipsOrderId,
@@ -86,21 +91,12 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
     },
   }
 
-  // Add recurring constraints when tokenization is requested
-  if (recurring) {
-    body.recurring = {
-      max_amount:           recurring.maxAmount,
-      max_number_of_claims: recurring.maxClaims,
-      max_date_for_claims:  recurring.maxDate,
-    }
-  }
-
   const url = `${baseUrl}/api/create_payment_request`
   console.error('[mips] POST', url, {
     idMerchant: creds.idMerchant ? `set(${creds.idMerchant.length})` : 'MISSING',
     mipsOrderId,
     amount,
-    recurring: !!recurring,
+    mode: odrp ? 'odrp' : 'simple',
   })
 
   const response = await fetch(url, {
@@ -132,14 +128,14 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
   return { paymentUrl: data.payment_link.url, mipsOrderId }
 }
 
-// ─── Claim recurring payment ──────────────────────────────────────────────────
+// ─── Claim recurring payment (ODRP) ──────────────────────────────────────────
 
 export interface ClaimPaymentParams {
   env: MipsEnvironment
-  orderId: string       // new unique order ID for this claim
+  orderId: string
   amount: number
   currency?: string
-  idToken: string       // 128-char token stored from initial payment
+  idToken: string
 }
 
 export interface ClaimPaymentResult {
@@ -189,10 +185,49 @@ export async function claimMipsPayment(params: ClaimPaymentParams): Promise<Clai
   return { status: data.payment_status as ClaimPaymentResult['status'], reason: data.Reason }
 }
 
+// ─── Cancel ODRP token ────────────────────────────────────────────────────────
+
+export interface CancelOdrpTokenParams {
+  env: MipsEnvironment
+  idToken: string
+  cardLastFourDigit: string
+}
+
+export async function cancelOdrpToken(params: CancelOdrpTokenParams): Promise<void> {
+  const { env, idToken, cardLastFourDigit } = params
+  const creds = getCredentials()
+  const baseUrl = getBaseUrl(env)
+
+  const body = {
+    authentify: {
+      id_merchant:       creds.idMerchant,
+      id_entity:         creds.idEntity,
+      id_operator:       creds.idOperator,
+      operator_password: creds.operatorPassword,
+    },
+    id_token:             idToken,
+    card_last_four_digit: cardLastFourDigit,
+  }
+
+  console.error('[mips] CANCEL ODRP', `${baseUrl}/api/cancel_odrp_token`)
+
+  const response = await fetch(`${baseUrl}/api/cancel_odrp_token`, {
+    method: 'POST',
+    headers: getMipsHeaders(),
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    console.error('[mips] cancel_odrp_token error:', response.status, text)
+    // Non-fatal: log but don't throw — token may already be cancelled on MIPS side
+  }
+}
+
 // ─── Decrypt IMN callback ─────────────────────────────────────────────────────
 
 export interface ImnTransactionDetails {
-  amount: string        // in cents, e.g. "1025" = Rs 10.25
+  amount: string
   currency: string
   status: 'success' | 'fail'
   id_order: string
@@ -201,7 +236,8 @@ export interface ImnTransactionDetails {
   payment_method: string
   checksum: string
   reason_fail?: string
-  id_token?: string     // 128-char token — present when tokenization is enabled
+  id_token?: string              // present when odrp mode tokenizes the card
+  card_last_four_digit?: string  // present when card payment is tokenized
 }
 
 export interface DecryptImnResult {
