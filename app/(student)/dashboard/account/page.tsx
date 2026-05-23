@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { AccountSettingsForm } from './account-settings-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Phone } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'My Account' }
 
@@ -62,6 +63,30 @@ export default async function AccountPage() {
                 </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Parent contact — read-only */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Phone className="w-4 h-4 text-primary" />
+              Parent Contact
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {(profile as any)?.parent_phone ? (
+              <>
+                <p className="text-sm font-mono font-medium">+230 {(profile as any).parent_phone}</p>
+                <p className="text-xs text-muted-foreground">
+                  This number receives WhatsApp updates about your live classes. Contact support to change it.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No parent phone on file. You will be prompted to add one when joining a live class.
+              </p>
+            )}
           </CardContent>
         </Card>
 

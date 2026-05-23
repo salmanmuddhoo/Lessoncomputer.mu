@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, Users, Trash2, UserX, UserCheck, Search, Package, RefreshCw, X, Radio } from 'lucide-react'
+import { Loader2, Users, Trash2, UserX, UserCheck, Search, Package, RefreshCw, X, Radio, Phone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +21,7 @@ interface Student {
   full_name: string | null
   is_active: boolean
   created_at: string
+  parent_phone: string | null
   grade: { id: string; name: string; color: string } | null
 }
 
@@ -62,6 +63,10 @@ export default function AdminStudentsPage() {
   const [studentSubs, setStudentSubs] = useState<StudentSub[]>([])
   const [subLoading, setSubLoading] = useState(false)
 
+  // Parent phone edit state (inside sub dialog)
+  const [editParentPhone, setEditParentPhone] = useState('')
+  const [savingParentPhone, setSavingParentPhone] = useState(false)
+
   // Separate grant state for video vs live
   const [addingVideoPkg, setAddingVideoPkg] = useState('')
   const [addingLivePkg, setAddingLivePkg] = useState('')
@@ -70,9 +75,9 @@ export default function AdminStudentsPage() {
   async function load() {
     const supabase = createClient()
     const [{ data: studentData }, { data: gradeData }] = await Promise.all([
-      supabase
+      (supabase as any)
         .from('profiles')
-        .select('id, full_name, is_active, created_at, grade:grades(id, name, color)')
+        .select('id, full_name, is_active, created_at, parent_phone, grade:grades(id, name, color)')
         .eq('role', 'student')
         .order('created_at', { ascending: false }),
       supabase.from('grades').select('id, name, color').eq('is_active', true).order('order_index'),
@@ -105,8 +110,25 @@ export default function AdminStudentsPage() {
     load()
   }
 
+  async function saveParentPhone() {
+    if (!subStudent) return
+    setSavingParentPhone(true)
+    const supabase = createClient()
+    const { error } = await (supabase as any)
+      .from('profiles')
+      .update({ parent_phone: editParentPhone.trim() || null })
+      .eq('id', subStudent.id)
+    if (error) { toast.error(error.message) } else {
+      toast.success('Parent phone updated')
+      setSubStudent({ ...subStudent, parent_phone: editParentPhone.trim() || null })
+      load()
+    }
+    setSavingParentPhone(false)
+  }
+
   async function openSubDialog(student: Student) {
     setSubStudent(student)
+    setEditParentPhone(student.parent_phone ?? '')
     setSubLoading(true)
     setAddingVideoPkg('')
     setAddingLivePkg('')
@@ -281,6 +303,7 @@ export default function AdminStudentsPage() {
                   <tr>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Student</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grade</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Parent Phone</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Joined</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">Actions</th>
@@ -308,6 +331,13 @@ export default function AdminStudentsPage() {
                           </Badge>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        {s.parent_phone ? (
+                          <span className="text-sm font-mono">{s.parent_phone}</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Not provided</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
@@ -377,6 +407,37 @@ export default function AdminStudentsPage() {
             </div>
           ) : (
             <div className="space-y-6 py-2">
+
+              {/* ── Parent Contact ── */}
+              <div className="pb-4 border-b border-border/60">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5" /> Parent Contact
+                </p>
+                <div className="flex gap-2">
+                  <div className="flex gap-1.5 flex-1">
+                    <span className="inline-flex items-center px-3 rounded-lg border border-border/60 bg-muted text-sm text-muted-foreground shrink-0">
+                      +230
+                    </span>
+                    <Input
+                      type="tel"
+                      inputMode="numeric"
+                      placeholder="5XXXXXXX"
+                      value={editParentPhone}
+                      onChange={(e) => setEditParentPhone(e.target.value)}
+                      disabled={savingParentPhone}
+                      className="font-mono"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={saveParentPhone}
+                    disabled={savingParentPhone}
+                    className="bg-primary text-primary-foreground hover:bg-accent shrink-0"
+                  >
+                    {savingParentPhone ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
+                  </Button>
+                </div>
+              </div>
 
               {/* ── Video Package Subscriptions ── */}
               <div>
