@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Radio, CheckCircle2, Lock, Calendar, ChevronDown, ChevronUp, Loader2, RefreshCw } from 'lucide-react'
+import { Radio, CheckCircle2, Lock, Calendar, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { LiveMonthChapters } from '@/components/lc/live-month-chapters'
 import { toast } from 'sonner'
 
@@ -92,14 +92,14 @@ export function LiveMonthsList({
     })
   }
 
-  async function initiatePayment(packageIds: string[], amount: number, description: string) {
+  async function initiatePayment(packageIds: string[], amount: number, description: string, isRecurring: boolean) {
     if (paying) return
     setPaying(true)
     try {
       const res = await fetch('/api/payment/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderType: 'live', packageIds, amount, description, isRecurring: true }),
+        body: JSON.stringify({ orderType: 'live', packageIds, amount, description, isRecurring }),
       })
       const data = await res.json() as { paymentUrl?: string; error?: string }
       if (!res.ok || !data.paymentUrl) {
@@ -116,7 +116,7 @@ export function LiveMonthsList({
 
   function handleSubscribeCurrent(pkg: MonthPackage) {
     const description = `Live classes: ${MONTHS[pkg.month - 1]} ${pkg.year}`
-    initiatePayment([pkg.id], liveSubscriptionPrice, description)
+    initiatePayment([pkg.id], liveSubscriptionPrice, description, true)
   }
 
   function handleSubscribePast() {
@@ -125,7 +125,8 @@ export function LiveMonthsList({
     const selectedPkgs = unsubscribedPastPackages.filter(p => selected.includes(p.id))
     const amount = selected.length * liveSubscriptionPrice
     const months = selectedPkgs.map(p => `${MONTHS[p.month - 1]} ${p.year}`).join(', ')
-    initiatePayment(selected, amount, `Live classes: ${months}`)
+    // Past months are one-off purchases — no recurring
+    initiatePayment(selected, amount, `Live classes: ${months}`, false)
   }
 
   return (
@@ -301,15 +302,6 @@ export function LiveMonthsList({
                 </span>
               </div>
             )}
-
-            {/* Recurring info */}
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
-              <RefreshCw className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
-              <span>
-                <span className="font-medium text-foreground">Auto-renewing subscription</span> — renews monthly.
-                Cancel anytime from your Subscriptions page.
-              </span>
-            </div>
 
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setPastDialog(null)} disabled={paying}>Cancel</Button>

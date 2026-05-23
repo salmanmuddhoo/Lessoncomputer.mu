@@ -159,7 +159,6 @@ export default async function StudentAttendancePage() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Class</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Marked at</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
@@ -182,11 +181,6 @@ export default async function StudentAttendancePage() {
                               <XCircle className="w-4 h-4" /> Absent
                             </span>
                           )}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs">
-                          {record?.scheduled_end_time
-                            ? new Date(record.scheduled_end_time).toLocaleTimeString('en-GB', { timeStyle: 'short' })
-                            : '—'}
                         </td>
                       </tr>
                     )
