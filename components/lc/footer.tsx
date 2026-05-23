@@ -15,6 +15,7 @@ const GRADE_LINKS = [
 const COMPANY_LINKS = [
   { name: 'About Us', href: '/about' },
   { name: 'Contact',  href: '/contact' },
+  { name: 'Blog',     href: '/blog' },
 ]
 
 const LEGAL_LINKS = [

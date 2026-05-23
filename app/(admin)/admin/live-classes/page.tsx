@@ -1,32 +1,71 @@
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
-import { Plus, Pencil, Calendar, Package } from 'lucide-react'
-
-export const metadata = { title: 'Manage Live Classes' }
+import { Plus, Pencil, Calendar, Package, Filter } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-export default async function AdminLiveClassesPage() {
-  const supabase = await createClient()
+interface LiveClass {
+  id: string
+  title: string
+  scheduled_at: string
+  is_published: boolean
+  is_recurring?: boolean
+  recurrence_day_of_week?: number | null
+  end_time?: string | null
+  grade: { name: string; color: string; id: string } | null
+  package: { id: string; name: string; month: number; year: number } | null
+}
+
+export default function AdminLiveClassesPage() {
+  const [classes, setClasses] = useState<LiveClass[]>([])
+  const [loading, setLoading] = useState(true)
+  const [gradeFilter, setGradeFilter] = useState<string>('all')
 
   const now = new Date()
   const currentMonth = now.getMonth() + 1
   const currentYear = now.getFullYear()
 
-  const { data: classes } = await supabase
-    .from('live_classes')
-    .select('*, grade:grades(name, color), package:subscription_packages(id, name, month, year)')
-    .order('scheduled_at', { ascending: false })
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('live_classes')
+        .select('*, grade:grades(id, name, color), package:subscription_packages(id, name, month, year)')
+        .order('scheduled_at', { ascending: false })
+      setClasses((data as any) ?? [])
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const grades = Array.from(
+    new Map(
+      classes
+        .map((c) => c.grade)
+        .filter(Boolean)
+        .map((g) => [g!.id, g!])
+    ).values()
+  ).sort((a, b) => a.name.localeCompare(b.name))
+
+  const filtered = gradeFilter === 'all'
+    ? classes
+    : classes.filter((c) => c.grade?.id === gradeFilter)
 
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold">Live Classes</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{classes?.length ?? 0} classes total</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{filtered.length} of {classes.length} classes</p>
         </div>
         <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
           <Link href="/admin/live-classes/new">
@@ -35,8 +74,26 @@ export default async function AdminLiveClassesPage() {
         </Button>
       </div>
 
+      {/* Grade filter */}
+      <div className="flex items-center gap-2 mb-4">
+        <Filter className="w-4 h-4 text-muted-foreground" />
+        <Select value={gradeFilter} onValueChange={setGradeFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Filter by grade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Grades</SelectItem>
+            {grades.map((g) => (
+              <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="rounded-xl border border-border/60 overflow-hidden">
-        {classes && classes.length > 0 ? (
+        {loading ? (
+          <div className="py-16 text-center text-muted-foreground text-sm">Loading…</div>
+        ) : filtered.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[600px]">
               <thead className="bg-muted/30 border-b border-border/60">
@@ -50,9 +107,9 @@ export default async function AdminLiveClassesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {classes.map((c) => {
-                  const grade = c.grade as { name: string; color: string } | null
-                  const pkg = c.package as { id: string; name: string; month: number; year: number } | null
+                {filtered.map((c) => {
+                  const grade = c.grade
+                  const pkg = c.package
                   const d = new Date(c.scheduled_at)
                   const classMonth = d.getMonth() + 1
                   const classYear = d.getFullYear()
@@ -88,9 +145,9 @@ export default async function AdminLiveClassesPage() {
                           <Calendar className="w-3 h-3 mt-0.5 shrink-0" />
                           <LiveClassSchedule
                             scheduledAt={c.scheduled_at}
-                            isRecurring={(c as any).is_recurring ?? false}
-                            recurrenceDayOfWeek={(c as any).recurrence_day_of_week ?? null}
-                            endTime={(c as any).end_time ?? null}
+                            isRecurring={c.is_recurring ?? false}
+                            recurrenceDayOfWeek={c.recurrence_day_of_week ?? null}
+                            endTime={c.end_time ?? null}
                           />
                         </span>
                       </td>
@@ -122,12 +179,16 @@ export default async function AdminLiveClassesPage() {
           </div>
         ) : (
           <div className="py-16 text-center">
-            <p className="text-muted-foreground mb-4">No live classes scheduled yet.</p>
-            <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
-              <Link href="/admin/live-classes/new">
-                <Plus className="w-4 h-4 mr-1" /> Schedule First Class
-              </Link>
-            </Button>
+            <p className="text-muted-foreground mb-4">
+              {gradeFilter === 'all' ? 'No live classes scheduled yet.' : 'No classes for this grade.'}
+            </p>
+            {gradeFilter === 'all' && (
+              <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
+                <Link href="/admin/live-classes/new">
+                  <Plus className="w-4 h-4 mr-1" /> Schedule First Class
+                </Link>
+              </Button>
+            )}
           </div>
         )}
       </div>

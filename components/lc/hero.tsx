@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, Play } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function Hero() {
@@ -40,11 +40,6 @@ export function Hero() {
           <Button size="lg" asChild className="bg-foreground text-background hover:bg-foreground/90 font-semibold rounded-full px-9 h-12 text-[15px]">
             <Link href="/register">
               Browse Grades <ArrowRight className="ml-2 w-4 h-4" />
-            </Link>
-          </Button>
-          <Button size="lg" variant="outline" asChild className="border-border hover:border-primary/50 hover:bg-primary/5 rounded-full px-9 h-12 text-[15px] font-medium">
-            <Link href="/live-classes">
-              <Play className="mr-2 w-4 h-4 fill-primary text-primary" /> Live Classes
             </Link>
           </Button>
         </div>
