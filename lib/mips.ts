@@ -83,7 +83,6 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
     idMerchant: creds.idMerchant ? `set(${creds.idMerchant.length})` : 'MISSING',
     mipsOrderId,
     amount,
-    authHeader: headers['Authorization'] ? `Basic set(${headers['Authorization'].length})` : 'MISSING',
   })
 
   const response = await fetch(url, {
