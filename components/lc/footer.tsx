@@ -13,16 +13,13 @@ const GRADE_LINKS = [
 ]
 
 const COMPANY_LINKS = [
-  { name: 'About Us',     href: '/about' },
-  { name: 'Pricing',      href: '/pricing' },
-  { name: 'Live Classes', href: '/live-classes' },
-  { name: 'Contact',      href: '/contact' },
+  { name: 'About Us', href: '/about' },
+  { name: 'Contact',  href: '/contact' },
 ]
 
 const LEGAL_LINKS = [
   { name: 'Privacy Policy',   href: '/privacy' },
   { name: 'Terms of Service', href: '/terms' },
-  { name: 'Refund Policy',    href: '/refunds' },
 ]
 
 function TikTokIcon({ className }: { className?: string }) {

@@ -71,12 +71,6 @@ export function Header({ user }: HeaderProps) {
               )}
             </div>
 
-            <Link href="/live-classes" className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground lc-transition rounded-lg hover:bg-secondary">
-              Live Classes
-            </Link>
-            <Link href="/pricing" className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground lc-transition rounded-lg hover:bg-secondary">
-              Pricing
-            </Link>
             <Link href="/about" className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground lc-transition rounded-lg hover:bg-secondary">
               About
             </Link>
@@ -119,7 +113,7 @@ export function Header({ user }: HeaderProps) {
       {mobileOpen && (
         <div className="md:hidden border-t border-border bg-card animate-scale-fade-in">
           <div className="px-5 py-5 space-y-1">
-            {[{ label: 'Home', href: '/' }, { label: 'Live Classes', href: '/live-classes' }, { label: 'Pricing', href: '/pricing' }, { label: 'About', href: '/about' }].map((item) => (
+            {[{ label: 'Home', href: '/' }, { label: 'About', href: '/about' }].map((item) => (
               <Link key={item.href} href={item.href} className="block px-3 py-2.5 text-sm font-medium hover:bg-secondary rounded-xl lc-transition" onClick={() => setMobileOpen(false)}>
                 {item.label}
               </Link>

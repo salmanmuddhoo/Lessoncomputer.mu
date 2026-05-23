@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import {
   ChevronDown, ChevronUp, FolderOpen, Play, Clock,
-  ListVideo, X, Package, Radio,
+  ListVideo, X, Package, Radio, FileText, BookOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -16,11 +16,19 @@ export interface PlaylistVideo {
   duration_minutes: number | null
 }
 
+export interface PlaylistDocument {
+  id: string
+  title: string
+  type: 'document' | 'revision_note'
+  url: string
+}
+
 export interface PlaylistChapter {
   id: string
   title: string
   order_index: number
   videos: PlaylistVideo[]
+  documents: PlaylistDocument[]
 }
 
 export interface PlaylistPackage {
@@ -39,8 +47,8 @@ interface Props {
   gradeColor?: string
 }
 
-function totalVideos(pkg: PlaylistPackage) {
-  return pkg.chapters.reduce((n, ch) => n + ch.videos.length, 0)
+function totalItems(pkg: PlaylistPackage) {
+  return pkg.chapters.reduce((n, ch) => n + ch.videos.length + ch.documents.length, 0)
 }
 
 function findLocation(playlist: PlaylistPackage[], videoId: string) {
@@ -68,7 +76,7 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
   // Mobile: whether the full panel is visible
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const totalCount = playlist.reduce((n, p) => n + totalVideos(p), 0)
+  const totalCount = playlist.reduce((n, p) => n + totalItems(p), 0)
 
   function togglePkg(id: string) {
     setOpenPkgs(prev => {
@@ -90,7 +98,7 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
     <div className="space-y-1">
       {playlist.map(pkg => {
         const isPkgOpen = openPkgs.has(pkg.id)
-        const count = totalVideos(pkg)
+        const count = totalItems(pkg)
         const isLive = pkg.package_type === 'live_month'
 
         return (
@@ -105,12 +113,12 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
                 : <Package className="w-3.5 h-3.5 text-primary shrink-0" />
               }
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold truncate">{pkg.name}</p>
+                <p className="text-sm font-semibold truncate">{pkg.name}</p>
                 {isLive && pkg.month && pkg.year && (
-                  <p className="text-[10px] text-muted-foreground">{MONTHS[pkg.month - 1]} {pkg.year}</p>
+                  <p className="text-xs text-muted-foreground">{MONTHS[pkg.month - 1]} {pkg.year}</p>
                 )}
               </div>
-              <span className="text-[10px] text-muted-foreground shrink-0 mr-1">{count}</span>
+              <span className="text-xs text-muted-foreground shrink-0 mr-1">{count}</span>
               {isPkgOpen
                 ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -121,6 +129,7 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
               <div className="divide-y divide-border/20">
                 {pkg.chapters.map(ch => {
                   const isChOpen = openChapters.has(ch.id)
+                  const itemCount = ch.videos.length + ch.documents.length
                   return (
                     <div key={ch.id}>
                       {/* Chapter row */}
@@ -128,17 +137,18 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
                         onClick={() => toggleChapter(ch.id)}
                         className="w-full flex items-center gap-2 px-4 py-2 bg-muted/10 hover:bg-muted/30 transition-colors text-left"
                       >
-                        <FolderOpen className="w-3 h-3 text-muted-foreground shrink-0" />
-                        <span className="flex-1 text-xs font-medium truncate">{ch.title}</span>
-                        <span className="text-[10px] text-muted-foreground shrink-0 mr-1">{ch.videos.length}</span>
+                        <FolderOpen className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="flex-1 text-sm font-medium truncate">{ch.title}</span>
+                        <span className="text-xs text-muted-foreground shrink-0 mr-1">{itemCount}</span>
                         {isChOpen
-                          ? <ChevronUp className="w-3 h-3 text-muted-foreground shrink-0" />
-                          : <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
+                          ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                         }
                       </button>
 
                       {isChOpen && (
                         <div>
+                          {/* Videos */}
                           {ch.videos.map(v => {
                             const isCurrent = v.id === currentVideoId
                             const href = `/videos/${v.id}${isLiveContext ? '?live=1' : ''}`
@@ -153,7 +163,6 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
                                     : 'hover:bg-muted/30 border-l-2 border-transparent'
                                 )}
                               >
-                                {/* Play indicator */}
                                 <div className={cn(
                                   'w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5',
                                   isCurrent
@@ -167,20 +176,46 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className={cn(
-                                    'text-xs leading-snug line-clamp-2',
+                                    'text-sm leading-snug line-clamp-2',
                                     isCurrent ? 'font-semibold text-primary' : 'font-medium group-hover:text-primary transition-colors'
                                   )}>
                                     {v.title}
                                   </p>
                                   {v.duration_minutes && (
-                                    <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-0.5">
-                                      <Clock className="w-2.5 h-2.5" />{v.duration_minutes} min
+                                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-0.5">
+                                      <Clock className="w-3 h-3" />{v.duration_minutes} min
                                     </p>
                                   )}
                                 </div>
                               </Link>
                             )
                           })}
+
+                          {/* Documents & revision notes */}
+                          {ch.documents.map(doc => (
+                            <a
+                              key={doc.id}
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-start gap-2.5 px-5 py-2.5 hover:bg-muted/30 border-l-2 border-transparent hover:border-primary/40 transition-colors group"
+                            >
+                              <div className="w-5 h-5 rounded-full bg-muted/60 group-hover:bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                                {doc.type === 'revision_note'
+                                  ? <BookOpen className="w-2.5 h-2.5 text-muted-foreground group-hover:text-primary" />
+                                  : <FileText className="w-2.5 h-2.5 text-muted-foreground group-hover:text-primary" />
+                                }
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                                  {doc.title}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {doc.type === 'revision_note' ? 'Revision Notes' : 'Document'}
+                                </p>
+                              </div>
+                            </a>
+                          ))}
                         </div>
                       )}
                     </div>
