@@ -1,23 +1,12 @@
 import Link from 'next/link'
-import { Video, Users, Star } from 'lucide-react'
+import { Video, Users, Star, Globe } from 'lucide-react'
 import type { Grade } from '@/lib/types/database'
 
 interface GradeCardProps {
-  grade: Grade & { videoCount?: number; liveClassCount?: number }
-}
-
-const SUBJECT_LABELS: Record<string, string> = {
-  'grade-7':  'Mathematics · Science · English · French',
-  'grade-8':  'Mathematics · Science · English · French',
-  'grade-9':  'Mathematics · Physics · Chemistry · Biology',
-  'grade-10': 'Mathematics · Physics · Chemistry · Biology',
-  'grade-11': 'SC Core Subjects · Electives',
-  'grade-12': 'HSC Core Subjects · Electives',
+  grade: Grade & { videoCount?: number; liveClassCount?: number; is_mauritius_only?: boolean }
 }
 
 export function GradeCard({ grade }: GradeCardProps) {
-  const subjects = SUBJECT_LABELS[grade.slug] ?? 'Core Subjects & Electives'
-
   return (
     <Link href={`/grades/${grade.slug}`} className="group block">
       <div className="bg-card rounded-2xl overflow-hidden lc-shadow lc-card-hover border border-border/50">
@@ -44,15 +33,23 @@ export function GradeCard({ grade }: GradeCardProps) {
               </span>
             </>
           )}
+
+          {/* Mauritius Only badge — top-right corner */}
+          {(grade as any).is_mauritius_only === false && (
+            <div className="absolute top-2 right-2 flex items-center gap-1 bg-background/90 backdrop-blur-sm text-foreground text-[10px] font-semibold px-2 py-1 rounded-full border border-border/50">
+              <Globe className="w-3 h-3" />
+              International
+            </div>
+          )}
+          {(grade as any).is_mauritius_only !== false && (
+            <div className="absolute top-2 right-2 flex items-center gap-1 bg-primary/90 backdrop-blur-sm text-primary-foreground text-[10px] font-semibold px-2 py-1 rounded-full">
+              🇲🇺 Mauritius Only
+            </div>
+          )}
         </div>
 
         {/* — Info area (Boty product info equivalent) — */}
         <div className="p-5">
-          {/* Subjects — like brand name in Boty */}
-          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase truncate mb-1.5">
-            {subjects}
-          </p>
-
           {/* Grade name — like product name in Boty (serif) */}
           <h3 className="font-serif font-semibold text-lg text-foreground mb-3 group-hover:text-primary lc-transition">
             {grade.name}

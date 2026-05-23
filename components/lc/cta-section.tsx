@@ -30,14 +30,6 @@ export function CTASection() {
                 Create Free Account <ArrowRight className="ml-2 w-4 h-4" />
               </Link>
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              asChild
-              className="bg-transparent border-background/25 text-background hover:bg-background/10 hover:border-background/50 rounded-full px-9 h-12 text-[15px]"
-            >
-              <Link href="/pricing">View Pricing</Link>
-            </Button>
           </div>
           <p className="relative text-xs text-background/35 mt-6">No credit card required · Free videos available immediately</p>
         </div>

@@ -32,15 +32,21 @@ const schema = z.object({
   image_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   order_index: z.coerce.number().min(0),
   is_active: z.boolean(),
+  is_mauritius_only: z.boolean(),
   live_subscription_price: z.coerce.number().min(0),
   live_subscription_enabled: z.boolean(),
 })
 
 type FormData = z.infer<typeof schema>
 
+function toSlug(name: string) {
+  return name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+}
+
 function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [slugTouched, setSlugTouched] = useState(false)
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -52,10 +58,18 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
       image_url: grade?.image_url ?? '',
       order_index: grade?.order_index ?? 0,
       is_active: grade?.is_active ?? true,
+      is_mauritius_only: (grade as any)?.is_mauritius_only ?? true,
       live_subscription_price: (grade as any)?.live_subscription_price ?? 0,
       live_subscription_enabled: (grade as any)?.live_subscription_enabled ?? false,
     },
   })
+
+  const watchedName = watch('name')
+  useEffect(() => {
+    if (!grade && !slugTouched && watchedName) {
+      setValue('slug', toSlug(watchedName))
+    }
+  }, [watchedName, grade, slugTouched, setValue])
 
   async function onSubmit(data: FormData) {
     setLoading(true)
@@ -99,7 +113,11 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
             </div>
             <div className="space-y-2">
               <Label>Slug *</Label>
-              <Input placeholder="grade-7" {...register('slug')} />
+              <Input
+                placeholder="grade-7"
+                {...register('slug')}
+                onChange={(e) => { setSlugTouched(true); register('slug').onChange(e) }}
+              />
               {errors.slug && <p className="text-xs text-destructive">{errors.slug.message}</p>}
             </div>
           </div>
@@ -128,6 +146,13 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
           <div className="flex items-center justify-between">
             <Label>Active</Label>
             <Switch checked={watch('is_active')} onCheckedChange={(v) => setValue('is_active', v)} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Mauritius Only</Label>
+              <p className="text-xs text-muted-foreground">Show as Mauritius-only on the homepage grade card</p>
+            </div>
+            <Switch checked={watch('is_mauritius_only')} onCheckedChange={(v) => setValue('is_mauritius_only', v)} />
           </div>
 
           <div className="pt-2">
