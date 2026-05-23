@@ -9,6 +9,7 @@ import {
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { LiveMonthsList } from '@/components/lc/live-months-list'
 import { JoinLiveClassButton } from '@/components/lc/join-live-class-button'
+import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Live Classes' }
@@ -240,7 +241,7 @@ export default async function StudentLiveClassesPage() {
       )}
 
       {/* CTA if no subscriptions at all */}
-      {hasAnyContent && subscribedPackageIds.size === 0 && (
+      {hasAnyContent && subscribedPackageIds.size === 0 && currentMonthPkg && (
         <div className="mt-8 p-5 rounded-xl border border-primary/20 bg-primary/5 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1">
             <p className="font-semibold">Start with this month</p>
@@ -248,11 +249,22 @@ export default async function StudentLiveClassesPage() {
               Subscribe to get access to live classes and all monthly content for {grade.name}.
             </p>
           </div>
-          <Button asChild className="shrink-0 bg-primary text-primary-foreground hover:bg-accent">
-            <Link href={`/grades/${grade.slug}`}>
-              View Grade Page <ArrowRight className="ml-2 w-4 h-4" />
-            </Link>
-          </Button>
+          <BuySubscribeDialog
+            videoPackages={videoPackages}
+            subscribedPackageIds={[]}
+            subscribedLivePackageIds={[]}
+            gradeName={grade.name}
+            liveSubscriptionPrice={grade.live_subscription_price}
+            liveSubscriptionEnabled={grade.live_subscription_enabled}
+            liveMonthPackageId={currentMonthPkg.id}
+            liveMonthLabel={`${MONTHS[currentMonth - 1]} ${currentYear}`}
+            pastLivePackages={(livePackages ?? [])
+              .filter((p: any) => p.year < currentYear || (p.year === currentYear && p.month < currentMonth))
+              .map((p: any) => ({ id: p.id, name: p.name, month: p.month, year: p.year }))}
+            defaultMode="live"
+            triggerLabel="Subscribe Now"
+            isLoggedIn
+          />
         </div>
       )}
     </div>

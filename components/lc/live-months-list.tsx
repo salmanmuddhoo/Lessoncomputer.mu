@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import Link from 'next/link'
-import { Radio, CheckCircle2, Lock, Calendar, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
+import { Radio, CheckCircle2, Lock, Calendar, ChevronDown, ChevronUp, Loader2, RefreshCw } from 'lucide-react'
 import { LiveMonthChapters } from '@/components/lc/live-month-chapters'
+import { toast } from 'sonner'
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -61,6 +62,7 @@ export function LiveMonthsList({
   liveSubscriptionPrice,
   gradeName,
 }: Props) {
+  const router = useRouter()
   const subscribedSet = new Set(subscribedPackageIds)
   const [openMonths, setOpenMonths] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
@@ -69,8 +71,7 @@ export function LiveMonthsList({
         .map(p => [p.id, true])
     )
   )
-
-  // Past months multi-select dialog state
+  const [paying, setPaying] = useState(false)
   const [pastDialog, setPastDialog] = useState<{ selectedIds: Set<string> } | null>(null)
 
   const unsubscribedPastPackages = packages.filter(pkg => {
@@ -78,31 +79,53 @@ export function LiveMonthsList({
     return isPast && !subscribedSet.has(pkg.id)
   })
 
-  function openPastDialog(clickedId: string) {
-    setPastDialog({ selectedIds: new Set([clickedId]) })
+  function toggleMonth(id: string) {
+    setOpenMonths(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
   function togglePastMonth(id: string) {
     setPastDialog(prev => {
       if (!prev) return prev
       const next = new Set(prev.selectedIds)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      next.has(id) ? next.delete(id) : next.add(id)
       return { selectedIds: next }
     })
   }
 
-  function buildContactUrl() {
-    if (!pastDialog) return '#'
-    const selected = [...pastDialog.selectedIds]
-    const selectedPkgs = unsubscribedPastPackages.filter(p => selected.includes(p.id))
-    const months = selectedPkgs.map(p => encodeURIComponent(`${MONTHS[p.month - 1]} ${p.year}`)).join(',')
-    const pkgs = selected.join(',')
-    return `/contact?type=live_past&packages=${pkgs}&months=${months}`
+  async function initiatePayment(packageIds: string[], amount: number, description: string) {
+    if (paying) return
+    setPaying(true)
+    try {
+      const res = await fetch('/api/payment/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderType: 'live', packageIds, amount, description, isRecurring: true }),
+      })
+      const data = await res.json() as { paymentUrl?: string; error?: string }
+      if (!res.ok || !data.paymentUrl) {
+        toast.error(data.error ?? 'Failed to initiate payment. Please try again.')
+        return
+      }
+      window.location.href = data.paymentUrl
+    } catch {
+      toast.error('Network error. Please try again.')
+    } finally {
+      setPaying(false)
+    }
   }
 
-  function toggleMonth(id: string) {
-    setOpenMonths(prev => ({ ...prev, [id]: !prev[id] }))
+  function handleSubscribeCurrent(pkg: MonthPackage) {
+    const description = `Live classes: ${MONTHS[pkg.month - 1]} ${pkg.year}`
+    initiatePayment([pkg.id], liveSubscriptionPrice, description)
+  }
+
+  function handleSubscribePast() {
+    if (!pastDialog || pastDialog.selectedIds.size === 0) return
+    const selected = [...pastDialog.selectedIds]
+    const selectedPkgs = unsubscribedPastPackages.filter(p => selected.includes(p.id))
+    const amount = selected.length * liveSubscriptionPrice
+    const months = selectedPkgs.map(p => `${MONTHS[p.month - 1]} ${p.year}`).join(', ')
+    initiatePayment(selected, amount, `Live classes: ${months}`)
   }
 
   return (
@@ -163,15 +186,22 @@ export function LiveMonthsList({
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => openPastDialog(pkg.id)}
+                          onClick={() => setPastDialog({ selectedIds: new Set([pkg.id]) })}
                         >
                           Buy Videos
                         </Button>
                       ) : (
-                        <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
-                          <Link href={`/contact?type=live&package=${pkg.id}&month=${encodeURIComponent(monthLabel)}`}>
-                            Subscribe
-                          </Link>
+                        <Button
+                          size="sm"
+                          className="bg-primary text-primary-foreground hover:bg-accent"
+                          onClick={() => handleSubscribeCurrent(pkg)}
+                          disabled={paying}
+                        >
+                          {paying
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                            : <Radio className="w-3.5 h-3.5 mr-1" />
+                          }
+                          Subscribe
                         </Button>
                       )}
                     </>
@@ -224,7 +254,7 @@ export function LiveMonthsList({
       {/* Past months purchase dialog */}
       {pastDialog && (
         <Dialog open onOpenChange={() => setPastDialog(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Radio className="w-4 h-4 text-primary" />
@@ -233,7 +263,7 @@ export function LiveMonthsList({
             </DialogHeader>
 
             <p className="text-sm text-muted-foreground">
-              Select the months you'd like to purchase. Contact us and we'll get you set up.
+              Select the months you'd like to purchase access to.
             </p>
 
             <div className="space-y-2 my-2">
@@ -272,17 +302,26 @@ export function LiveMonthsList({
               </div>
             )}
 
+            {/* Recurring info */}
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
+              <RefreshCw className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+              <span>
+                <span className="font-medium text-foreground">Auto-renewing subscription</span> — renews monthly.
+                Cancel anytime from your Subscriptions page.
+              </span>
+            </div>
+
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setPastDialog(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setPastDialog(null)} disabled={paying}>Cancel</Button>
               <Button
-                asChild
-                disabled={pastDialog.selectedIds.size === 0}
+                onClick={handleSubscribePast}
+                disabled={pastDialog.selectedIds.size === 0 || paying}
                 className="bg-primary text-primary-foreground hover:bg-accent"
               >
-                <Link href={buildContactUrl()}>
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Contact to Subscribe
-                </Link>
+                {paying
+                  ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Processing…</>
+                  : `Pay Rs ${(pastDialog.selectedIds.size * Number(liveSubscriptionPrice)).toFixed(2)}`
+                }
               </Button>
             </DialogFooter>
           </DialogContent>
