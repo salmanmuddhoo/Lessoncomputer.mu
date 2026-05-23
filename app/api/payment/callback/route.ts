@@ -46,13 +46,14 @@ export async function POST(req: NextRequest) {
     // Look up the order by MIPS id_order
     const { data: orderRaw } = await (supabase as any)
       .from('mips_orders')
-      .select('id, student_id, package_ids, is_recurring, status')
+      .select('id, student_id, order_type, package_ids, is_recurring, status')
       .eq('mips_transaction_id', details.id_order)
       .single()
 
     const order = orderRaw as {
       id: string
       student_id: string
+      order_type: 'video' | 'live'
       package_ids: string[]
       is_recurring: boolean
       status: string
@@ -70,10 +71,11 @@ export async function POST(req: NextRequest) {
     if (details.status === 'success') {
       // Activate subscriptions for all packages
       const subscriptionRows = order.package_ids.map((packageId: string) => ({
-        student_id:   order.student_id,
-        package_id:   packageId,
-        is_recurring: order.is_recurring,
-        status:       'active',
+        student_id:        order.student_id,
+        package_id:        packageId,
+        subscription_type: order.order_type,   // 'video' | 'live'
+        is_recurring:      order.is_recurring,  // false for video, user-chosen for live
+        status:            'active',
       }))
 
       const { error: subError } = await (supabase as any)
