@@ -71,7 +71,7 @@ function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscrip
 
       <div className="p-3 border-t border-sidebar-border">
         {gradeName && (
-          <p className="text-xs text-muted-foreground px-3 pb-2 truncate">Grade: {gradeName}</p>
+          <p className="text-xs text-muted-foreground px-3 pb-2 truncate">{gradeName}</p>
         )}
         <button
           onClick={handleSignOut}
@@ -91,7 +91,7 @@ export function StudentSidebar({ userName, gradeName, hasLiveSubscription, hasVi
   return (
     <>
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col h-full bg-sidebar border-r border-sidebar-border">
+      <aside className="hidden md:flex w-64 shrink-0 flex-col sticky top-0 h-screen overflow-hidden bg-sidebar border-r border-sidebar-border">
         <div className="p-5 border-b border-sidebar-border">
           <Logo size="sm" />
           {userName && (

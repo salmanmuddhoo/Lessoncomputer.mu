@@ -117,7 +117,7 @@ export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt
         <>
           <button
             onClick={() => setShowParentDialog(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary/10 border border-primary/30 text-primary text-sm font-semibold transition-colors hover:bg-primary/20 shrink-0"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 shrink-0"
           >
             <Phone className="w-4 h-4 shrink-0" />
             Add Parent Contact

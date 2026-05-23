@@ -21,6 +21,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return { title: data?.title ? `${data.title} | Revision Notes` : 'Revision Notes' }
 }
 
+function sanitiseHtml(raw: string): string {
+  // Strip full-document wrappers and embedded stylesheets so they can't
+  // override the page theme. Inline styles (for formatting) are preserved.
+  const bodyContent = raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? raw
+  return bodyContent
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<link[^>]*>/gi, '')
+}
+
 export default async function RevisionNotePage({ params, searchParams }: PageProps) {
   const { id } = await params
   const { live } = await searchParams
@@ -38,7 +48,8 @@ export default async function RevisionNotePage({ params, searchParams }: PagePro
   const visible = isLiveContext ? note.is_published_for_live : note.is_published
   if (!visible) notFound()
 
-  const html = (isLiveContext && note.content_live) ? note.content_live : note.content
+  const rawHtml = (isLiveContext && note.content_live) ? note.content_live : note.content
+  const html = rawHtml ? sanitiseHtml(rawHtml) : null
   const grade = note.grade as { name: string; color: string; slug: string } | null
   const chapter = note.chapter as { title: string } | null
 
@@ -47,7 +58,7 @@ export default async function RevisionNotePage({ params, searchParams }: PagePro
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
         {/* Back */}
         <Link
-          href="javascript:history.back()"
+          href="/"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mb-6"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
