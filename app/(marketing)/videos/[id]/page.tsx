@@ -122,14 +122,30 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
         .filter(Boolean)
 
       let allVideos: any[] = []
+      let allDocs: any[] = []
+      let allNotes: any[] = []
       if (chapterIds.length > 0) {
-        const { data: vids } = await supabase
-          .from('videos')
-          .select('id, title, duration_minutes, chapter_id')
-          .in('chapter_id', chapterIds)
-          .eq(publishedField as any, true)
-          .order('created_at', { ascending: true })
+        const [{ data: vids }, { data: docs }, { data: notes }] = await Promise.all([
+          supabase
+            .from('videos')
+            .select('id, title, duration_minutes, chapter_id')
+            .in('chapter_id', chapterIds)
+            .eq(publishedField as any, true)
+            .order('created_at', { ascending: true }),
+          (supabase as any)
+            .from('documents')
+            .select('id, title, file_url, file_url_live, chapter_id')
+            .in('chapter_id', chapterIds)
+            .eq(isLiveContext ? 'is_published_for_live' : 'is_published', true),
+          (supabase as any)
+            .from('revision_notes')
+            .select('id, title, chapter_id')
+            .in('chapter_id', chapterIds)
+            .eq(isLiveContext ? 'is_published_for_live' : 'is_published', true),
+        ])
         allVideos = vids ?? []
+        allDocs = docs ?? []
+        allNotes = notes ?? []
       }
 
       playlistData = packages
@@ -140,15 +156,39 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
             .filter(Boolean)
 
           const chapters = chapterLinks
-            .map((ch: any) => ({
-              id: ch.id,
-              title: ch.title,
-              order_index: ch.order_index ?? 0,
-              videos: allVideos
+            .map((ch: any) => {
+              const videos = allVideos
                 .filter(v => v.chapter_id === ch.id)
-                .map(v => ({ id: v.id, title: v.title, duration_minutes: v.duration_minutes })),
-            }))
-            .filter((ch: any) => ch.videos.length > 0)
+                .map(v => ({ id: v.id, title: v.title, duration_minutes: v.duration_minutes }))
+
+              const documents = [
+                ...allDocs
+                  .filter(d => d.chapter_id === ch.id)
+                  .map(d => ({
+                    id: d.id,
+                    title: d.title,
+                    type: 'document' as const,
+                    url: (isLiveContext && d.file_url_live) ? d.file_url_live : d.file_url,
+                  })),
+                ...allNotes
+                  .filter(n => n.chapter_id === ch.id)
+                  .map(n => ({
+                    id: n.id,
+                    title: n.title,
+                    type: 'revision_note' as const,
+                    url: `/notes/${n.id}`,
+                  })),
+              ]
+
+              return {
+                id: ch.id,
+                title: ch.title,
+                order_index: ch.order_index ?? 0,
+                videos,
+                documents,
+              }
+            })
+            .filter((ch: any) => ch.videos.length > 0 || ch.documents.length > 0)
             .sort((a: any, b: any) => a.order_index - b.order_index)
 
           return {

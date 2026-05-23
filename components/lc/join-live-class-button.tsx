@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ExternalLink, Loader2, Clock } from 'lucide-react'
+import { ExternalLink, Loader2, Clock, Phone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { ParentContactDialog } from '@/components/lc/parent-contact-dialog'
@@ -69,11 +69,7 @@ export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt
     return () => clearInterval(interval)
   }, [state.enabled, scheduledAt, isRecurring, recurrenceDayOfWeek])
 
-  async function handleJoin() {
-    if (!parentPhoneProvided) {
-      setShowParentDialog(true)
-      return
-    }
+  async function doJoin() {
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -101,10 +97,43 @@ export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt
     }
   }
 
+  async function handleJoin() {
+    if (!parentPhoneProvided) {
+      setShowParentDialog(true)
+      return
+    }
+    await doJoin()
+  }
+
+  // Class not open yet
   if (!state.enabled) {
     const label = state.minutesLeft !== null && state.minutesLeft <= 60
       ? `Opens in ${state.minutesLeft} min`
       : 'Opens 30 min before'
+
+    // If parent phone not provided, show a prompt button instead
+    if (!parentPhoneProvided) {
+      return (
+        <>
+          <button
+            onClick={() => setShowParentDialog(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary/10 border border-primary/30 text-primary text-sm font-semibold transition-colors hover:bg-primary/20 shrink-0"
+          >
+            <Phone className="w-4 h-4 shrink-0" />
+            Add Parent Contact
+          </button>
+          <ParentContactDialog
+            open={showParentDialog}
+            onClose={() => setShowParentDialog(false)}
+            onSuccess={() => {
+              setParentPhoneProvided(true)
+              setShowParentDialog(false)
+            }}
+          />
+        </>
+      )
+    }
+
     return (
       <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-muted text-muted-foreground text-sm font-semibold shrink-0 cursor-not-allowed select-none">
         <Clock className="w-4 h-4 shrink-0" />
@@ -130,7 +159,7 @@ export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt
         onSuccess={() => {
           setParentPhoneProvided(true)
           setShowParentDialog(false)
-          handleJoin()
+          doJoin()
         }}
       />
     </>
