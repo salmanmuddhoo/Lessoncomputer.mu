@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Package, Radio, ArrowRight, RefreshCw, XCircle } from 'lucide-react'
+import { Package, Radio, RefreshCw, XCircle, Receipt } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,6 +22,7 @@ interface SubscriptionCardProps {
   subscriptionType: string
   isRecurring: boolean
   purchasedAt: string
+  orderId: string | null
   pkg: {
     name: string
     month: number | null
@@ -30,14 +31,13 @@ interface SubscriptionCardProps {
   } | null
 }
 
-export function SubscriptionCard({ id, subscriptionType, isRecurring, purchasedAt, pkg }: SubscriptionCardProps) {
+export function SubscriptionCard({ id, subscriptionType, isRecurring, purchasedAt, pkg, orderId }: SubscriptionCardProps) {
   const router = useRouter()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
 
   const isLive = subscriptionType === 'live' || (pkg?.month != null && pkg?.year != null)
   const monthLabel = pkg?.month && pkg?.year ? `${MONTHS[pkg.month - 1]} ${pkg.year}` : null
-  const href = isLive ? '/dashboard/live-classes' : '/dashboard/my-videos'
 
   async function handleCancelRecurring() {
     setCancelling(true)
@@ -108,12 +108,15 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, purchasedA
               Cancel recurring
             </Button>
           )}
-          <Link
-            href={href}
-            className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
-          >
-            View <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          {orderId && (
+            <Link
+              href={`/dashboard/subscriptions/receipt/${orderId}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/60 hover:bg-muted/30 transition-colors"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              Receipt
+            </Link>
+          )}
         </div>
       </div>
 

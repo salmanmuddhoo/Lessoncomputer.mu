@@ -80,12 +80,13 @@ export async function POST(req: NextRequest) {
       env,
     })
 
-    // For recurring live subscriptions, enable MIPS tokenization so future months
-    // can be claimed server-side without the student re-entering card details.
-    const recurringParams = effectiveRecurring ? {
-      maxAmount: amount,
-      maxClaims: 24,    // up to 24 monthly claims (2 years)
-      maxDate:   new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    // For recurring live subscriptions, use ODRP mode to tokenize the card so
+    // future months can be claimed server-side without the student re-entering details.
+    const odrpParams = effectiveRecurring ? {
+      maxAmountTotal:    amount * 24,  // up to 24 months total
+      maxAmountPerClaim: amount,
+      maxFrequency:      1,            // once per period
+      maxDate:           new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
     } : undefined
 
     const result = await createMipsPayment({
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
       currency: 'MUR',
       description,
       returnUrl: `${origin}/payment/result?orderId=${orderId}`,
-      recurring: recurringParams,
+      odrp: odrpParams,
     })
 
     // Store the MIPS id_order so the IMN callback can look up this order

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { cancelOdrpToken, type MipsEnvironment } from '@/lib/mips'
 
 // POST /api/payment/cancel-recurring
 // Student cancels their recurring live subscription.
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
       .update({ is_recurring: false, updated_at: new Date().toISOString() })
       .eq('id', subscriptionId)
 
-    // Check if student has any other active recurring live subs — if none, deactivate token
+    // Check if student has any other active recurring live subs
     const { data: otherRecurring } = await (supabase as any)
       .from('student_subscriptions')
       .select('id')
@@ -39,6 +40,27 @@ export async function POST(req: NextRequest) {
       .eq('status', 'active')
 
     if (!otherRecurring?.length) {
+      // Fetch the token to cancel on MIPS side
+      const { data: tokenRaw } = await (supabase as any)
+        .from('student_payment_tokens')
+        .select('id, id_token, card_last_four_digit')
+        .eq('student_id', user.id)
+        .eq('is_active', true)
+        .single()
+
+      if (tokenRaw?.id_token && tokenRaw?.card_last_four_digit) {
+        const { data: settings } = await (supabase as any)
+          .from('site_settings').select('mips_environment').eq('id', 1).single()
+        const env: MipsEnvironment = (settings?.mips_environment as MipsEnvironment) ?? 'test'
+
+        await cancelOdrpToken({
+          env,
+          idToken:           tokenRaw.id_token,
+          cardLastFourDigit: tokenRaw.card_last_four_digit,
+        })
+      }
+
+      // Deactivate token in our DB regardless
       await (supabase as any)
         .from('student_payment_tokens')
         .update({ is_active: false, updated_at: new Date().toISOString() })
