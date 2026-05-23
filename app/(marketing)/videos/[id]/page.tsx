@@ -176,7 +176,7 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
                     id: n.id,
                     title: n.title,
                     type: 'revision_note' as const,
-                    url: `/notes/${n.id}`,
+                    url: `/api/notes/${n.id}${isLiveContext ? '?live=1' : ''}`,
                   })),
               ]
 
