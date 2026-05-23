@@ -1,17 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Package, Radio, ArrowRight, BookOpen } from 'lucide-react'
+import { BookOpen, ArrowRight } from 'lucide-react'
 import type { Metadata } from 'next'
+import { SubscriptionCard } from '@/components/lc/subscription-card'
 
 export const metadata: Metadata = { title: 'My Subscriptions' }
-
-const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
-]
 
 export default async function StudentSubscriptionsPage() {
   const supabase = await createClient()
@@ -23,6 +18,8 @@ export default async function StudentSubscriptionsPage() {
     .select(`
       id,
       package_id,
+      subscription_type,
+      is_recurring,
       purchased_at,
       package:subscription_packages(
         id, name, month, year, price,
@@ -55,52 +52,17 @@ export default async function StudentSubscriptionsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {activeSubs.map((sub: any) => {
-            const pkg = sub.package
-            const isLive = pkg?.month != null && pkg?.year != null
-            const monthLabel = pkg?.month && pkg?.year
-              ? `${MONTHS[pkg.month - 1]} ${pkg.year}`
-              : null
-            const href = isLive ? '/dashboard/live-classes' : '/dashboard/my-videos'
-
-            return (
-              <Link
-                key={sub.id}
-                href={href}
-                className="flex items-center gap-4 p-4 rounded-xl border border-border/60 bg-card hover:border-primary/30 hover:bg-muted/20 transition-colors group"
-              >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                  isLive ? 'bg-primary/10' : 'bg-muted'
-                }`}>
-                  {isLive
-                    ? <Radio className="w-5 h-5 text-primary" />
-                    : <Package className="w-5 h-5 text-muted-foreground" />
-                  }
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                    <span className="font-semibold text-sm truncate">{pkg?.name ?? 'Package'}</span>
-                    <Badge
-                      variant="outline"
-                      className={`text-xs shrink-0 ${isLive ? 'text-primary border-primary/30 bg-primary/5' : ''}`}
-                    >
-                      {isLive ? 'Live Classes' : 'Video Package'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    {monthLabel && <span>{monthLabel}</span>}
-                    <span>Purchased {new Date(sub.purchased_at).toLocaleDateString('en-MU', { dateStyle: 'medium' })}</span>
-                    {sub.expires_at && (
-                      <span>· Expires {new Date(sub.expires_at).toLocaleDateString('en-MU', { dateStyle: 'medium' })}</span>
-                    )}
-                  </div>
-                </div>
-
-                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-              </Link>
-            )
-          })}
+          {activeSubs.map((sub: any) => (
+            <SubscriptionCard
+              key={sub.id}
+              id={sub.id}
+              packageId={sub.package_id}
+              subscriptionType={sub.subscription_type ?? 'video'}
+              isRecurring={sub.is_recurring ?? false}
+              purchasedAt={sub.purchased_at}
+              pkg={sub.package}
+            />
+          ))}
         </div>
       )}
     </div>

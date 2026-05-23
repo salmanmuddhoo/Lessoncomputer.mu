@@ -90,11 +90,27 @@ export async function POST(req: NextRequest) {
       await (supabase as any)
         .from('mips_orders')
         .update({
-          status:         'paid',
-          metadata:       { transaction_id: details.transaction_id, payment_method: details.payment_method },
-          updated_at:     new Date().toISOString(),
+          status:     'paid',
+          metadata:   { transaction_id: details.transaction_id, payment_method: details.payment_method },
+          updated_at: new Date().toISOString(),
         })
         .eq('id', order.id)
+
+      // Store MIPS token for future recurring claims (live subscriptions only)
+      if (order.is_recurring && details.id_token) {
+        await (supabase as any)
+          .from('student_payment_tokens')
+          .upsert({
+            student_id:      order.student_id,
+            id_token:        details.id_token,
+            max_amount:      Number(details.amount) / 100,  // callback amount is in cents
+            currency:        details.currency,
+            is_active:       true,
+            source_order_id: order.id,
+            updated_at:      new Date().toISOString(),
+          }, { onConflict: 'student_id' })
+        console.log('[payment/callback] Recurring token stored for student:', order.student_id)
+      }
 
       console.log('[payment/callback] Paid & subscriptions activated:', details.id_order)
     } else {

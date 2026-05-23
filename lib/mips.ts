@@ -24,7 +24,8 @@ function getMipsHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'user-agent': '',
+    // MIPS docs require a non-empty user-agent
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.78 Safari/537.36',
   }
 }
 
@@ -42,6 +43,14 @@ export interface CreatePaymentParams {
   currency?: string
   description: string
   returnUrl: string
+  // For recurring live subscriptions: enable MIPS tokenization so subsequent
+  // months can be claimed without the student re-entering card details.
+  // Requires MIPS to have tokenization enabled on the merchant account.
+  recurring?: {
+    maxAmount: number       // max Rs amount claimable per claim
+    maxClaims: number       // max number of recurring claims (e.g. 12 for annual)
+    maxDate: string         // ISO date string — MIPS will reject claims after this
+  }
 }
 
 export interface CreatePaymentResult {
@@ -50,12 +59,12 @@ export interface CreatePaymentResult {
 }
 
 export async function createMipsPayment(params: CreatePaymentParams): Promise<CreatePaymentResult> {
-  const { env, orderId, amount, currency = 'MUR', description, returnUrl } = params
+  const { env, orderId, amount, currency = 'MUR', description, returnUrl, recurring } = params
   const creds = getCredentials()
   const baseUrl = getBaseUrl(env)
   const mipsOrderId = toMipsOrderId(orderId)
 
-  const body = {
+  const body: Record<string, unknown> = {
     authentify: {
       id_merchant:       creds.idMerchant,
       id_entity:         creds.idEntity,
@@ -63,8 +72,8 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
       operator_password: creds.operatorPassword,
     },
     request: {
-      request_mode: 'simple',
-      sending_mode: 'link',
+      request_mode:  recurring ? 'recurring' : 'simple',
+      sending_mode:  'link',
       request_title: description.slice(0, 200),
     },
     initial_payment: {
@@ -77,24 +86,31 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
     },
   }
 
+  // Add recurring constraints when tokenization is requested
+  if (recurring) {
+    body.recurring = {
+      max_amount:           recurring.maxAmount,
+      max_number_of_claims: recurring.maxClaims,
+      max_date_for_claims:  recurring.maxDate,
+    }
+  }
+
   const url = `${baseUrl}/api/create_payment_request`
-  const headers = getMipsHeaders()
   console.error('[mips] POST', url, {
     idMerchant: creds.idMerchant ? `set(${creds.idMerchant.length})` : 'MISSING',
     mipsOrderId,
     amount,
-    authHeader: headers['Authorization'] ? `Basic set(${headers['Authorization'].length})` : 'MISSING',
+    recurring: !!recurring,
   })
 
   const response = await fetch(url, {
     method: 'POST',
-    headers,
+    headers: getMipsHeaders(),
     body: JSON.stringify(body),
   })
 
   if (!response.ok) {
     const text = await response.text()
-    // Detect HTML error pages (e.g. Apache 401/403) and give a cleaner message
     const isHtml = text.trimStart().startsWith('<')
     throw new Error(
       isHtml
@@ -116,6 +132,63 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
   return { paymentUrl: data.payment_link.url, mipsOrderId }
 }
 
+// ─── Claim recurring payment ──────────────────────────────────────────────────
+
+export interface ClaimPaymentParams {
+  env: MipsEnvironment
+  orderId: string       // new unique order ID for this claim
+  amount: number
+  currency?: string
+  idToken: string       // 128-char token stored from initial payment
+}
+
+export interface ClaimPaymentResult {
+  status: 'SUCCESS' | 'FAIL' | 'ERROR' | 'Rejected'
+  reason: string
+}
+
+export async function claimMipsPayment(params: ClaimPaymentParams): Promise<ClaimPaymentResult> {
+  const { env, orderId, amount, currency = 'MUR', idToken } = params
+  const creds = getCredentials()
+  const baseUrl = getBaseUrl(env)
+  const mipsOrderId = toMipsOrderId(orderId)
+
+  const body = {
+    authentify: {
+      id_merchant:       creds.idMerchant,
+      id_entity:         creds.idEntity,
+      id_operator:       creds.idOperator,
+      operator_password: creds.operatorPassword,
+    },
+    order: {
+      id_order:  mipsOrderId,
+      currency,
+      amount,
+      id_token:  idToken,
+    },
+  }
+
+  console.error('[mips] CLAIM', `${baseUrl}/api/claim_payment_request`, {
+    mipsOrderId,
+    amount,
+    idToken: `set(${idToken.length})`,
+  })
+
+  const response = await fetch(`${baseUrl}/api/claim_payment_request`, {
+    method: 'POST',
+    headers: getMipsHeaders(),
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`MIPS claim error ${response.status}: ${text}`)
+  }
+
+  const data = await response.json() as { payment_status: string; Reason: string }
+  return { status: data.payment_status as ClaimPaymentResult['status'], reason: data.Reason }
+}
+
 // ─── Decrypt IMN callback ─────────────────────────────────────────────────────
 
 export interface ImnTransactionDetails {
@@ -128,6 +201,7 @@ export interface ImnTransactionDetails {
   payment_method: string
   checksum: string
   reason_fail?: string
+  id_token?: string     // 128-char token — present when tokenization is enabled
 }
 
 export interface DecryptImnResult {
