@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { ExternalLink, Loader2, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { ParentContactDialog } from '@/components/lc/parent-contact-dialog'
 
 interface Props {
   liveClassId: string
@@ -13,6 +14,7 @@ interface Props {
   endTime: string | null
   isRecurring: boolean
   recurrenceDayOfWeek: number | null
+  hasParentPhone?: boolean
 }
 
 function getClassStartDate(scheduledAt: string, isRecurring: boolean, recurrenceDayOfWeek: number | null): Date {
@@ -50,9 +52,11 @@ function computeState(scheduledAt: string, isRecurring: boolean, recurrenceDayOf
   return { enabled: false, minutesLeft }
 }
 
-export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt, endTime, isRecurring, recurrenceDayOfWeek }: Props) {
+export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt, endTime, isRecurring, recurrenceDayOfWeek, hasParentPhone = true }: Props) {
   const [state, setState] = useState(() => computeState(scheduledAt, isRecurring, recurrenceDayOfWeek))
   const [loading, setLoading] = useState(false)
+  const [showParentDialog, setShowParentDialog] = useState(false)
+  const [parentPhoneProvided, setParentPhoneProvided] = useState(hasParentPhone)
   const supabase = createClient()
 
   useEffect(() => {
@@ -66,6 +70,10 @@ export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt
   }, [state.enabled, scheduledAt, isRecurring, recurrenceDayOfWeek])
 
   async function handleJoin() {
+    if (!parentPhoneProvided) {
+      setShowParentDialog(true)
+      return
+    }
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -106,13 +114,25 @@ export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt
   }
 
   return (
-    <button
-      onClick={handleJoin}
-      disabled={loading}
-      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-accent text-sm font-semibold transition-colors shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
-    >
-      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-      Join Live Class
-    </button>
+    <>
+      <button
+        onClick={handleJoin}
+        disabled={loading}
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-accent text-sm font-semibold transition-colors shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+        Join Live Class
+      </button>
+
+      <ParentContactDialog
+        open={showParentDialog}
+        onClose={() => setShowParentDialog(false)}
+        onSuccess={() => {
+          setParentPhoneProvided(true)
+          setShowParentDialog(false)
+          handleJoin()
+        }}
+      />
+    </>
   )
 }

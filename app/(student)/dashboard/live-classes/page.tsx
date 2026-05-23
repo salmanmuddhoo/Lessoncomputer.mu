@@ -26,9 +26,11 @@ export default async function StudentLiveClassesPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('grade_id, grade:grades(id, name, color, slug, live_subscription_enabled, live_subscription_price)')
+    .select('grade_id, parent_phone, grade:grades(id, name, color, slug, live_subscription_enabled, live_subscription_price)')
     .eq('id', user.id)
     .single()
+
+  const hasParentPhone = !!((profile as any)?.parent_phone)
 
   const grade = profile?.grade as {
     id: string; name: string; color: string; slug: string
@@ -208,6 +210,7 @@ export default async function StudentLiveClassesPage() {
                 endTime={currentLiveClass.end_time ?? null}
                 isRecurring={currentLiveClass.is_recurring ?? false}
                 recurrenceDayOfWeek={currentLiveClass.recurrence_day_of_week ?? null}
+                hasParentPhone={hasParentPhone}
               />
             ) : (
               <Badge variant="secondary" className="shrink-0">Link coming soon</Badge>

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { AccountForm } from './account-form'
 import { SiteSettingsForm } from '@/components/lc/site-settings-form'
 import { MipsSettingsForm } from '@/components/lc/mips-settings-form'
+import { WhatsAppSettingsForm } from '@/components/lc/whatsapp-settings-form'
 
 export const metadata: Metadata = { title: 'Admin Settings' }
 
@@ -18,7 +19,7 @@ export default async function AdminSettingsPage() {
       .single(),
     (supabase as any)
       .from('site_settings')
-      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment')
+      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, whatsapp_group_url')
       .eq('id', 1)
       .single(),
   ])
@@ -29,6 +30,7 @@ export default async function AdminSettingsPage() {
     tiktok_url: string | null
     whatsapp_number: string | null
     mips_environment: string | null
+    whatsapp_group_url: string | null
   }
 
   return (
@@ -56,6 +58,10 @@ export default async function AdminSettingsPage() {
 
         <MipsSettingsForm
           initialEnvironment={(ss.mips_environment as 'test' | 'production') ?? 'test'}
+        />
+
+        <WhatsAppSettingsForm
+          initialGroupUrl={ss.whatsapp_group_url ?? ''}
         />
       </div>
     </div>
