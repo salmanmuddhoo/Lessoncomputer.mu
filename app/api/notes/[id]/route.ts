@@ -5,12 +5,45 @@ interface RouteProps {
   params: Promise<{ id: string }>
 }
 
+const LOGIN_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in required</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f9fafb; }
+    .box { text-align: center; padding: 2rem; max-width: 360px; }
+    h2 { margin: 0 0 0.5rem; color: #111; }
+    p { color: #555; margin: 0 0 1.5rem; }
+    a { display: inline-block; padding: 0.6rem 1.5rem; background: #f59e0b; color: #fff; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    a:hover { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>Sign in required</h2>
+    <p>Please sign in to view this content.</p>
+    <a href="/login">Sign in</a>
+  </div>
+</body>
+</html>`
+
 export async function GET(request: Request, { params }: RouteProps) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return new NextResponse(LOGIN_HTML, {
+      status: 401,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })
+  }
+
   const { id } = await params
   const { searchParams } = new URL(request.url)
   const isLive = searchParams.get('live') === '1'
 
-  const supabase = await createClient()
   const { data: note } = await (supabase as any)
     .from('revision_notes')
     .select('title, content, content_live')
