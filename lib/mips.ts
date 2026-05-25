@@ -105,20 +105,23 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
     body: JSON.stringify(body),
   })
 
+  const responseText = await response.text()
+  console.error('[mips] create_payment_request response', {
+    status: response.status,
+    statusText: response.statusText,
+    body: responseText.slice(0, 500), // first 500 chars to avoid log bloat
+    headers: Object.fromEntries(response.headers.entries()),
+  })
+
   if (!response.ok) {
-    const text = await response.text()
-    const isHtml = text.trimStart().startsWith('<')
-    throw new Error(
-      isHtml
-        ? `MIPS API returned HTTP ${response.status}. Check credentials or contact MIPS support.`
-        : `MIPS API error ${response.status}: ${text}`
-    )
+    throw new Error(`MIPS API error ${response.status}: ${responseText}`)
   }
 
-  const data = await response.json() as {
-    operation_status: string
-    operation_details?: string
-    payment_link?: { url: string; qr_code: string }
+  let data: { operation_status: string; operation_details?: string; payment_link?: { url: string; qr_code: string } }
+  try {
+    data = JSON.parse(responseText)
+  } catch {
+    throw new Error(`MIPS API returned non-JSON ${response.status}: ${responseText}`)
   }
 
   if (data.operation_status !== 'success' || !data.payment_link?.url) {
@@ -176,12 +179,14 @@ export async function claimMipsPayment(params: ClaimPaymentParams): Promise<Clai
     body: JSON.stringify(body),
   })
 
+  const claimText = await response.text()
+  console.error('[mips] claim_payment_request response', { status: response.status, body: claimText.slice(0, 500) })
+
   if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`MIPS claim error ${response.status}: ${text}`)
+    throw new Error(`MIPS claim error ${response.status}: ${claimText}`)
   }
 
-  const data = await response.json() as { payment_status: string; Reason: string }
+  const data = JSON.parse(claimText) as { payment_status: string; Reason: string }
   return { status: data.payment_status as ClaimPaymentResult['status'], reason: data.Reason }
 }
 
@@ -269,12 +274,14 @@ export async function decryptImnCallback(
     body: JSON.stringify(body),
   })
 
+  const decryptText = await response.text()
+  console.error('[mips] decrypt_imn_data response', { status: response.status, body: decryptText.slice(0, 500) })
+
   if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`MIPS decrypt error ${response.status}: ${text}`)
+    throw new Error(`MIPS decrypt error ${response.status}: ${decryptText}`)
   }
 
-  return response.json() as Promise<DecryptImnResult>
+  return JSON.parse(decryptText) as DecryptImnResult
 }
 
 // ─── Checksum verification ────────────────────────────────────────────────────
