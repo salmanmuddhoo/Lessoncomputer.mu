@@ -21,10 +21,16 @@ function getCredentials() {
 }
 
 function getMipsHeaders(): Record<string, string> {
+  const creds = getCredentials()
+  // MIPS API sits behind Apache HTTP Basic Auth.
+  // Use MIPS_BASIC_USER / MIPS_BASIC_PASS if set; fall back to id_operator / operator_password.
+  const basicUser = process.env.MIPS_BASIC_USER || creds.idOperator
+  const basicPass = process.env.MIPS_BASIC_PASS || creds.operatorPassword
+  const token = Buffer.from(`${basicUser}:${basicPass}`).toString('base64')
   return {
+    'Authorization': `Basic ${token}`,
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.78 Safari/537.36',
   }
 }
 
