@@ -3,23 +3,36 @@ import { createClient } from '@/lib/supabase/server'
 import { decryptImnCallback, verifyImnChecksum, type MipsEnvironment } from '@/lib/mips'
 
 // MIPS IMN (Instant Merchant Notification) callback
-// MIPS POSTs encrypted data here — we decrypt via the MIPS API then verify checksum
+// MIPS POSTs encrypted data here — supports both JSON and form-encoded bodies
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json() as Record<string, unknown>
+  const rawText = await req.text()
+  const contentType = req.headers.get('content-type') ?? ''
+  console.error('[payment/callback] received', { contentType, rawText: rawText.slice(0, 300) })
 
-    // MIPS sends the callback as { received_crypted_data: '...' }
-    const cryptedData = (body.received_crypted_data ?? body.crypted_data ?? '') as string
+  try {
+    // Parse both JSON and application/x-www-form-urlencoded
+    let cryptedData = ''
+    if (contentType.includes('application/json')) {
+      const parsed = JSON.parse(rawText) as Record<string, unknown>
+      cryptedData = (parsed.received_crypted_data ?? parsed.crypted_data ?? '') as string
+    } else {
+      // form-encoded or unknown — try URLSearchParams first, fallback to JSON
+      try {
+        const params = new URLSearchParams(rawText)
+        cryptedData = params.get('received_crypted_data') ?? params.get('crypted_data') ?? ''
+      } catch {
+        const parsed = JSON.parse(rawText) as Record<string, unknown>
+        cryptedData = (parsed.received_crypted_data ?? parsed.crypted_data ?? '') as string
+      }
+    }
 
     if (!cryptedData) {
-      console.error('[payment/callback] Missing received_crypted_data in body:', body)
+      console.error('[payment/callback] Missing crypted data. Raw body:', rawText.slice(0, 500))
       return NextResponse.json({ error: 'Missing received_crypted_data' }, { status: 400 })
     }
 
     const supabase = await createClient()
 
-    // Determine which MIPS environment this order belongs to
-    // (read from site_settings; the order metadata also stores it but settings is simpler)
     const { data: settings } = await (supabase as any)
       .from('site_settings')
       .select('mips_environment')
@@ -27,7 +40,6 @@ export async function POST(req: NextRequest) {
       .single()
     const env: MipsEnvironment = (settings?.mips_environment as MipsEnvironment) ?? 'test'
 
-    // Decrypt the callback data via MIPS API
     const decrypted = await decryptImnCallback(cryptedData, env)
     const details = decrypted.transaction_details
 
@@ -36,14 +48,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid decrypted data' }, { status: 400 })
     }
 
-    // Verify checksum: SHA256(amount.currency.status.id_order.transaction_id.type.payment_method.salt)
     const checksumValid = verifyImnChecksum(details)
     if (!checksumValid) {
       console.error('[payment/callback] Checksum mismatch for order:', details.id_order)
       return NextResponse.json({ error: 'Checksum mismatch' }, { status: 403 })
     }
 
-    // Look up the order by MIPS id_order
     const { data: orderRaw } = await (supabase as any)
       .from('mips_orders')
       .select('id, student_id, order_type, package_ids, is_recurring, status')
@@ -69,12 +79,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (details.status === 'success') {
-      // Activate subscriptions for all packages
       const subscriptionRows = order.package_ids.map((packageId: string) => ({
         student_id:        order.student_id,
         package_id:        packageId,
-        subscription_type: order.order_type,   // 'video' | 'live'
-        is_recurring:      order.is_recurring,  // false for video, user-chosen for live
+        subscription_type: order.order_type,
+        is_recurring:      order.is_recurring,
         status:            'active',
       }))
 
@@ -96,7 +105,6 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', order.id)
 
-      // Store MIPS ODRP token for future recurring claims (live subscriptions only)
       if (order.is_recurring && details.id_token) {
         await (supabase as any)
           .from('student_payment_tokens')
@@ -119,15 +127,17 @@ export async function POST(req: NextRequest) {
         .from('mips_orders')
         .update({ status: 'failed', updated_at: new Date().toISOString() })
         .eq('id', order.id)
+      console.error('[payment/callback] Payment failed/rejected:', details.id_order, details)
     }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
-    console.error('[payment/callback]', err)
+    console.error('[payment/callback] error:', String(err), 'raw:', rawText.slice(0, 300))
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
 
-export async function GET(req: NextRequest) {
-  return POST(req)
+export async function GET() {
+  // Health check — lets us verify the callback URL is reachable
+  return NextResponse.json({ ok: true, endpoint: 'payment/callback' })
 }
