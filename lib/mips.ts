@@ -89,6 +89,8 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
       currency,
       amount,
     },
+    // notification_url at top level AND inside iframe_behavior — MIPS docs vary
+    notification_url: notificationUrl,
     iframe_behavior: {
       custom_redirection_url: returnUrl,
       notification_url:       notificationUrl,

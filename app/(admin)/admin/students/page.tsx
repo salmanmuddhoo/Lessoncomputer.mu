@@ -561,6 +561,29 @@ export default function AdminStudentsPage() {
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={statusBadge(p.status)}>{p.status}</span>
                           <span className="text-sm font-semibold">{p.currency} {p.amount.toFixed(2)}</span>
+                          {(p.status === 'pending' || p.status === 'failed') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7 px-2 border-primary/40 text-primary hover:bg-primary/10"
+                              onClick={async () => {
+                                const res = await fetch('/api/payment/admin-activate', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ orderId: p.id }),
+                                })
+                                const data = await res.json()
+                                if (res.ok) {
+                                  toast.success('Subscription activated')
+                                  setPayments((prev) => prev.map((x) => x.id === p.id ? { ...x, status: 'paid' } : x))
+                                } else {
+                                  toast.error(data.error ?? 'Failed to activate')
+                                }
+                              }}
+                            >
+                              Activate
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
