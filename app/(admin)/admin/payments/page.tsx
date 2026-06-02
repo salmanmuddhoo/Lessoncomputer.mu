@@ -16,7 +16,7 @@ interface MipsOrder {
   mips_transaction_id: string | null
   is_recurring: boolean
   created_at: string
-  profiles: { full_name: string | null } | null
+  studentName?: string | null
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof CheckCircle2; className: string }> = {
@@ -31,13 +31,35 @@ export default async function AdminPaymentsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: ordersRaw } = await (supabase as any)
+  const { data: ordersRaw, error: ordersError } = await (supabase as any)
     .from('mips_orders')
-    .select('id, student_id, order_type, amount, currency, description, status, mips_transaction_id, is_recurring, created_at, profiles(full_name)')
+    .select('id, student_id, order_type, amount, currency, description, status, mips_transaction_id, is_recurring, created_at')
     .order('created_at', { ascending: false })
     .limit(200)
 
-  const orders = (ordersRaw ?? []) as MipsOrder[]
+  if (ordersError) {
+    console.error('[admin/payments] orders fetch error:', ordersError)
+  }
+
+  const rawOrders = (ordersRaw ?? []) as MipsOrder[]
+
+  // Fetch profiles separately — mips_orders.student_id → auth.users, not profiles
+  const studentIds = [...new Set(rawOrders.map((o) => o.student_id))]
+  let profileMap: Record<string, string | null> = {}
+  if (studentIds.length > 0) {
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', studentIds)
+    for (const p of (profilesData ?? [])) {
+      profileMap[(p as any).id] = (p as any).full_name ?? null
+    }
+  }
+
+  const orders: MipsOrder[] = rawOrders.map((o) => ({
+    ...o,
+    studentName: profileMap[o.student_id] ?? null,
+  }))
 
   const totals = orders.reduce((acc, o) => {
     if (o.status === 'paid') acc.revenue += o.amount
@@ -105,7 +127,7 @@ export default async function AdminPaymentsPage() {
                       <div className="text-[11px]">{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     </td>
                     <td className="px-4 py-3 font-medium">
-                      {order.profiles?.full_name ?? <span className="text-muted-foreground italic">Unknown</span>}
+                      {order.studentName ?? <span className="text-muted-foreground italic">Unknown</span>}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate">
                       {order.description ?? '—'}
