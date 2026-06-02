@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/server'
 import { decryptImnCallback, verifyImnChecksum, type MipsEnvironment } from '@/lib/mips'
+
+// MIPS requires the response body to be the literal string "success" or "fail"
+const imn = (s: 'success' | 'fail') =>
+  new NextResponse(s, { status: 200, headers: { 'Content-Type': 'text/plain' } })
 
 // MIPS IMN (Instant Merchant Notification) callback
 // MIPS POSTs encrypted data here — supports both JSON and form-encoded bodies
@@ -28,11 +32,9 @@ export async function POST(req: NextRequest) {
 
     if (!cryptedData) {
       console.error('[payment/callback] Missing crypted data. Raw body:', rawText.slice(0, 500))
-      return NextResponse.json({ error: 'Missing received_crypted_data' }, { status: 400 })
+      return imn('fail')
     }
 
-    // Use anon client only for reads; service-role for writes (bypasses RLS on student_subscriptions)
-    const supabase = await createClient()
     const admin = createServiceRoleClient()
 
     const { data: settings } = await (admin as any)
@@ -47,13 +49,13 @@ export async function POST(req: NextRequest) {
 
     if (!details?.id_order) {
       console.error('[payment/callback] Decrypted data missing id_order:', decrypted)
-      return NextResponse.json({ error: 'Invalid decrypted data' }, { status: 400 })
+      return imn('fail')
     }
 
     const checksumValid = verifyImnChecksum(details)
     if (!checksumValid) {
       console.error('[payment/callback] Checksum mismatch for order:', details.id_order)
-      return NextResponse.json({ error: 'Checksum mismatch' }, { status: 403 })
+      return imn('fail')
     }
 
     const { data: orderRaw } = await (admin as any)
@@ -73,11 +75,11 @@ export async function POST(req: NextRequest) {
 
     if (!order) {
       console.error('[payment/callback] Order not found for id_order:', details.id_order)
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+      return imn('fail')
     }
 
     if (order.status === 'paid') {
-      return NextResponse.json({ ok: true }) // idempotent
+      return imn('success') // idempotent
     }
 
     if (details.status === 'success') {
@@ -95,7 +97,7 @@ export async function POST(req: NextRequest) {
 
       if (subError) {
         console.error('[payment/callback] Subscription activation failed:', subError)
-        return NextResponse.json({ error: 'Subscription activation failed' }, { status: 500 })
+        return imn('fail')
       }
 
       await (admin as any)
@@ -124,18 +126,18 @@ export async function POST(req: NextRequest) {
       }
 
       console.log('[payment/callback] Paid & subscriptions activated:', details.id_order)
+      return imn('success')
     } else {
       await (admin as any)
         .from('mips_orders')
         .update({ status: 'failed', updated_at: new Date().toISOString() })
         .eq('id', order.id)
       console.error('[payment/callback] Payment failed/rejected:', details.id_order, details)
+      return imn('fail')
     }
-
-    return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[payment/callback] error:', String(err), 'raw:', rawText.slice(0, 300))
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    return imn('fail')
   }
 }
 
