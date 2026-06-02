@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { decryptImnCallback, verifyImnChecksum, type MipsEnvironment } from '@/lib/mips'
 
 // MIPS IMN (Instant Merchant Notification) callback
@@ -31,9 +31,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing received_crypted_data' }, { status: 400 })
     }
 
+    // Use anon client only for reads; service-role for writes (bypasses RLS on student_subscriptions)
     const supabase = await createClient()
+    const admin = createServiceRoleClient()
 
-    const { data: settings } = await (supabase as any)
+    const { data: settings } = await (admin as any)
       .from('site_settings')
       .select('mips_environment')
       .eq('id', 1)
@@ -54,7 +56,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Checksum mismatch' }, { status: 403 })
     }
 
-    const { data: orderRaw } = await (supabase as any)
+    const { data: orderRaw } = await (admin as any)
       .from('mips_orders')
       .select('id, student_id, order_type, package_ids, is_recurring, status')
       .eq('mips_transaction_id', details.id_order)
@@ -87,7 +89,7 @@ export async function POST(req: NextRequest) {
         status:            'active',
       }))
 
-      const { error: subError } = await (supabase as any)
+      const { error: subError } = await (admin as any)
         .from('student_subscriptions')
         .upsert(subscriptionRows, { onConflict: 'student_id,package_id' })
 
@@ -96,7 +98,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Subscription activation failed' }, { status: 500 })
       }
 
-      await (supabase as any)
+      await (admin as any)
         .from('mips_orders')
         .update({
           status:     'paid',
@@ -106,7 +108,7 @@ export async function POST(req: NextRequest) {
         .eq('id', order.id)
 
       if (order.is_recurring && details.id_token) {
-        await (supabase as any)
+        await (admin as any)
           .from('student_payment_tokens')
           .upsert({
             student_id:           order.student_id,
@@ -123,7 +125,7 @@ export async function POST(req: NextRequest) {
 
       console.log('[payment/callback] Paid & subscriptions activated:', details.id_order)
     } else {
-      await (supabase as any)
+      await (admin as any)
         .from('mips_orders')
         .update({ status: 'failed', updated_at: new Date().toISOString() })
         .eq('id', order.id)

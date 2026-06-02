@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 
 // Admin-only: manually activate subscriptions for a pending/failed order
 export async function POST(req: NextRequest) {
@@ -13,7 +13,9 @@ export async function POST(req: NextRequest) {
   const { orderId } = await req.json() as { orderId: string }
   if (!orderId) return NextResponse.json({ error: 'orderId required' }, { status: 400 })
 
-  const { data: orderRaw } = await (supabase as any)
+  const admin = createServiceRoleClient()
+
+  const { data: orderRaw } = await (admin as any)
     .from('mips_orders')
     .select('id, student_id, order_type, package_ids, is_recurring, status')
     .eq('id', orderId)
@@ -30,13 +32,13 @@ export async function POST(req: NextRequest) {
     status:            'active',
   }))
 
-  const { error: subError } = await (supabase as any)
+  const { error: subError } = await (admin as any)
     .from('student_subscriptions')
     .upsert(subscriptionRows, { onConflict: 'student_id,package_id' })
 
   if (subError) return NextResponse.json({ error: subError.message }, { status: 500 })
 
-  await (supabase as any)
+  await (admin as any)
     .from('mips_orders')
     .update({ status: 'paid', updated_at: new Date().toISOString() })
     .eq('id', orderId)

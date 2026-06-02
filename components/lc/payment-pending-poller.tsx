@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Props {
@@ -10,12 +10,37 @@ interface Props {
 
 export function PaymentPendingPoller({ orderId, intervalMs = 4000 }: Props) {
   const router = useRouter()
+  const activeRef = useRef(true)
 
   useEffect(() => {
-    const id = setInterval(() => {
-      router.refresh()
-    }, intervalMs)
-    return () => clearInterval(id)
+    activeRef.current = true
+
+    const check = async () => {
+      if (!activeRef.current) return
+      try {
+        const res = await fetch('/api/payment/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        })
+        const data = await res.json()
+        if (data.status === 'paid') {
+          router.refresh()
+          return
+        }
+      } catch {
+        // network error — fall through to retry
+      }
+      if (activeRef.current) {
+        router.refresh()
+      }
+    }
+
+    const id = setInterval(check, intervalMs)
+    return () => {
+      activeRef.current = false
+      clearInterval(id)
+    }
   }, [orderId, intervalMs, router])
 
   return null
