@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { createMipsPayment, type MipsEnvironment } from '@/lib/mips'
 
 export async function POST(req: NextRequest) {
@@ -104,8 +104,10 @@ export async function POST(req: NextRequest) {
       odrp: odrpParams,
     })
 
-    // Store the MIPS id_order so the IMN callback can look up this order
-    await (supabase as any)
+    // Store the MIPS id_order so the IMN callback can look up this order.
+    // Uses service-role: students have no UPDATE policy on mips_orders.
+    const admin = createServiceRoleClient()
+    await (admin as any)
       .from('mips_orders')
       .update({ mips_transaction_id: result.mipsOrderId })
       .eq('id', orderId)

@@ -290,6 +290,52 @@ export async function decryptImnCallback(
   return JSON.parse(decryptText) as DecryptImnResult
 }
 
+// ─── Get payment request details (status check) ──────────────────────────────
+
+export interface MipsPaymentDetails {
+  operation_status: string
+  payment_status?: string   // 'SUCCESS' | 'FAIL' | 'PENDING' etc.
+  id_order?: string
+  transaction_id?: string
+  amount?: number
+  currency?: string
+  payment_method?: string
+  [key: string]: unknown
+}
+
+export async function getMipsPaymentDetails(
+  mipsOrderId: string,
+  env: MipsEnvironment,
+): Promise<MipsPaymentDetails> {
+  const creds = getCredentials()
+  const baseUrl = getBaseUrl(env)
+
+  const body = {
+    authentify: {
+      id_merchant:       creds.idMerchant,
+      id_entity:         creds.idEntity,
+      id_operator:       creds.idOperator,
+      operator_password: creds.operatorPassword,
+    },
+    id_order: mipsOrderId,
+  }
+
+  const response = await fetch(`${baseUrl}/api/get_payment_request_details`, {
+    method: 'POST',
+    headers: getMipsHeaders(),
+    body: JSON.stringify(body),
+  })
+
+  const text = await response.text()
+  console.error('[mips] get_payment_request_details', { status: response.status, mipsOrderId, body: text.slice(0, 500) })
+
+  if (!response.ok) {
+    throw new Error(`MIPS details error ${response.status}: ${text}`)
+  }
+
+  return JSON.parse(text) as MipsPaymentDetails
+}
+
 // ─── Checksum verification ────────────────────────────────────────────────────
 
 // Checksum = SHA256(amount.currency.status.id_order.transaction_id.type.payment_method.salt)
