@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { getMonthDateRange } from '@/lib/subscription-billing'
 
 // Admin-only: manually activate subscriptions for a pending/failed order
 export async function POST(req: NextRequest) {
@@ -24,13 +25,30 @@ export async function POST(req: NextRequest) {
   if (!orderRaw) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   if (orderRaw.status === 'paid') return NextResponse.json({ ok: true, alreadyPaid: true })
 
-  const subscriptionRows = orderRaw.package_ids.map((packageId: string) => ({
-    student_id:        orderRaw.student_id,
-    package_id:        packageId,
-    subscription_type: orderRaw.order_type,
-    is_recurring:      orderRaw.is_recurring,
-    status:            'active',
-  }))
+  // Resolve valid_from/valid_until for live packages
+  const { data: pkgRows } = await (admin as any)
+    .from('subscription_packages')
+    .select('id, package_type, month, year')
+    .in('id', orderRaw.package_ids)
+  const pkgMap = new Map<string, { package_type: string; month: number | null; year: number | null }>(
+    (pkgRows ?? []).map((p: any) => [p.id, p])
+  )
+
+  const subscriptionRows = (orderRaw.package_ids as string[]).map((packageId) => {
+    const pkg = pkgMap.get(packageId)
+    const dates = pkg?.package_type === 'live_month' && pkg.month && pkg.year
+      ? getMonthDateRange(pkg.month, pkg.year)
+      : { validFrom: null, validUntil: null }
+    return {
+      student_id:        orderRaw.student_id,
+      package_id:        packageId,
+      subscription_type: orderRaw.order_type,
+      is_recurring:      orderRaw.is_recurring,
+      status:            'active',
+      valid_from:        dates.validFrom,
+      valid_until:       dates.validUntil,
+    }
+  })
 
   const { error: subError } = await (admin as any)
     .from('student_subscriptions')

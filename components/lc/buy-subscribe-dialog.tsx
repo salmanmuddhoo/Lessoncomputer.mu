@@ -42,6 +42,7 @@ interface Props {
   triggerLabel?: string
   triggerSize?: 'sm' | 'default'
   isLoggedIn?: boolean
+  isNextMonthMode?: boolean  // true when after cutoff — selling next month's access
 }
 
 export function BuySubscribeDialog({
@@ -59,6 +60,7 @@ export function BuySubscribeDialog({
   triggerLabel,
   triggerSize = 'default',
   isLoggedIn,
+  isNextMonthMode = false,
 }: Props) {
   const subscribedSet = new Set(subscribedPackageIds)
   const subscribedLiveSet = new Set(subscribedLivePackageIds)
@@ -310,15 +312,22 @@ export function BuySubscribeDialog({
           ) : (
             /* Not subscribed to current month — show subscription form */
             <div className="py-2 space-y-4">
-              {/* Current month — mandatory */}
+              {/* Current / next month — mandatory */}
               <div className="p-4 rounded-lg border border-primary/30 bg-primary/5">
                 <div className="flex items-center gap-2 mb-1">
                   <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20 gap-1">
                     <Lock className="w-2.5 h-2.5" /> Required
                   </Badge>
-                  <span className="text-xs text-muted-foreground">current month</span>
+                  <span className="text-xs text-muted-foreground">
+                    {isNextMonthMode ? 'upcoming month' : 'current month'}
+                  </span>
                 </div>
                 <p className="font-semibold">{liveMonthLabel} Live Classes</p>
+                {isNextMonthMode && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                    Access begins 1&nbsp;{liveMonthLabel}
+                  </p>
+                )}
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xl font-bold text-primary">Rs {liveSubscriptionPrice.toFixed(2)}</span>
                   <span className="text-sm text-muted-foreground">/month</span>

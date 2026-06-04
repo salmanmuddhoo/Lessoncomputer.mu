@@ -72,12 +72,15 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
   let pkgIds: string[] = []
 
   if (user && video.chapter_id) {
+    const today = new Date().toISOString().split('T')[0]
     const { data: subs } = await supabase
       .from('student_subscriptions')
       .select('package_id, package:subscription_packages(package_type)')
       .eq('student_id', user.id)
       .eq('status', 'active')
       .not('package_id', 'is', null)
+      .or(`valid_from.is.null,valid_from.lte.${today}`)
+      .or(`valid_until.is.null,valid_until.gte.${today}`)
 
     pkgIds = (subs ?? []).map((s: any) => s.package_id).filter(Boolean)
 

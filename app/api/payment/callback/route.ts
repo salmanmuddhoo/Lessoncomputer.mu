@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { decryptImnCallback, verifyImnChecksum, type MipsEnvironment } from '@/lib/mips'
+import { getMonthDateRange } from '@/lib/subscription-billing'
 
 // MIPS requires the response body to be the literal string "success" or "fail"
 const imn = (s: 'success' | 'fail') =>
@@ -86,13 +87,30 @@ export async function POST(req: NextRequest) {
 
     // status is uppercase 'SUCCESS' or 'FAIL'
     if (details.status?.toUpperCase() === 'SUCCESS') {
-      const subscriptionRows = order.package_ids.map((packageId: string) => ({
-        student_id:        order.student_id,
-        package_id:        packageId,
-        subscription_type: order.order_type,
-        is_recurring:      order.is_recurring,
-        status:            'active',
-      }))
+      // Resolve valid_from/valid_until for live packages by looking up their month/year
+      const { data: pkgRows } = await (admin as any)
+        .from('subscription_packages')
+        .select('id, package_type, month, year')
+        .in('id', order.package_ids)
+      const pkgMap = new Map<string, { package_type: string; month: number | null; year: number | null }>(
+        (pkgRows ?? []).map((p: any) => [p.id, p])
+      )
+
+      const subscriptionRows = order.package_ids.map((packageId: string) => {
+        const pkg = pkgMap.get(packageId)
+        const dates = pkg?.package_type === 'live_month' && pkg.month && pkg.year
+          ? getMonthDateRange(pkg.month, pkg.year)
+          : { validFrom: null, validUntil: null }
+        return {
+          student_id:        order.student_id,
+          package_id:        packageId,
+          subscription_type: order.order_type,
+          is_recurring:      order.is_recurring,
+          status:            'active',
+          valid_from:        dates.validFrom,
+          valid_until:       dates.validUntil,
+        }
+      })
 
       const { error: subError } = await (admin as any)
         .from('student_subscriptions')
