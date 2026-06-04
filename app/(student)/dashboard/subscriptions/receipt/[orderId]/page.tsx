@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { PrintButton } from './print-button'
+import { PrintButton, BackButton } from './print-button'
 
 export const metadata: Metadata = { title: 'Payment Receipt' }
 
@@ -53,12 +53,7 @@ export default async function ReceiptPage({ params }: PageProps) {
     <>
       {/* Print button — hidden when printing */}
       <div className="print:hidden flex items-center gap-3 mb-6 px-4 pt-4">
-        <button
-          onClick={() => history.back()}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ← Back
-        </button>
+        <BackButton />
         <div className="flex-1" />
         <PrintButton />
       </div>
