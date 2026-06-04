@@ -22,6 +22,8 @@ export default async function StudentSubscriptionsPage() {
         subscription_type,
         is_recurring,
         purchased_at,
+        valid_from,
+        valid_until,
         package:subscription_packages(
           id, name, month, year, price,
           grade:grades(slug, name, color)
@@ -52,7 +54,7 @@ export default async function StudentSubscriptionsPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold">My Subscriptions</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">All your active subscriptions</p>
+        <p className="text-muted-foreground text-sm mt-0.5">Your active and upcoming subscriptions</p>
       </div>
 
       {activeSubs.length === 0 ? (

@@ -4,6 +4,7 @@ import { AccountForm } from './account-form'
 import { SiteSettingsForm } from '@/components/lc/site-settings-form'
 import { MipsSettingsForm } from '@/components/lc/mips-settings-form'
 import { WhatsAppSettingsForm } from '@/components/lc/whatsapp-settings-form'
+import { BillingSettingsForm } from '@/components/lc/billing-settings-form'
 
 export const metadata: Metadata = { title: 'Admin Settings' }
 
@@ -19,7 +20,7 @@ export default async function AdminSettingsPage() {
       .single(),
     (supabase as any)
       .from('site_settings')
-      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, whatsapp_group_url')
+      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, whatsapp_group_url, billing_day, cutoff_day')
       .eq('id', 1)
       .single(),
   ])
@@ -31,6 +32,8 @@ export default async function AdminSettingsPage() {
     whatsapp_number: string | null
     mips_environment: string | null
     whatsapp_group_url: string | null
+    billing_day: number | null
+    cutoff_day: number | null
   }
 
   return (
@@ -62,6 +65,11 @@ export default async function AdminSettingsPage() {
 
         <WhatsAppSettingsForm
           initialGroupUrl={ss.whatsapp_group_url ?? ''}
+        />
+
+        <BillingSettingsForm
+          initialBillingDay={ss.billing_day ?? 28}
+          initialCutoffDay={ss.cutoff_day ?? 20}
         />
       </div>
     </div>
