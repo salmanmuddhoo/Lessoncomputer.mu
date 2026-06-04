@@ -18,15 +18,15 @@ export async function POST(req: NextRequest) {
     let cryptedData = ''
     if (contentType.includes('application/json')) {
       const parsed = JSON.parse(rawText) as Record<string, unknown>
-      cryptedData = (parsed.received_crypted_data ?? parsed.crypted_data ?? '') as string
+      cryptedData = (parsed.received_crypted_data ?? parsed.crypted_data ?? parsed.crypted_callback ?? '') as string
     } else {
       // form-encoded or unknown — try URLSearchParams first, fallback to JSON
       try {
         const params = new URLSearchParams(rawText)
-        cryptedData = params.get('received_crypted_data') ?? params.get('crypted_data') ?? ''
+        cryptedData = params.get('received_crypted_data') ?? params.get('crypted_data') ?? params.get('crypted_callback') ?? ''
       } catch {
         const parsed = JSON.parse(rawText) as Record<string, unknown>
-        cryptedData = (parsed.received_crypted_data ?? parsed.crypted_data ?? '') as string
+        cryptedData = (parsed.received_crypted_data ?? parsed.crypted_data ?? parsed.crypted_callback ?? '') as string
       }
     }
 
