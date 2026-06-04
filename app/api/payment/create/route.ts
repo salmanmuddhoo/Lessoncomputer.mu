@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       MIPS_HASH_SALT:          process.env.MIPS_HASH_SALT          ? `set(${process.env.MIPS_HASH_SALT.length})`          : 'MISSING',
       MIPS_CIPHER_KEY:         process.env.MIPS_CIPHER_KEY         ? `set(${process.env.MIPS_CIPHER_KEY.length})`         : 'MISSING',
       NEXT_PUBLIC_SITE_URL:    process.env.NEXT_PUBLIC_SITE_URL    ?? 'MISSING',
-      notificationUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? origin}/api/payment/callback`,
+      notificationUrl: `${(process.env.NEXT_PUBLIC_SITE_URL ?? origin).replace(/\/$/, '')}/api/payment/callback`,
       env,
     })
 
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       maxDate:           new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
     } : undefined
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? origin
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? origin).replace(/\/$/, '')
     const result = await createMipsPayment({
       env,
       orderId,

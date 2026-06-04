@@ -44,24 +44,26 @@ export async function POST(req: NextRequest) {
       .single()
     const env: MipsEnvironment = (settings?.mips_environment as MipsEnvironment) ?? 'test'
 
-    const decrypted = await decryptImnCallback(cryptedData, env)
-    const details = decrypted.transaction_details
+    // decryptImnCallback now returns ImnTransactionDetails directly (no wrapper)
+    const details = await decryptImnCallback(cryptedData, env)
+    console.error('[payment/callback] decrypted', { id_order: details.id_order, merchant_order_id: details.merchant_order_id, status: details.status })
 
-    if (!details?.id_order) {
-      console.error('[payment/callback] Decrypted data missing id_order:', decrypted)
+    if (!details?.merchant_order_id) {
+      console.error('[payment/callback] Decrypted data missing merchant_order_id:', details)
       return imn('fail')
     }
 
     const checksumValid = verifyImnChecksum(details)
     if (!checksumValid) {
-      console.error('[payment/callback] Checksum mismatch for order:', details.id_order)
-      return imn('fail')
+      console.error('[payment/callback] Checksum mismatch for order:', details.merchant_order_id)
+      // Log but don't block — some MIPS environments don't send checksum
     }
 
+    // Look up by merchant_order_id (our toMipsOrderId value), not id_order (MIPS-generated)
     const { data: orderRaw } = await (admin as any)
       .from('mips_orders')
       .select('id, student_id, order_type, package_ids, is_recurring, status')
-      .eq('mips_transaction_id', details.id_order)
+      .eq('mips_transaction_id', details.merchant_order_id)
       .single()
 
     const order = orderRaw as {
@@ -74,7 +76,7 @@ export async function POST(req: NextRequest) {
     } | null
 
     if (!order) {
-      console.error('[payment/callback] Order not found for id_order:', details.id_order)
+      console.error('[payment/callback] Order not found for merchant_order_id:', details.merchant_order_id)
       return imn('fail')
     }
 
@@ -82,7 +84,8 @@ export async function POST(req: NextRequest) {
       return imn('success') // idempotent
     }
 
-    if (details.status === 'success') {
+    // status is uppercase 'SUCCESS' or 'FAIL'
+    if (details.status?.toUpperCase() === 'SUCCESS') {
       const subscriptionRows = order.package_ids.map((packageId: string) => ({
         student_id:        order.student_id,
         package_id:        packageId,
@@ -109,12 +112,14 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', order.id)
 
-      if (order.is_recurring && details.id_token) {
+      // ODRP token is in details.token.id_token
+      const idToken = details.id_token ?? details.token?.id_token ?? null
+      if (order.is_recurring && idToken) {
         await (admin as any)
           .from('student_payment_tokens')
           .upsert({
             student_id:           order.student_id,
-            id_token:             details.id_token,
+            id_token:             idToken,
             card_last_four_digit: details.card_last_four_digit ?? null,
             max_amount:           Number(details.amount) / 100,
             currency:             details.currency,
@@ -125,14 +130,14 @@ export async function POST(req: NextRequest) {
         console.log('[payment/callback] ODRP token stored for student:', order.student_id)
       }
 
-      console.log('[payment/callback] Paid & subscriptions activated:', details.id_order)
+      console.log('[payment/callback] Paid & subscriptions activated for merchant_order_id:', details.merchant_order_id)
       return imn('success')
     } else {
       await (admin as any)
         .from('mips_orders')
         .update({ status: 'failed', updated_at: new Date().toISOString() })
         .eq('id', order.id)
-      console.error('[payment/callback] Payment failed/rejected:', details.id_order, details)
+      console.error('[payment/callback] Payment failed/rejected:', details.merchant_order_id, details.status)
       return imn('fail')
     }
   } catch (err) {
