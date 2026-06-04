@@ -237,28 +237,29 @@ export async function cancelOdrpToken(params: CancelOdrpTokenParams): Promise<vo
 
 // ─── Decrypt IMN callback ─────────────────────────────────────────────────────
 
+// MIPS returns data at the top level (not nested under transaction_details).
+// status is uppercase: 'SUCCESS' | 'FAIL'
 export interface ImnTransactionDetails {
-  amount: string
+  amount: number | string
   currency: string
-  status: 'success' | 'fail'
-  id_order: string
+  status: string               // 'SUCCESS' | 'FAIL' — uppercase
+  id_order: string             // MIPS-generated order ID
+  merchant_order_id: string    // our original mips_transaction_id
   transaction_id: string
   type: string
   payment_method: string
   checksum: string
   reason_fail?: string
-  id_token?: string              // present when odrp mode tokenizes the card
-  card_last_four_digit?: string  // present when card payment is tokenized
-}
-
-export interface DecryptImnResult {
-  transaction_details: ImnTransactionDetails
+  id_token?: string            // present when ODRP tokenizes the card
+  card_last_four_digit?: string
+  token?: { id_token: string | null; [key: string]: unknown }
+  [key: string]: unknown
 }
 
 export async function decryptImnCallback(
   cryptedData: string,
   env: MipsEnvironment,
-): Promise<DecryptImnResult> {
+): Promise<ImnTransactionDetails> {
   const creds = getCredentials()
   const baseUrl = getBaseUrl(env)
 
@@ -287,7 +288,7 @@ export async function decryptImnCallback(
     throw new Error(`MIPS decrypt error ${response.status}: ${decryptText}`)
   }
 
-  return JSON.parse(decryptText) as DecryptImnResult
+  return JSON.parse(decryptText) as ImnTransactionDetails
 }
 
 // ─── Checksum verification ────────────────────────────────────────────────────
@@ -298,5 +299,6 @@ export function verifyImnChecksum(details: ImnTransactionDetails): boolean {
   const { amount, currency, status, id_order, transaction_id, type, payment_method, checksum } = details
   const payload = `${amount}.${currency}.${status}.${id_order}.${transaction_id}.${type}.${payment_method}.${salt}`
   const computed = crypto.createHash('sha256').update(payload).digest('hex')
+  console.error('[mips] checksum verify', { computed, received: checksum, match: computed === checksum })
   return computed === checksum
 }
