@@ -2,6 +2,7 @@
 
 import { Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useRouter } from 'next/navigation'
 
 export function PrintButton() {
   return (
@@ -13,5 +14,17 @@ export function PrintButton() {
       <Printer className="w-4 h-4" />
       Save as PDF / Print
     </Button>
+  )
+}
+
+export function BackButton() {
+  const router = useRouter()
+  return (
+    <button
+      onClick={() => router.back()}
+      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+    >
+      ← Back
+    </button>
   )
 }
