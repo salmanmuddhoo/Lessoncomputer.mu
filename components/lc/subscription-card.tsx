@@ -21,6 +21,7 @@ interface SubscriptionCardProps {
   packageId: string | null
   subscriptionType: string
   isRecurring: boolean
+  canCancelRecurring?: boolean
   purchasedAt: string
   orderId: string | null
   pkg: {
@@ -31,7 +32,7 @@ interface SubscriptionCardProps {
   } | null
 }
 
-export function SubscriptionCard({ id, subscriptionType, isRecurring, purchasedAt, pkg, orderId }: SubscriptionCardProps) {
+export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelRecurring = isRecurring, purchasedAt, pkg, orderId }: SubscriptionCardProps) {
   const router = useRouter()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -115,7 +116,7 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, purchasedA
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {isLive && isRecurring && (
+          {canCancelRecurring && (
             <Button
               variant="ghost"
               size="sm"

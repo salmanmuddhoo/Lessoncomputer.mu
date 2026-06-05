@@ -50,6 +50,16 @@ export default async function StudentSubscriptionsPage() {
     return order?.id ?? null
   }
 
+  // Only the latest live recurring subscription should show the cancel button.
+  // Past months are already over — cancelling them would have no effect.
+  const latestLiveRecurringId = activeSubs
+    .filter((s: any) => s.is_recurring && s.package?.month != null && s.package?.year != null)
+    .sort((a: any, b: any) =>
+      b.package.year !== a.package.year
+        ? b.package.year - a.package.year
+        : b.package.month - a.package.month
+    )[0]?.id ?? null
+
   return (
     <div>
       <div className="mb-8">
@@ -77,6 +87,7 @@ export default async function StudentSubscriptionsPage() {
               packageId={sub.package_id}
               subscriptionType={sub.subscription_type ?? 'video'}
               isRecurring={sub.is_recurring ?? false}
+              canCancelRecurring={sub.id === latestLiveRecurringId}
               purchasedAt={sub.purchased_at}
               pkg={sub.package}
               orderId={findOrderId(sub.package_id)}
