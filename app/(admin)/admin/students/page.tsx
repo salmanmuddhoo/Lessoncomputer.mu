@@ -50,6 +50,8 @@ interface StudentSub {
   package_id: string
   is_recurring: boolean
   purchased_at: string
+  valid_from: string | null
+  valid_until: string | null
 }
 
 interface Payment {
@@ -162,9 +164,6 @@ export default function AdminStudentsPage() {
     setAddingVideoPkg('')
     setAddingLivePkg('')
     const supabase = createClient()
-    const now = new Date()
-    const currentMonth = now.getMonth() + 1
-    const currentYear = now.getFullYear()
 
     const [{ data: pkgData }, { data: subData }, { data: payData }, { data: attData }] = await Promise.all([
       supabase
@@ -175,7 +174,7 @@ export default function AdminStudentsPage() {
         .order('month', { ascending: false }),
       supabase
         .from('student_subscriptions')
-        .select('id, package_id, is_recurring, purchased_at')
+        .select('id, package_id, is_recurring, purchased_at, valid_from, valid_until')
         .eq('student_id', student.id)
         .eq('status', 'active'),
       (supabase as any)
@@ -194,10 +193,7 @@ export default function AdminStudentsPage() {
     setSubPackages(
       ((pkgData ?? []) as SubscriptionPackage[]).filter((p) => {
         if (gradeId && p.grade_id !== gradeId) return false
-        if (p.package_type === 'live_month') {
-          if (!p.month || !p.year) return false
-          return p.year < currentYear || (p.year === currentYear && p.month <= currentMonth)
-        }
+        if (p.package_type === 'live_month') return !!(p.month && p.year)
         return true
       })
     )
@@ -256,6 +252,8 @@ export default function AdminStudentsPage() {
   function renderSubRow(sub: StudentSub) {
     const pkg = subPackages.find((p) => p.id === sub.package_id)
     const isLive = pkg?.package_type === 'live_month'
+    const today = new Date().toISOString().split('T')[0]!
+    const isUpcoming = isLive && sub.valid_from != null && sub.valid_from > today
     return (
       <div key={sub.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-border/60 bg-muted/20">
         <div>
@@ -263,6 +261,11 @@ export default function AdminStudentsPage() {
           <div className="flex items-center gap-2 mt-0.5">
             {pkg && isLive && pkg.month && pkg.year && (
               <span className="text-xs text-muted-foreground">{MONTHS[pkg.month - 1]} {pkg.year}</span>
+            )}
+            {isUpcoming && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium">
+                Upcoming — access from {sub.valid_from}
+              </span>
             )}
             {sub.is_recurring && (
               <span className="flex items-center gap-0.5 text-xs text-primary">
