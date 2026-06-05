@@ -121,6 +121,18 @@ export async function POST(req: NextRequest) {
         return imn('fail')
       }
 
+      // If this is a recurring live purchase, clear is_recurring on all previous live
+      // subscriptions so only the latest one triggers future billing cron charges.
+      if (order.is_recurring && order.order_type === 'live') {
+        await (admin as any)
+          .from('student_subscriptions')
+          .update({ is_recurring: false, updated_at: new Date().toISOString() })
+          .eq('student_id', order.student_id)
+          .eq('subscription_type', 'live')
+          .eq('is_recurring', true)
+          .not('package_id', 'in', `(${order.package_ids.join(',')})`)
+      }
+
       await (admin as any)
         .from('mips_orders')
         .update({
