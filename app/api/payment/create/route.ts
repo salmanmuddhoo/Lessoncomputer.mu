@@ -28,77 +28,48 @@ export async function POST(req: NextRequest) {
     // Video packages are always one-off; only live subscriptions can be recurring
     const effectiveRecurring = (orderType === 'live' || orderType === 'mixed') ? isRecurring : false
 
-    // Block duplicate purchase: if student already has a recurring live subscription for
-    // this grade, the cron will auto-charge them — no need for a manual purchase
+    // A recurring subscriber is auto-charged for CURRENT and FUTURE months, so block
+    // re-purchasing those. PAST-month live videos remain purchasable (missed content).
     if (orderType === 'live' || orderType === 'mixed') {
-      const { data: gradeInfo } = await (supabase as any)
+      const { data: orderLivePkgs } = await (supabase as any)
         .from('subscription_packages')
-        .select('grade_id')
+        .select('id, grade_id, month, year')
         .in('id', packageIds)
-        .limit(1)
-        .single()
+        .eq('package_type', 'live_month')
 
-      if (gradeInfo?.grade_id) {
-        const { data: recurringSubs } = await supabase
-          .from('student_subscriptions')
-          .select('package_id')
-          .eq('student_id', user.id)
-          .eq('status', 'active')
-          .eq('is_recurring', true)
-          .not('package_id', 'is', null)
+      const now = new Date()
+      const curY = now.getFullYear()
+      const curM = now.getMonth() + 1
+      const currentOrFutureLive = (orderLivePkgs ?? []).filter((p: any) =>
+        p.year > curY || (p.year === curY && p.month >= curM)
+      )
 
-        if (recurringSubs && recurringSubs.length > 0) {
-          const recurringPkgIds = recurringSubs.map((s: any) => s.package_id).filter(Boolean)
-          const { count } = await (supabase as any)
-            .from('subscription_packages')
-            .select('id', { count: 'exact', head: true })
-            .in('id', recurringPkgIds)
-            .eq('grade_id', gradeInfo.grade_id)
-            .eq('package_type', 'live_month')
+      if (currentOrFutureLive.length > 0) {
+        const gradeId = currentOrFutureLive[0].grade_id
+        if (gradeId) {
+          const { data: recurringSubs } = await supabase
+            .from('student_subscriptions')
+            .select('package_id')
+            .eq('student_id', user.id)
+            .eq('status', 'active')
+            .eq('is_recurring', true)
+            .not('package_id', 'is', null)
 
-          if (count && count > 0) {
-            return NextResponse.json(
-              { error: 'You already have an active recurring subscription for this grade. Next month will be charged automatically on your billing date.' },
-              { status: 400 }
-            )
-          }
-        }
-      }
-    }
+          if (recurringSubs && recurringSubs.length > 0) {
+            const recurringPkgIds = recurringSubs.map((s: any) => s.package_id).filter(Boolean)
+            const { count } = await (supabase as any)
+              .from('subscription_packages')
+              .select('id', { count: 'exact', head: true })
+              .in('id', recurringPkgIds)
+              .eq('grade_id', gradeId)
+              .eq('package_type', 'live_month')
 
-    // Block duplicate purchase: if student already has a recurring live subscription for
-    // this grade, the cron will auto-charge them — no need for a manual purchase
-    if (orderType === 'live') {
-      const { data: gradeInfo } = await (supabase as any)
-        .from('subscription_packages')
-        .select('grade_id')
-        .in('id', packageIds)
-        .limit(1)
-        .single()
-
-      if (gradeInfo?.grade_id) {
-        const { data: recurringSubs } = await supabase
-          .from('student_subscriptions')
-          .select('package_id')
-          .eq('student_id', user.id)
-          .eq('status', 'active')
-          .eq('is_recurring', true)
-          .not('package_id', 'is', null)
-
-        if (recurringSubs && recurringSubs.length > 0) {
-          const recurringPkgIds = recurringSubs.map((s: any) => s.package_id).filter(Boolean)
-          const { count } = await (supabase as any)
-            .from('subscription_packages')
-            .select('id', { count: 'exact', head: true })
-            .in('id', recurringPkgIds)
-            .eq('grade_id', gradeInfo.grade_id)
-            .eq('package_type', 'live_month')
-
-          if (count && count > 0) {
-            return NextResponse.json(
-              { error: 'You already have an active recurring subscription for this grade. Next month will be charged automatically on your billing date.' },
-              { status: 400 }
-            )
+            if (count && count > 0) {
+              return NextResponse.json(
+                { error: 'You already have an active recurring subscription for this grade. Upcoming months are charged automatically — you can still buy past-month videos.' },
+                { status: 400 }
+              )
+            }
           }
         }
       }
@@ -132,8 +103,9 @@ export async function POST(req: NextRequest) {
     if (orderError || !order) {
       const msg = orderError?.message ?? 'unknown'
       console.error('[payment/create] Failed to create order:', msg)
-      // Most likely cause: migration 024 not applied in production DB
-      if (msg.includes('does not exist') || msg.includes('relation')) {
+      // Only flag a missing migration when the table itself is absent — NOT for
+      // constraint violations (whose message also contains the word "relation").
+      if (msg.includes('mips_orders') && msg.includes('does not exist')) {
         return NextResponse.json(
           { error: 'Database migration 024 not applied. Run the migration in Supabase SQL Editor.' },
           { status: 500 }
