@@ -66,6 +66,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Block duplicate purchase: if student already has a recurring live subscription for
+    // this grade, the cron will auto-charge them — no need for a manual purchase
+    if (orderType === 'live') {
+      const { data: gradeInfo } = await (supabase as any)
+        .from('subscription_packages')
+        .select('grade_id')
+        .in('id', packageIds)
+        .limit(1)
+        .single()
+
+      if (gradeInfo?.grade_id) {
+        const { data: recurringSubs } = await supabase
+          .from('student_subscriptions')
+          .select('package_id')
+          .eq('student_id', user.id)
+          .eq('status', 'active')
+          .eq('is_recurring', true)
+          .not('package_id', 'is', null)
+
+        if (recurringSubs && recurringSubs.length > 0) {
+          const recurringPkgIds = recurringSubs.map((s: any) => s.package_id).filter(Boolean)
+          const { count } = await (supabase as any)
+            .from('subscription_packages')
+            .select('id', { count: 'exact', head: true })
+            .in('id', recurringPkgIds)
+            .eq('grade_id', gradeInfo.grade_id)
+            .eq('package_type', 'live_month')
+
+          if (count && count > 0) {
+            return NextResponse.json(
+              { error: 'You already have an active recurring subscription for this grade. Next month will be charged automatically on your billing date.' },
+              { status: 400 }
+            )
+          }
+        }
+      }
+    }
+
     // Read MIPS environment from site_settings
     const { data: settings } = await (supabase as any)
       .from('site_settings')

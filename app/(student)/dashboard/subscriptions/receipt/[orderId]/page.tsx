@@ -111,32 +111,18 @@ export default async function ReceiptPage({ params }: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {order.package_ids.map((pkgId) => {
-                  const pkg = pkgMap.get(pkgId)
-                  const isLive = pkg?.package_type === 'live_month'
-                  const isRecurringLine = isLive && order.is_recurring
-                  return (
-                    <tr key={pkgId} className="border-b border-border/40 last:border-0">
-                      <td className="px-4 py-3">
-                        <p className="font-medium">{pkg?.name ?? 'Package'}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {isLive ? 'Live Classes' : 'Video Package'}
-                          {isRecurringLine && (
-                            <span className="ml-1.5 text-primary">
-                              {order.metadata?.cron ? '· Auto-renewal' : '· Recurring monthly'}
-                            </span>
-                          )}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        {pkg?.price != null
-                          ? `${order.currency} ${Number(pkg.price).toFixed(2)}`
-                          : '—'
-                        }
-                      </td>
-                    </tr>
-                  )
-                })}
+                <tr>
+                  <td className="px-4 py-3">
+                    <p className="font-medium">{order.description}</p>
+                    <p className="text-xs text-muted-foreground capitalize mt-0.5">
+                      {order.order_type} subscription
+                      {order.metadata?.cron && <span className="ml-1.5 text-primary">· Auto-renewal</span>}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold">
+                    {order.currency} {Number(order.amount).toFixed(2)}
+                  </td>
+                </tr>
               </tbody>
               <tfoot>
                 <tr className="border-t border-border/60 bg-muted/10">
