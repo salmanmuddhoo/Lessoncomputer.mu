@@ -27,19 +27,21 @@ export default async function StudentAttendancePage() {
     )
   }
 
-  // Require live subscription
+  // Require an ACTIVE recurring live subscription (same gate as Live Classes)
   const { data: subs } = await supabase
     .from('student_subscriptions')
-    .select('package:subscription_packages(package_type)')
+    .select('is_recurring, subscription_type, package:subscription_packages(package_type)')
     .eq('student_id', user.id)
     .eq('status', 'active')
 
-  const hasLive = (subs ?? []).some((s: any) => s.package?.package_type === 'live_month')
-  if (!hasLive) {
+  const hasRecurringLive = (subs ?? []).some(
+    (s: any) => s.is_recurring && (s.subscription_type === 'live' || s.package?.package_type === 'live_month')
+  )
+  if (!hasRecurringLive) {
     return (
       <div className="py-20 text-center rounded-xl border border-border/60">
         <ClipboardList className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-        <p className="text-muted-foreground">Attendance is only available for Live Classes subscribers.</p>
+        <p className="text-muted-foreground">Attendance is only available with an active recurring Live Classes subscription.</p>
       </div>
     )
   }

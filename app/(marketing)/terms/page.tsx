@@ -43,9 +43,12 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-2">4. Intellectual Property</h2>
           <p>
-            All video lessons, course materials, and content on LessonComputer.mu are the intellectual
-            property of LessonComputer.mu or its content creators. Unauthorised reproduction is
-            strictly prohibited.
+            All content on LessonComputer.mu is the sole property of the Company. This includes,
+            without limitation, all video lessons, live classes, course materials, documents,
+            revision notes, text, graphics, logos, trademarks, designs, and software. No content
+            may be copied, reproduced, redistributed, resold, publicly displayed, or otherwise used
+            without the Company's prior written consent. Unauthorised use is strictly prohibited and
+            may result in account termination and legal action.
           </p>
         </section>
 

@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { DM_Sans, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
+import { CookieConsent } from '@/components/lc/cookie-consent'
 import './globals.css'
 
 const dmSans = DM_Sans({
@@ -52,6 +53,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${dmSans.variable} ${playfairDisplay.variable} font-sans antialiased overflow-x-hidden`}>
         {children}
+        <CookieConsent />
         <Toaster richColors />
         <Analytics />
       </body>

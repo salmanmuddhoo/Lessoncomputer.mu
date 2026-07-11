@@ -74,6 +74,7 @@ export function BuySubscribeDialog({
   )
   const [selectedPastLive, setSelectedPastLive] = useState<Set<string>>(new Set())
   const [paying, setPaying] = useState(false)
+  const [agreed, setAgreed] = useState(false)
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
 
@@ -81,6 +82,7 @@ export function BuySubscribeDialog({
     setIncludeLive(defaultMode === 'live' && canIncludeLive)
     setSelected(new Set(mandatoryPackageId ? [mandatoryPackageId] : []))
     setSelectedPastLive(new Set())
+    setAgreed(false)
     setOpen(true)
   }
 
@@ -113,7 +115,7 @@ export function BuySubscribeDialog({
   const orderType = hasLiveSelected && hasVideoSelected ? 'mixed' : hasLiveSelected ? 'live' : 'video'
 
   async function initiatePayment() {
-    if (paying || combinedTotal === 0) return
+    if (paying || combinedTotal === 0 || !agreed) return
     setPaying(true)
     try {
       const videoIds = Array.from(selected)
@@ -383,11 +385,27 @@ export function BuySubscribeDialog({
             )}
           </div>
 
+          {/* Terms agreement — required before paying */}
+          <label className="flex items-start gap-2 pt-3 border-t border-border/40 cursor-pointer">
+            <Checkbox
+              checked={agreed}
+              onCheckedChange={(v) => setAgreed(!!v)}
+              className="mt-0.5 shrink-0"
+            />
+            <span className="text-xs text-muted-foreground leading-relaxed">
+              I have read and agree to the{' '}
+              <Link href="/terms" target="_blank" className="text-primary hover:underline">
+                Terms &amp; Conditions
+              </Link>{' '}
+              of LessonComputer.mu.
+            </span>
+          </label>
+
           <DialogFooter className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button
               onClick={initiatePayment}
-              disabled={!mounted || paying || combinedTotal === 0}
+              disabled={!mounted || paying || combinedTotal === 0 || !agreed}
               className="bg-primary text-primary-foreground hover:bg-accent"
             >
               {paying
