@@ -35,7 +35,7 @@ export default async function ReceiptPage({ params }: PageProps) {
     package_ids: string[]
     status: string
     created_at: string
-    metadata: { transaction_id?: string; payment_method?: string } | null
+    metadata: { transaction_id?: string; payment_method?: string; cron?: boolean; claim?: boolean } | null
   }
 
   const { data: profile } = await supabase
@@ -103,7 +103,10 @@ export default async function ReceiptPage({ params }: PageProps) {
                 <tr>
                   <td className="px-4 py-3">
                     <p className="font-medium">{order.description}</p>
-                    <p className="text-xs text-muted-foreground capitalize mt-0.5">{order.order_type} subscription</p>
+                    <p className="text-xs text-muted-foreground capitalize mt-0.5">
+                      {order.order_type} subscription
+                      {order.metadata?.cron && <span className="ml-1.5 text-primary">· Auto-renewal</span>}
+                    </p>
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">
                     {order.currency} {Number(order.amount).toFixed(2)}
