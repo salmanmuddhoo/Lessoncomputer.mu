@@ -85,7 +85,7 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelR
         toast.error(data.error ?? 'Failed to cancel recurring subscription.')
         return
       }
-      toast.success('Recurring billing cancelled. Your access remains until the end of the current period.')
+      toast.success('Recurring billing cancelled. Live class access is now paused — restore recurring any time to regain access.')
       setConfirmOpen(false)
       router.refresh()
     } catch {
@@ -181,8 +181,9 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelR
           <DialogHeader>
             <DialogTitle>Cancel recurring billing?</DialogTitle>
             <DialogDescription id="cancel-recurring-desc">
-              Your access to live classes will continue until the end of the current month.
-              You will <strong>not</strong> be charged next month and can restore recurring billing any time.
+              Live class access requires an active recurring subscription, so cancelling will
+              <strong> pause your access to live classes and their resources</strong>. You will not be
+              charged again, and you can <strong>restore recurring any time</strong> to instantly regain access.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
