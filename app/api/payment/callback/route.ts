@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     // Look up by merchant_order_id (our toMipsOrderId value), not id_order (MIPS-generated)
     const { data: orderRaw } = await (admin as any)
       .from('mips_orders')
-      .select('id, student_id, order_type, package_ids, is_recurring, status')
+      .select('id, student_id, order_type, package_ids, is_recurring, status, metadata')
       .eq('mips_transaction_id', details.merchant_order_id)
       .single()
 
@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
       package_ids: string[]
       is_recurring: boolean
       status: string
+      metadata: { liveAmount?: number | null } | null
     } | null
 
     if (!order) {
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
             student_id:           order.student_id,
             id_token:             idToken,
             card_last_four_digit: details.card_last_four_digit ?? null,
-            max_amount:           Number(details.amount) / 100,
+            max_amount:           order.metadata?.liveAmount ?? Number(details.amount) / 100,
             currency:             details.currency,
             is_active:            true,
             source_order_id:      order.id,
