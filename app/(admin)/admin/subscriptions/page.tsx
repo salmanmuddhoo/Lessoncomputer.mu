@@ -75,8 +75,13 @@ export default function AdminSubscriptionsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [gradeFilter, setGradeFilter] = useState<string>('all')
 
   const supabase = createClient()
+
+  const filteredPackages = gradeFilter === 'all'
+    ? packages
+    : packages.filter((p) => p.grade_id === gradeFilter)
 
   const load = useCallback(async () => {
     const [{ data: pkgs }, { data: gradeData }] = await Promise.all([
@@ -255,25 +260,44 @@ export default function AdminSubscriptionsPage() {
             Buy-once content bundles for students
           </p>
         </div>
-        <Button onClick={openCreate} className="bg-primary text-primary-foreground hover:bg-accent">
-          <Plus className="w-4 h-4 mr-2" />
-          New Package
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={gradeFilter} onValueChange={setGradeFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All grades" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All grades</SelectItem>
+              {grades.map((g) => (
+                <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={openCreate} className="bg-primary text-primary-foreground hover:bg-accent">
+            <Plus className="w-4 h-4 mr-2" />
+            New Package
+          </Button>
+        </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
-      ) : packages.length === 0 ? (
+      ) : filteredPackages.length === 0 ? (
         <div className="py-20 text-center rounded-xl border border-border/60">
           <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">No video packages yet.</p>
-          <p className="text-sm text-muted-foreground mt-1">Create your first package to get started.</p>
+          {gradeFilter === 'all' ? (
+            <>
+              <p className="text-muted-foreground">No video packages yet.</p>
+              <p className="text-sm text-muted-foreground mt-1">Create your first package to get started.</p>
+            </>
+          ) : (
+            <p className="text-muted-foreground">No video packages for this grade.</p>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
-          {packages.map((pkg) => (
+          {filteredPackages.map((pkg) => (
             <div key={pkg.id} className="rounded-xl border border-border/60 bg-card overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-4">
                 <button
