@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
         currency:    'MUR',
         description,
         status:      'pending',
-        metadata:    { env, liveAmount: effectiveRecurring ? (liveAmount ?? null) : null },
+        metadata:    { env, recurringAmount: effectiveRecurring ? (liveAmount ?? null) : null },
       })
       .select('id')
       .single()
