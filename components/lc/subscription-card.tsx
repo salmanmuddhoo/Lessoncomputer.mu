@@ -38,6 +38,7 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelR
   const router = useRouter()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [restoring, setRestoring] = useState(false)
 
   const isLive = subscriptionType === 'live' || (pkg?.month != null && pkg?.year != null)
   const monthLabel = pkg?.month && pkg?.year ? `${MONTHS[pkg.month - 1]} ${pkg.year}` : null
@@ -48,6 +49,28 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelR
     pkg.year > now.getFullYear() ||
     (pkg.year === now.getFullYear() && pkg.month > now.getMonth() + 1)
   )
+
+  async function handleRestoreRecurring() {
+    setRestoring(true)
+    try {
+      const res = await fetch('/api/payment/restore-recurring', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionId: id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? 'Failed to restore recurring billing.')
+        return
+      }
+      toast.success('Recurring billing restored. You will be charged automatically next month.')
+      router.refresh()
+    } catch {
+      toast.error('Network error. Please try again.')
+    } finally {
+      setRestoring(false)
+    }
+  }
 
   async function handleCancelRecurring() {
     setCancelling(true)
@@ -129,14 +152,17 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelR
               Cancel recurring
             </Button>
           )}
-          {canResubscribe && gradeSlug && (
-            <Link
-              href={`/grades/${gradeSlug}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-primary/40 text-primary hover:bg-primary/5 transition-colors"
+          {canResubscribe && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRestoreRecurring}
+              disabled={restoring}
+              className="text-xs text-primary hover:text-primary hover:bg-primary/10 border border-primary/40 gap-1"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Re-subscribe
-            </Link>
+              {restoring ? 'Restoring…' : 'Restore recurring'}
+            </Button>
           )}
           {orderId && (
             <Link
@@ -156,7 +182,7 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelR
             <DialogTitle>Cancel recurring billing?</DialogTitle>
             <DialogDescription id="cancel-recurring-desc">
               Your access to live classes will continue until the end of the current month.
-              You will <strong>not</strong> be charged next month and can re-subscribe any time.
+              You will <strong>not</strong> be charged next month and can restore recurring billing any time.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
