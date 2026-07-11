@@ -71,15 +71,15 @@ export default async function ReceiptPage({ params }: PageProps) {
 
       {/* Receipt */}
       <div className="max-w-xl mx-auto px-4 pb-12 print:px-0 print:pb-0 print:max-w-none">
-        <div className="border border-border/60 rounded-2xl p-8 print:border-0 print:rounded-none print:p-0 space-y-6">
+        <div className="border border-border/60 rounded-2xl p-5 sm:p-8 print:border-0 print:rounded-none print:p-0 space-y-6">
 
           {/* Header */}
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">LessonComputer.mu</h1>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight">LessonComputer.mu</h1>
               <p className="text-xs text-muted-foreground mt-0.5">Official Payment Receipt</p>
             </div>
-            <div className="text-right">
+            <div className="text-right shrink-0">
               <p className="text-xs text-muted-foreground">Receipt No.</p>
               <p className="font-mono text-sm font-bold">{receiptNo}</p>
             </div>
@@ -88,13 +88,13 @@ export default async function ReceiptPage({ params }: PageProps) {
           <hr className="border-border/60" />
 
           {/* Details */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground mb-0.5">Billed to</p>
-              <p className="font-medium">{profile?.full_name ?? user.email}</p>
-              <p className="text-xs text-muted-foreground">{user.email}</p>
+              <p className="font-medium break-words">{profile?.full_name ?? user.email}</p>
+              <p className="text-xs text-muted-foreground break-all">{user.email}</p>
             </div>
-            <div className="text-right">
+            <div className="sm:text-right min-w-0">
               <p className="text-xs text-muted-foreground mb-0.5">Date</p>
               <p className="font-medium">{formattedDate}</p>
               <p className="text-xs text-muted-foreground">{formattedTime}</p>
@@ -137,17 +137,17 @@ export default async function ReceiptPage({ params }: PageProps) {
 
           {/* Payment info */}
           {(order.metadata?.transaction_id || order.metadata?.payment_method) && (
-            <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-muted-foreground">
               {order.metadata.transaction_id && (
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium text-foreground mb-0.5">Transaction ID</p>
-                  <p className="font-mono">{order.metadata.transaction_id}</p>
+                  <p className="font-mono break-all">{order.metadata.transaction_id}</p>
                 </div>
               )}
               {order.metadata.payment_method && (
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium text-foreground mb-0.5">Payment method</p>
-                  <p className="capitalize">{order.metadata.payment_method}</p>
+                  <p className="capitalize break-words">{order.metadata.payment_method}</p>
                 </div>
               )}
             </div>

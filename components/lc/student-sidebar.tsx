@@ -93,7 +93,7 @@ export function StudentSidebar({ userName, gradeName, hasLiveSubscription, hasVi
       {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex w-64 shrink-0 flex-col sticky top-0 h-screen overflow-hidden bg-sidebar border-r border-sidebar-border">
         <div className="p-5 border-b border-sidebar-border">
-          <Logo size="sm" />
+          <Logo size="sm" onDark />
           {userName && (
             <p className="text-xs text-muted-foreground mt-1 truncate">Hi, {userName.split(' ')[0]}</p>
           )}
@@ -104,7 +104,7 @@ export function StudentSidebar({ userName, gradeName, hasLiveSubscription, hasVi
       {/* ── Mobile top bar ── */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4">
         <div>
-          <Logo size="sm" />
+          <Logo size="sm" onDark />
         </div>
         <button
           onClick={() => setMobileOpen(true)}
@@ -122,7 +122,7 @@ export function StudentSidebar({ userName, gradeName, hasLiveSubscription, hasVi
           <aside className="relative w-72 max-w-[85vw] flex flex-col h-full bg-sidebar border-r border-sidebar-border shadow-xl">
             <div className="p-5 border-b border-sidebar-border flex items-center justify-between">
               <div>
-                <Logo size="sm" />
+                <Logo size="sm" onDark />
                 {userName && (
                   <p className="text-xs text-muted-foreground mt-1 truncate">Hi, {userName.split(' ')[0]}</p>
                 )}

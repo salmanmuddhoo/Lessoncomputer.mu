@@ -97,7 +97,8 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelR
 
   return (
     <>
-      <div className="flex items-center gap-4 p-4 rounded-xl border border-border/60 bg-card transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-xl border border-border/60 bg-card transition-colors">
+       <div className="flex items-center gap-4 flex-1 min-w-0">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
           isLive ? 'bg-primary/10' : 'bg-muted'
         }`}>
@@ -139,8 +140,9 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelR
             )}
           </div>
         </div>
+       </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
           {canCancelRecurring && (
             <Button
               variant="ghost"
