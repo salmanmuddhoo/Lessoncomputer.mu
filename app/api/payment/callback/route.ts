@@ -7,6 +7,24 @@ import { getMonthDateRange } from '@/lib/subscription-billing'
 const imn = (s: 'success' | 'fail') =>
   new NextResponse(s, { status: 200, headers: { 'Content-Type': 'text/plain' } })
 
+// The ODRP token key name varies across MIPS environments (id_token, token.id_token,
+// odrp_token, card_token, …). Recursively scan the decrypted payload for the first
+// non-empty string under any key that looks like a token so we don't miss it.
+function findOdrpToken(obj: unknown, depth = 0): string | null {
+  if (!obj || typeof obj !== 'object' || depth > 4) return null
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    const k = key.toLowerCase()
+    if ((k === 'id_token' || k.endsWith('_token') || k === 'token') && typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+    if (value && typeof value === 'object') {
+      const nested = findOdrpToken(value, depth + 1)
+      if (nested) return nested
+    }
+  }
+  return null
+}
+
 // MIPS IMN (Instant Merchant Notification) callback
 // MIPS POSTs encrypted data here — supports both JSON and form-encoded bodies
 export async function POST(req: NextRequest) {
@@ -156,10 +174,10 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', order.id)
 
-      // ODRP token is in details.token.id_token
-      const idToken = details.id_token ?? details.token?.id_token ?? null
+      // ODRP token: check the known fields first, then deep-scan for any token-like key
+      const idToken = details.id_token ?? details.token?.id_token ?? findOdrpToken(details)
       if (order.is_recurring && idToken) {
-        await (admin as any)
+        const { error: tokenError } = await (admin as any)
           .from('student_payment_tokens')
           .upsert({
             student_id:           order.student_id,
@@ -171,7 +189,17 @@ export async function POST(req: NextRequest) {
             source_order_id:      order.id,
             updated_at:           new Date().toISOString(),
           }, { onConflict: 'student_id' })
-        console.log('[payment/callback] ODRP token stored for student:', order.student_id)
+        if (tokenError) {
+          console.error('[payment/callback] Failed to store ODRP token:', tokenError, 'for student:', order.student_id)
+        } else {
+          console.log('[payment/callback] ODRP token stored for student:', order.student_id)
+        }
+      } else if (order.is_recurring) {
+        // Recurring order but no token found — surface the payload keys so we can locate it
+        console.error('[payment/callback] Recurring order but NO ODRP token found in callback.', {
+          student_id: order.student_id,
+          keys: Object.keys(details),
+        })
       }
 
       console.log('[payment/callback] Paid & subscriptions activated for merchant_order_id:', details.merchant_order_id)

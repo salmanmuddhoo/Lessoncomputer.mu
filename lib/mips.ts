@@ -36,7 +36,7 @@ export function toMipsOrderId(uuid: string): string {
   return uuid.replace(/-/g, '').slice(0, 25)
 }
 
-// ─── Create payment request ───────────────────────────────────────────────────
+// ─── Create payment request ───────────────────────────────────────
 
 export interface CreatePaymentParams {
   env: MipsEnvironment
@@ -137,7 +137,7 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
   return { paymentUrl: data.payment_link.url, mipsOrderId }
 }
 
-// ─── Claim recurring payment (ODRP) ──────────────────────────────────────────
+// ─── Claim recurring payment (ODRP) ───────────────────────────────
 
 export interface ClaimPaymentParams {
   env: MipsEnvironment
@@ -196,7 +196,7 @@ export async function claimMipsPayment(params: ClaimPaymentParams): Promise<Clai
   return { status: data.payment_status as ClaimPaymentResult['status'], reason: data.Reason }
 }
 
-// ─── Cancel ODRP token ────────────────────────────────────────────────────────
+// ─── Cancel ODRP token ────────────────────────────────────────
 
 export interface CancelOdrpTokenParams {
   env: MipsEnvironment
@@ -235,7 +235,7 @@ export async function cancelOdrpToken(params: CancelOdrpTokenParams): Promise<vo
   }
 }
 
-// ─── Decrypt IMN callback ─────────────────────────────────────────────────────
+// ─── Decrypt IMN callback ──────────────────────────────────────
 
 // MIPS returns data at the top level (not nested under transaction_details).
 // status is uppercase: 'SUCCESS' | 'FAIL'
@@ -282,16 +282,27 @@ export async function decryptImnCallback(
   })
 
   const decryptText = await response.text()
-  console.error('[mips] decrypt_imn_data response', { status: response.status, body: decryptText.slice(0, 500) })
 
   if (!response.ok) {
+    console.error('[mips] decrypt_imn_data response', { status: response.status, body: decryptText.slice(0, 500) })
     throw new Error(`MIPS decrypt error ${response.status}: ${decryptText}`)
   }
 
-  return JSON.parse(decryptText) as ImnTransactionDetails
+  const parsed = JSON.parse(decryptText) as ImnTransactionDetails
+  // Log the full key structure (not truncated) so we can see where MIPS puts the
+  // ODRP token — the field name varies across MIPS environments/versions.
+  console.error('[mips] decrypt_imn_data ok', {
+    status: response.status,
+    keys: Object.keys(parsed),
+    id_token: parsed.id_token ?? null,
+    nested_token: parsed.token ?? null,
+    full: decryptText,
+  })
+
+  return parsed
 }
 
-// ─── Checksum verification ────────────────────────────────────────────────────
+// ─── Checksum verification ───────────────────────────────────────
 
 // Checksum = SHA256(amount.currency.status.id_order.transaction_id.type.payment_method.salt)
 export function verifyImnChecksum(details: ImnTransactionDetails): boolean {
