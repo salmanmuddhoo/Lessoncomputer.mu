@@ -96,6 +96,17 @@ export async function POST(req: NextRequest) {
         (pkgRows ?? []).map((p: any) => [p.id, p])
       )
 
+      // Only the latest live_month package (highest year/month) should be recurring —
+      // past months added to the same order are one-time purchases.
+      const latestLivePkgId = order.package_ids.reduce<string | null>((best, id) => {
+        const pkg = pkgMap.get(id)
+        if (pkg?.package_type !== 'live_month' || !pkg.month || !pkg.year) return best
+        if (!best) return id
+        const bestPkg = pkgMap.get(best)!
+        return pkg.year > bestPkg.year || (pkg.year === bestPkg.year && pkg.month > bestPkg.month)
+          ? id : best
+      }, null)
+
       const subscriptionRows = order.package_ids.map((packageId: string) => {
         const pkg = pkgMap.get(packageId)
         const isLivePkg = pkg?.package_type === 'live_month'
@@ -106,7 +117,7 @@ export async function POST(req: NextRequest) {
           student_id:        order.student_id,
           package_id:        packageId,
           subscription_type: isLivePkg ? 'live' : 'video',
-          is_recurring:      order.is_recurring && isLivePkg,
+          is_recurring:      order.is_recurring && packageId === latestLivePkgId,
           status:            'active',
           valid_from:        dates.validFrom,
           valid_until:       dates.validUntil,
