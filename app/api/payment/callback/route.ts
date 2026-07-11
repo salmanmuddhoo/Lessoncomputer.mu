@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       package_ids: string[]
       is_recurring: boolean
       status: string
-      metadata: { liveAmount?: number | null } | null
+      metadata: { recurringAmount?: number | null; [key: string]: unknown } | null
     } | null
 
     if (!order) {
@@ -150,7 +150,8 @@ export async function POST(req: NextRequest) {
         .from('mips_orders')
         .update({
           status:     'paid',
-          metadata:   { transaction_id: details.transaction_id, payment_method: details.payment_method },
+          // Merge — preserve recurringAmount/env set at create time instead of overwriting
+          metadata:   { ...(order.metadata ?? {}), transaction_id: details.transaction_id, payment_method: details.payment_method },
           updated_at: new Date().toISOString(),
         })
         .eq('id', order.id)
@@ -164,7 +165,7 @@ export async function POST(req: NextRequest) {
             student_id:           order.student_id,
             id_token:             idToken,
             card_last_four_digit: details.card_last_four_digit ?? null,
-            max_amount:           order.metadata?.liveAmount ?? Number(details.amount) / 100,
+            max_amount:           order.metadata?.recurringAmount ?? Number(details.amount) / 100,
             currency:             details.currency,
             is_active:            true,
             source_order_id:      order.id,
