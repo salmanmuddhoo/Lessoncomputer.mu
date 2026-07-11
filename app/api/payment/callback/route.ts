@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     const order = orderRaw as {
       id: string
       student_id: string
-      order_type: 'video' | 'live'
+      order_type: 'video' | 'live' | 'mixed'
       package_ids: string[]
       is_recurring: boolean
       status: string
@@ -98,14 +98,15 @@ export async function POST(req: NextRequest) {
 
       const subscriptionRows = order.package_ids.map((packageId: string) => {
         const pkg = pkgMap.get(packageId)
-        const dates = pkg?.package_type === 'live_month' && pkg.month && pkg.year
+        const isLivePkg = pkg?.package_type === 'live_month'
+        const dates = isLivePkg && pkg.month && pkg.year
           ? getMonthDateRange(pkg.month, pkg.year)
           : { validFrom: null, validUntil: null }
         return {
           student_id:        order.student_id,
           package_id:        packageId,
-          subscription_type: order.order_type,
-          is_recurring:      order.is_recurring,
+          subscription_type: isLivePkg ? 'live' : 'video',
+          is_recurring:      order.is_recurring && isLivePkg,
           status:            'active',
           valid_from:        dates.validFrom,
           valid_until:       dates.validUntil,
@@ -121,9 +122,9 @@ export async function POST(req: NextRequest) {
         return imn('fail')
       }
 
-      // If this is a recurring live purchase, clear is_recurring on all previous live
+      // If this order includes a recurring live purchase, clear is_recurring on all previous live
       // subscriptions so only the latest one triggers future billing cron charges.
-      if (order.is_recurring && order.order_type === 'live') {
+      if (order.is_recurring && (order.order_type === 'live' || order.order_type === 'mixed')) {
         await (admin as any)
           .from('student_subscriptions')
           .update({ is_recurring: false, updated_at: new Date().toISOString() })

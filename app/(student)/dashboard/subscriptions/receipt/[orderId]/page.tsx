@@ -18,7 +18,7 @@ export default async function ReceiptPage({ params }: PageProps) {
 
   const { data: orderRaw } = await (supabase as any)
     .from('mips_orders')
-    .select('id, amount, currency, description, order_type, package_ids, status, created_at, metadata')
+    .select('id, amount, currency, description, order_type, package_ids, is_recurring, status, created_at, metadata')
     .eq('id', orderId)
     .eq('student_id', user.id)
     .eq('status', 'paid')
@@ -33,10 +33,21 @@ export default async function ReceiptPage({ params }: PageProps) {
     description: string
     order_type: string
     package_ids: string[]
+    is_recurring: boolean
     status: string
     created_at: string
     metadata: { transaction_id?: string; payment_method?: string; cron?: boolean; claim?: boolean } | null
   }
+
+  // Fetch individual package details for line-item breakdown
+  const { data: pkgRows } = await (supabase as any)
+    .from('subscription_packages')
+    .select('id, name, price, package_type, month, year')
+    .in('id', order.package_ids)
+
+  const pkgMap = new Map<string, { id: string; name: string; price: number; package_type: string; month: number | null; year: number | null }>(
+    ((pkgRows ?? []) as any[]).map((p) => [p.id, p])
+  )
 
   const { data: profile } = await supabase
     .from('profiles')

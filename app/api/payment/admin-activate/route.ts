@@ -36,14 +36,15 @@ export async function POST(req: NextRequest) {
 
   const subscriptionRows = (orderRaw.package_ids as string[]).map((packageId) => {
     const pkg = pkgMap.get(packageId)
-    const dates = pkg?.package_type === 'live_month' && pkg.month && pkg.year
+    const isLivePkg = pkg?.package_type === 'live_month'
+    const dates = isLivePkg && pkg.month && pkg.year
       ? getMonthDateRange(pkg.month, pkg.year)
       : { validFrom: null, validUntil: null }
     return {
       student_id:        orderRaw.student_id,
       package_id:        packageId,
-      subscription_type: orderRaw.order_type,
-      is_recurring:      orderRaw.is_recurring,
+      subscription_type: isLivePkg ? 'live' : 'video',
+      is_recurring:      orderRaw.is_recurring && isLivePkg,
       status:            'active',
       valid_from:        dates.validFrom,
       valid_until:       dates.validUntil,
