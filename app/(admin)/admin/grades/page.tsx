@@ -222,7 +222,8 @@ export default function AdminGradesPage() {
       ) : (
         <div className="rounded-xl border border-border/60 overflow-hidden">
           {grades.length > 0 ? (
-            <table className="w-full text-sm">
+           <>
+            <table className="w-full text-sm hidden md:table">
               <thead className="bg-muted/30 border-b border-border/60">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grade</th>
@@ -271,6 +272,45 @@ export default function AdminGradesPage() {
                 ))}
               </tbody>
             </table>
+
+            {/* Mobile cards — the table's Actions column is unreachable on small screens */}
+            <div className="md:hidden divide-y divide-border/40">
+              {grades.map((g) => (
+                <div key={g.id} className="p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                      <span className="font-medium truncate">{g.name}</span>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full shrink-0 ${g.is_active ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+                      {g.is_active ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                      {g.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="font-mono">{g.slug}</span>
+                    <span>Order: {g.order_index}</span>
+                  </div>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/admin/grades/${g.id}/chapters`}>
+                        <BookOpen className="w-3.5 h-3.5 mr-1" /> Chapters
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/admin/grades/${g.id}/timetable`}>
+                        <Calendar className="w-3.5 h-3.5 mr-1" /> Timetable
+                      </Link>
+                    </Button>
+                    <GradeDialog grade={g} onDone={load} />
+                    <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => deleteGrade(g.id)}>
+                      <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+           </>
           ) : (
             <div className="py-16 text-center">
               <p className="text-muted-foreground mb-4">No grades configured yet.</p>

@@ -142,7 +142,7 @@ export function AdminSidebar() {
       {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex w-64 shrink-0 flex-col h-full bg-sidebar border-r border-sidebar-border">
         <div className="p-5 border-b border-sidebar-border">
-          <Logo size="sm" />
+          <Logo size="sm" onDark />
           <span className="text-xs text-muted-foreground mt-1 block">Admin Panel</span>
         </div>
         <NavContent />
@@ -150,7 +150,7 @@ export function AdminSidebar() {
 
       {/* ── Mobile top bar ── */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4">
-        <Logo size="sm" />
+        <Logo size="sm" onDark />
         <button
           onClick={() => setMobileOpen(true)}
           className="p-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
@@ -167,7 +167,7 @@ export function AdminSidebar() {
           <aside className="relative w-72 max-w-[85vw] flex flex-col h-full bg-sidebar border-r border-sidebar-border shadow-xl">
             <div className="p-5 border-b border-sidebar-border flex items-center justify-between">
               <div>
-                <Logo size="sm" />
+                <Logo size="sm" onDark />
                 <span className="text-xs text-muted-foreground mt-1 block">Admin Panel</span>
               </div>
               <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors">
