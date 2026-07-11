@@ -11,25 +11,26 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json() as {
-      orderType: 'video' | 'live'
+      orderType: 'video' | 'live' | 'mixed'
       packageIds: string[]
       amount: number
       description: string
       isRecurring?: boolean
+      liveAmount?: number
     }
 
-    const { orderType, packageIds, amount, description, isRecurring = false } = body
+    const { orderType, packageIds, amount, description, isRecurring = false, liveAmount } = body
 
     if (!orderType || !packageIds?.length || !amount) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     // Video packages are always one-off; only live subscriptions can be recurring
-    const effectiveRecurring = orderType === 'live' ? isRecurring : false
+    const effectiveRecurring = (orderType === 'live' || orderType === 'mixed') ? isRecurring : false
 
     // Block duplicate purchase: if student already has a recurring live subscription for
     // this grade, the cron will auto-charge them — no need for a manual purchase
-    if (orderType === 'live') {
+    if (orderType === 'live' || orderType === 'mixed') {
       const { data: gradeInfo } = await (supabase as any)
         .from('subscription_packages')
         .select('grade_id')
@@ -123,9 +124,12 @@ export async function POST(req: NextRequest) {
 
     // For recurring live subscriptions, use ODRP mode to tokenize the card so
     // future months can be claimed server-side without the student re-entering details.
+    // Use liveAmount (monthly live price) for maxAmountPerClaim, not the full order total
+    // which may include one-time video packages or past months.
+    const recurringMonthlyAmount = liveAmount ?? amount
     const odrpParams = effectiveRecurring ? {
-      maxAmountTotal:    amount * 24,  // up to 24 months total
-      maxAmountPerClaim: amount,
+      maxAmountTotal:    recurringMonthlyAmount * 24,  // up to 24 months total
+      maxAmountPerClaim: recurringMonthlyAmount,
       maxFrequency:      1,            // once per period
       maxDate:           new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
     } : undefined

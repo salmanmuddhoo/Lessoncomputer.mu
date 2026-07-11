@@ -18,7 +18,7 @@ export default async function ReceiptPage({ params }: PageProps) {
 
   const { data: orderRaw } = await (supabase as any)
     .from('mips_orders')
-    .select('id, amount, currency, description, order_type, package_ids, status, created_at, metadata')
+    .select('id, amount, currency, description, order_type, package_ids, is_recurring, status, created_at, metadata')
     .eq('id', orderId)
     .eq('student_id', user.id)
     .eq('status', 'paid')
@@ -33,10 +33,21 @@ export default async function ReceiptPage({ params }: PageProps) {
     description: string
     order_type: string
     package_ids: string[]
+    is_recurring: boolean
     status: string
     created_at: string
     metadata: { transaction_id?: string; payment_method?: string; cron?: boolean; claim?: boolean } | null
   }
+
+  // Fetch individual package details for line-item breakdown
+  const { data: pkgRows } = await (supabase as any)
+    .from('subscription_packages')
+    .select('id, name, price, package_type, month, year')
+    .in('id', order.package_ids)
+
+  const pkgMap = new Map<string, { id: string; name: string; price: number; package_type: string; month: number | null; year: number | null }>(
+    ((pkgRows ?? []) as any[]).map((p) => [p.id, p])
+  )
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -100,18 +111,32 @@ export default async function ReceiptPage({ params }: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td className="px-4 py-3">
-                    <p className="font-medium">{order.description}</p>
-                    <p className="text-xs text-muted-foreground capitalize mt-0.5">
-                      {order.order_type} subscription
-                      {order.metadata?.cron && <span className="ml-1.5 text-primary">· Auto-renewal</span>}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold">
-                    {order.currency} {Number(order.amount).toFixed(2)}
-                  </td>
-                </tr>
+                {order.package_ids.map((pkgId) => {
+                  const pkg = pkgMap.get(pkgId)
+                  const isLive = pkg?.package_type === 'live_month'
+                  const isRecurringLine = isLive && order.is_recurring
+                  return (
+                    <tr key={pkgId} className="border-b border-border/40 last:border-0">
+                      <td className="px-4 py-3">
+                        <p className="font-medium">{pkg?.name ?? 'Package'}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {isLive ? 'Live Classes' : 'Video Package'}
+                          {isRecurringLine && (
+                            <span className="ml-1.5 text-primary">
+                              {order.metadata?.cron ? '· Auto-renewal' : '· Recurring monthly'}
+                            </span>
+                          )}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold">
+                        {pkg?.price != null
+                          ? `${order.currency} ${Number(pkg.price).toFixed(2)}`
+                          : '—'
+                        }
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr className="border-t border-border/60 bg-muted/10">

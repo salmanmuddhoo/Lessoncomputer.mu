@@ -60,6 +60,16 @@ export default async function StudentSubscriptionsPage() {
         : b.package.month - a.package.month
     )[0]?.id ?? null
 
+  const today = new Date().toISOString().split('T')[0]
+
+  function canResubscribeLive(sub: any): boolean {
+    if (sub.subscription_type !== 'live') return false
+    if (sub.is_recurring) return false
+    // Only show re-subscribe for current/upcoming periods, not expired past months
+    if (sub.valid_until && sub.valid_until < today) return false
+    return true
+  }
+
   return (
     <div>
       <div className="mb-8">
@@ -88,6 +98,8 @@ export default async function StudentSubscriptionsPage() {
               subscriptionType={sub.subscription_type ?? 'video'}
               isRecurring={sub.is_recurring ?? false}
               canCancelRecurring={sub.id === latestLiveRecurringId}
+              canResubscribe={canResubscribeLive(sub)}
+              gradeSlug={sub.package?.grade?.slug ?? null}
               purchasedAt={sub.purchased_at}
               pkg={sub.package}
               orderId={findOrderId(sub.package_id)}

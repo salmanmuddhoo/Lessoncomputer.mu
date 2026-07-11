@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Package, Radio, RefreshCw, XCircle, Receipt, Clock } from 'lucide-react'
+import { Package, Radio, RefreshCw, XCircle, Receipt, Clock, RotateCcw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,6 +22,8 @@ interface SubscriptionCardProps {
   subscriptionType: string
   isRecurring: boolean
   canCancelRecurring?: boolean
+  canResubscribe?: boolean
+  gradeSlug?: string | null
   purchasedAt: string
   orderId: string | null
   pkg: {
@@ -32,7 +34,7 @@ interface SubscriptionCardProps {
   } | null
 }
 
-export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelRecurring = isRecurring, purchasedAt, pkg, orderId }: SubscriptionCardProps) {
+export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelRecurring = isRecurring, canResubscribe = false, gradeSlug, purchasedAt, pkg, orderId }: SubscriptionCardProps) {
   const router = useRouter()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -126,6 +128,15 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelR
               <XCircle className="w-3.5 h-3.5" />
               Cancel recurring
             </Button>
+          )}
+          {canResubscribe && gradeSlug && (
+            <Link
+              href={`/grades/${gradeSlug}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-primary/40 text-primary hover:bg-primary/5 transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Re-subscribe
+            </Link>
           )}
           {orderId && (
             <Link
