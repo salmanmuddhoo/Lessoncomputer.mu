@@ -5,7 +5,7 @@ import { GradePageContent } from '@/components/lc/grade-page-content'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { Badge } from '@/components/ui/badge'
-import { BookOpen, Video, Users, Package, Clock, Radio, AlertCircle } from 'lucide-react'
+import { BookOpen, Video, Users, Package, Clock, Radio, AlertCircle, RefreshCw } from 'lucide-react'
 import { getBillingSettings, getTargetMonth } from '@/lib/subscription-billing'
 
 interface PageProps {
@@ -128,32 +128,44 @@ export default async function GradePage({ params }: PageProps) {
   let subscribedVideoPackageIds: string[] = []
   let subscribedLivePackageIds: string[] = []
   let isLiveSubscribed = false
+  let hasRecurringLive = false
 
   if (user) {
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toISOString().split('T')[0]!
+    // No date filter — we need all active subs including upcoming ones for the recurring check
     const { data: subs } = await supabase
       .from('student_subscriptions')
-      .select('package_id')
+      .select('package_id, is_recurring, valid_from, valid_until')
       .eq('student_id', user.id)
       .eq('status', 'active')
       .not('package_id', 'is', null)
-      .or(`valid_from.is.null,valid_from.lte.${today}`)
-      .or(`valid_until.is.null,valid_until.gte.${today}`)
 
     const videoPackageIds = new Set((rawPackages ?? []).map((p: any) => p.id))
     const pastLiveIds = new Set((pastLivePackages ?? []).map((p: any) => p.id))
+    // All live package IDs for this grade (past + current/next target month)
+    const allGradeLiveIds = new Set([
+      ...Array.from(pastLiveIds),
+      ...((currentLivePackage as any)?.id ? [(currentLivePackage as any).id] : []),
+    ])
 
     for (const s of subs ?? []) {
       if (!s.package_id) continue
-      if (videoPackageIds.has(s.package_id)) {
-        subscribedVideoPackageIds.push(s.package_id)
+
+      // Apply date gate in JS for video/content access
+      const accessible = (!s.valid_from || s.valid_from <= today) && (!s.valid_until || s.valid_until >= today)
+
+      if (accessible) {
+        if (videoPackageIds.has(s.package_id)) subscribedVideoPackageIds.push(s.package_id)
+        if (currentLivePackage && s.package_id === (currentLivePackage as any).id) {
+          isLiveSubscribed = true
+          subscribedLivePackageIds.push(s.package_id)
+        }
+        if (pastLiveIds.has(s.package_id)) subscribedLivePackageIds.push(s.package_id)
       }
-      if (currentLivePackage && s.package_id === (currentLivePackage as any).id) {
-        isLiveSubscribed = true
-        subscribedLivePackageIds.push(s.package_id)
-      }
-      if (pastLiveIds.has(s.package_id)) {
-        subscribedLivePackageIds.push(s.package_id)
+
+      // Recurring check has no date gate — an upcoming recurring sub still blocks a new purchase
+      if ((s as any).is_recurring && allGradeLiveIds.has(s.package_id)) {
+        hasRecurringLive = true
       }
     }
   }
@@ -296,6 +308,13 @@ export default async function GradePage({ params }: PageProps) {
                 <Badge className="gap-1 bg-primary/10 text-primary border-primary/20" variant="outline">
                   <Radio className="w-3 h-3" /> {afterCutoff ? 'Enrolled for ' + liveMonthLabel : 'Subscribed'}
                 </Badge>
+              ) : hasRecurringLive ? (
+                <div className="flex flex-col items-end gap-1">
+                  <Badge className="gap-1 bg-green-100 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800" variant="outline">
+                    <RefreshCw className="w-3 h-3" /> Auto-renewal active
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">Next month charged on day {billing.billingDay}</span>
+                </div>
               ) : user ? (
                 <BuySubscribeDialog
                   videoPackages={dialogPackageList}
