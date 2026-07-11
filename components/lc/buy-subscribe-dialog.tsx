@@ -174,12 +174,12 @@ export function BuySubscribeDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md" aria-describedby={undefined}>
+        <DialogContent className="max-w-md flex flex-col max-h-[90vh]" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Complete your purchase</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-1">
+          <div className="space-y-4 py-1 overflow-y-auto flex-1 min-h-0">
             {/* Live subscription section */}
             {liveSubscriptionEnabled && liveMonthPackageId && (
               <div>
