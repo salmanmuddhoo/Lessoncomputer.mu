@@ -64,6 +64,11 @@ export default async function GradePage({ params }: PageProps) {
   const target = getTargetMonth(now, billing.cutoffDay)
   const afterCutoff = !target.isCurrentMonth
 
+  // Next calendar month (used to offer re-subscribe when current month is already subscribed)
+  const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  const nextMonthNum = nextMonthDate.getMonth() + 1
+  const nextMonthYear = nextMonthDate.getFullYear()
+
   const [
     { data: videos },
     { data: liveClasses },
@@ -72,6 +77,7 @@ export default async function GradePage({ params }: PageProps) {
     { data: documents },
     { data: currentLivePackage },
     { data: pastLivePackages },
+    { data: nextMonthLivePackage },
   ] = await Promise.all([
     supabase
       .from('videos')
@@ -123,11 +129,21 @@ export default async function GradePage({ params }: PageProps) {
       .or(`year.lt.${target.year},and(year.eq.${target.year},month.lt.${target.month})`)
       .order('year', { ascending: false })
       .order('month', { ascending: false }),
+    supabase
+      .from('subscription_packages')
+      .select('id, name, month, year')
+      .eq('grade_id', grade.id)
+      .eq('package_type', 'live_month')
+      .eq('month', nextMonthNum)
+      .eq('year', nextMonthYear)
+      .eq('is_active', true)
+      .maybeSingle(),
   ])
 
   let subscribedVideoPackageIds: string[] = []
   let subscribedLivePackageIds: string[] = []
   let isLiveSubscribed = false
+  let isNextMonthSubscribed = false
   let hasRecurringLive = false
 
   if (user) {
@@ -142,10 +158,11 @@ export default async function GradePage({ params }: PageProps) {
 
     const videoPackageIds = new Set((rawPackages ?? []).map((p: any) => p.id))
     const pastLiveIds = new Set((pastLivePackages ?? []).map((p: any) => p.id))
-    // All live package IDs for this grade (past + current/next target month)
+    // All live package IDs for this grade (past + current/next target month + next calendar month)
     const allGradeLiveIds = new Set([
       ...Array.from(pastLiveIds),
       ...((currentLivePackage as any)?.id ? [(currentLivePackage as any).id] : []),
+      ...((nextMonthLivePackage as any)?.id ? [(nextMonthLivePackage as any).id] : []),
     ])
 
     for (const s of subs ?? []) {
@@ -161,6 +178,12 @@ export default async function GradePage({ params }: PageProps) {
           subscribedLivePackageIds.push(s.package_id)
         }
         if (pastLiveIds.has(s.package_id)) subscribedLivePackageIds.push(s.package_id)
+      }
+
+      // Track next month subscription (accessible or upcoming)
+      if (nextMonthLivePackage && s.package_id === (nextMonthLivePackage as any).id) {
+        isNextMonthSubscribed = true
+        subscribedLivePackageIds.push(s.package_id)
       }
 
       // Recurring check has no date gate — an upcoming recurring sub still blocks a new purchase
@@ -305,9 +328,30 @@ export default async function GradePage({ params }: PageProps) {
                 Rs {liveSubscriptionPrice.toFixed(2)}<span className="text-sm font-normal text-muted-foreground">/mo</span>
               </span>
               {isLiveSubscribed ? (
-                <Badge className="gap-1 bg-primary/10 text-primary border-primary/20" variant="outline">
-                  <Radio className="w-3 h-3" /> {afterCutoff ? 'Enrolled for ' + liveMonthLabel : 'Subscribed'}
-                </Badge>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <Badge className="gap-1 bg-primary/10 text-primary border-primary/20" variant="outline">
+                    <Radio className="w-3 h-3" /> {afterCutoff ? 'Enrolled for ' + liveMonthLabel : 'Subscribed'}
+                  </Badge>
+                  {/* Allow subscribing for next month when not on recurring billing */}
+                  {!hasRecurringLive && nextMonthLivePackage && !isNextMonthSubscribed && user && (
+                    <BuySubscribeDialog
+                      videoPackages={dialogPackageList}
+                      subscribedPackageIds={subscribedVideoPackageIds}
+                      gradeName={grade.name}
+                      liveSubscriptionPrice={liveSubscriptionPrice}
+                      liveSubscriptionEnabled={liveSubscriptionEnabled}
+                      liveMonthPackageId={(nextMonthLivePackage as any).id}
+                      liveMonthLabel={`${MONTHS[(nextMonthLivePackage as any).month - 1]} ${(nextMonthLivePackage as any).year}`}
+                      pastLivePackages={(pastLivePackages ?? []) as any}
+                      subscribedLivePackageIds={subscribedLivePackageIds}
+                      defaultMode="live"
+                      triggerLabel={`Subscribe for ${MONTHS[(nextMonthLivePackage as any).month - 1]}`}
+                      triggerSize="sm"
+                      isNextMonthMode={true}
+                      isLoggedIn={!!user}
+                    />
+                  )}
+                </div>
               ) : hasRecurringLive ? (
                 <div className="flex flex-col items-end gap-1">
                   <Badge className="gap-1 bg-green-100 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800" variant="outline">

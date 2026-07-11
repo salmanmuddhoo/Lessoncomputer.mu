@@ -70,6 +70,18 @@ export default async function StudentSubscriptionsPage() {
     return true
   }
 
+  // Deduplicate: when multiple subscriptions share the same order, only the first
+  // card for that orderId shows the Receipt button (not one button per subscription)
+  const seenOrderIds = new Set<string>()
+  const dedupedOrderIds = activeSubs.map((sub: any) => {
+    const orderId = findOrderId(sub.package_id)
+    if (orderId && !seenOrderIds.has(orderId)) {
+      seenOrderIds.add(orderId)
+      return orderId
+    }
+    return null
+  })
+
   return (
     <div>
       <div className="mb-8">
@@ -90,7 +102,7 @@ export default async function StudentSubscriptionsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {activeSubs.map((sub: any) => (
+          {activeSubs.map((sub: any, i: number) => (
             <SubscriptionCard
               key={sub.id}
               id={sub.id}
@@ -102,7 +114,7 @@ export default async function StudentSubscriptionsPage() {
               gradeSlug={sub.package?.grade?.slug ?? null}
               purchasedAt={sub.purchased_at}
               pkg={sub.package}
-              orderId={findOrderId(sub.package_id)}
+              orderId={dedupedOrderIds[i] ?? null}
             />
           ))}
         </div>
