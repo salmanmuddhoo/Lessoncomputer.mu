@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -73,6 +74,8 @@ export function LiveMonthsList({
   )
   const [paying, setPaying] = useState(false)
   const [pastDialog, setPastDialog] = useState<{ selectedIds: Set<string> } | null>(null)
+  const [confirmCurrent, setConfirmCurrent] = useState<MonthPackage | null>(null)
+  const [agreed, setAgreed] = useState(false)
 
   const unsubscribedPastPackages = packages.filter(pkg => {
     const isPast = pkg.year < currentYear || (pkg.year === currentYear && pkg.month < currentMonth)
@@ -115,6 +118,7 @@ export function LiveMonthsList({
   }
 
   function handleSubscribeCurrent(pkg: MonthPackage) {
+    if (!confirmCurrent) return
     const description = `Live classes: ${MONTHS[pkg.month - 1]} ${pkg.year}`
     initiatePayment([pkg.id], liveSubscriptionPrice, description, true)
   }
@@ -187,7 +191,7 @@ export function LiveMonthsList({
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setPastDialog({ selectedIds: new Set([pkg.id]) })}
+                          onClick={() => { setAgreed(false); setPastDialog({ selectedIds: new Set([pkg.id]) }) }}
                         >
                           Buy Videos
                         </Button>
@@ -195,7 +199,7 @@ export function LiveMonthsList({
                         <Button
                           size="sm"
                           className="bg-primary text-primary-foreground hover:bg-accent"
-                          onClick={() => handleSubscribeCurrent(pkg)}
+                          onClick={() => { setAgreed(false); setConfirmCurrent(pkg) }}
                           disabled={paying}
                         >
                           {paying
@@ -254,7 +258,7 @@ export function LiveMonthsList({
 
       {/* Past months purchase dialog */}
       {pastDialog && (
-        <Dialog open onOpenChange={() => setPastDialog(null)}>
+        <Dialog open onOpenChange={() => { setPastDialog(null); setAgreed(false) }}>
           <DialogContent className="max-w-md" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -303,16 +307,67 @@ export function LiveMonthsList({
               </div>
             )}
 
+            <label className="flex items-start gap-2 pt-3 mt-1 border-t border-border/40 cursor-pointer">
+              <Checkbox checked={agreed} onCheckedChange={(v) => setAgreed(!!v)} className="mt-0.5 shrink-0" />
+              <span className="text-xs text-muted-foreground leading-relaxed">
+                I have read and agree to the{' '}
+                <Link href="/terms" target="_blank" className="text-primary hover:underline">Terms &amp; Conditions</Link>{' '}
+                of LessonComputer.mu.
+              </span>
+            </label>
+
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setPastDialog(null)} disabled={paying}>Cancel</Button>
               <Button
                 onClick={handleSubscribePast}
-                disabled={pastDialog.selectedIds.size === 0 || paying}
+                disabled={pastDialog.selectedIds.size === 0 || paying || !agreed}
                 className="bg-primary text-primary-foreground hover:bg-accent"
               >
                 {paying
                   ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Processing…</>
                   : `Pay Rs ${(pastDialog.selectedIds.size * Number(liveSubscriptionPrice)).toFixed(2)}`
+                }
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Current month subscribe confirmation */}
+      {confirmCurrent && (
+        <Dialog open onOpenChange={() => { setConfirmCurrent(null); setAgreed(false) }}>
+          <DialogContent className="max-w-md" aria-describedby={undefined}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Radio className="w-4 h-4 text-primary" />
+                Subscribe to {MONTHS[confirmCurrent.month - 1]} {confirmCurrent.year}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 flex items-center justify-between">
+              <span className="text-sm font-medium">Live Classes — auto-renewing monthly</span>
+              <span className="text-sm font-bold text-primary shrink-0">Rs {Number(liveSubscriptionPrice).toFixed(2)}</span>
+            </div>
+
+            <label className="flex items-start gap-2 pt-3 mt-1 border-t border-border/40 cursor-pointer">
+              <Checkbox checked={agreed} onCheckedChange={(v) => setAgreed(!!v)} className="mt-0.5 shrink-0" />
+              <span className="text-xs text-muted-foreground leading-relaxed">
+                I have read and agree to the{' '}
+                <Link href="/terms" target="_blank" className="text-primary hover:underline">Terms &amp; Conditions</Link>{' '}
+                of LessonComputer.mu.
+              </span>
+            </label>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setConfirmCurrent(null)} disabled={paying}>Cancel</Button>
+              <Button
+                onClick={() => handleSubscribeCurrent(confirmCurrent)}
+                disabled={paying || !agreed}
+                className="bg-primary text-primary-foreground hover:bg-accent"
+              >
+                {paying
+                  ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Redirecting…</>
+                  : `Pay Rs ${Number(liveSubscriptionPrice).toFixed(2)}`
                 }
               </Button>
             </DialogFooter>
