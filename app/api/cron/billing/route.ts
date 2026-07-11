@@ -62,6 +62,27 @@ export async function GET(req: NextRequest) {
       continue
     }
 
+    // If the student soft-cancelled (is_recurring=false) and billing day arrived
+    // without them restoring, their intent is clear — deactivate the ODRP token
+    // so we never attempt to charge a card they've effectively abandoned.
+    const { data: recurringLiveSub } = await (admin as any)
+      .from('student_subscriptions')
+      .select('id')
+      .eq('student_id', token.student_id)
+      .eq('subscription_type', 'live')
+      .eq('is_recurring', true)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (!recurringLiveSub) {
+      await (admin as any)
+        .from('student_payment_tokens')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', token.id)
+      results.push({ studentId: token.student_id, status: 'skipped', reason: 'recurring cancelled — token deactivated' })
+      continue
+    }
+
     const { data: nextPkg } = await (admin as any)
       .from('subscription_packages')
       .select('id, name, price')
