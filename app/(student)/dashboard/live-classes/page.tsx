@@ -88,7 +88,7 @@ export default async function StudentLiveClassesPage() {
       .order('name', { ascending: true }),
     supabase
       .from('student_subscriptions')
-      .select('package_id, purchased_at')
+      .select('package_id, purchased_at, is_recurring, subscription_type')
       .eq('student_id', user.id)
       .eq('status', 'active'),
     supabase
@@ -118,6 +118,57 @@ export default async function StudentLiveClassesPage() {
     (p: any) => p.month === currentMonth && p.year === currentYear
   )
   const isSubscribedCurrentMonth = currentMonthPkg ? subscribedPackageIds.has(currentMonthPkg.id) : false
+
+  // Access to live-class resources requires an ACTIVE recurring subscription.
+  // Without it, hide all resources and prompt the student to subscribe again.
+  const hasRecurringLive = (subs ?? []).some(
+    (s: any) => s.is_recurring && s.subscription_type === 'live'
+  )
+
+  if (!hasRecurringLive) {
+    const livePackageIds = new Set((livePackages ?? []).map((p: any) => p.id))
+    const subscribedLivePackageIds = [...subscribedPackageIds].filter((id) => livePackageIds.has(id as string)) as string[]
+    return (
+      <div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Live Classes</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            Monthly live sessions for <span className="font-medium" style={{ color: grade.color }}>{grade.name}</span>
+          </p>
+        </div>
+        <div className="py-16 px-6 text-center rounded-xl border border-primary/20 bg-primary/5">
+          <Radio className="w-12 h-12 text-primary/40 mx-auto mb-4" />
+          <h2 className="font-semibold mb-2">Your recurring subscription is inactive</h2>
+          <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+            Live classes and their resources are available only with an active recurring subscription.
+            Subscribe again to instantly restore access to everything for {grade.name}.
+          </p>
+          {currentMonthPkg ? (
+            <div className="flex justify-center">
+              <BuySubscribeDialog
+                videoPackages={videoPackages}
+                subscribedPackageIds={subscribedVideoPackageIds}
+                subscribedLivePackageIds={subscribedLivePackageIds}
+                gradeName={grade.name}
+                liveSubscriptionPrice={grade.live_subscription_price}
+                liveSubscriptionEnabled={grade.live_subscription_enabled}
+                liveMonthPackageId={currentMonthPkg.id}
+                liveMonthLabel={`${MONTHS[currentMonth - 1]} ${currentYear}`}
+                pastLivePackages={(livePackages ?? [])
+                  .filter((p: any) => p.year < currentYear || (p.year === currentYear && p.month < currentMonth))
+                  .map((p: any) => ({ id: p.id, name: p.name, month: p.month, year: p.year }))}
+                defaultMode="live"
+                triggerLabel="Subscribe Now"
+                isLoggedIn
+              />
+            </div>
+          ) : (
+            <Button asChild><Link href={`/grades/${grade.slug}`}>Browse subscriptions <ArrowRight className="ml-2 w-4 h-4" /></Link></Button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   // Fetch content for subscribed packages only
   const subscribedChapterIds = (livePackages ?? [])

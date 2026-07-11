@@ -17,7 +17,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
       .single(),
     supabase
       .from('student_subscriptions')
-      .select('package:subscription_packages(package_type)')
+      .select('is_recurring, subscription_type, package:subscription_packages(package_type)')
       .eq('student_id', user.id)
       .eq('status', 'active'),
     (supabase as any)
@@ -33,8 +33,11 @@ export default async function StudentLayout({ children }: { children: React.Reac
   const gradeName = (profile?.grade as { name: string } | null)?.name ?? null
   const whatsappNumber = (siteSettingsRaw as any)?.whatsapp_number ?? null
 
+  // Live-class resources require an ONGOING recurring subscription. Once a student
+  // cancels recurring (or it lapses), the Live Classes & Attendance menus disappear
+  // until they subscribe again.
   const hasLiveSubscription = (subs ?? []).some(
-    (s: any) => s.package?.package_type === 'live_month'
+    (s: any) => s.is_recurring && (s.subscription_type === 'live' || s.package?.package_type === 'live_month')
   )
   const hasVideoSubscription = (subs ?? []).some(
     (s: any) => s.package?.package_type !== 'live_month'
