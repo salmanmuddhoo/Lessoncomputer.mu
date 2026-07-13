@@ -24,6 +24,13 @@ export default async function HomePage() {
     liveClassCount: (g.live_classes as unknown as { count: number }[])?.[0]?.count ?? 0,
   })) as (Grade & { videoCount: number; liveClassCount: number })[] | undefined
 
+  const { data: testimonials } = await (supabase as any)
+    .from('testimonials')
+    .select('id, type, author_name, author_role, quote, media_url')
+    .eq('is_published', true)
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: false })
+
   return (
     <>
       {/* 1. Hero — large serif headline, two CTAs */}
@@ -42,7 +49,7 @@ export default async function HomePage() {
       <FeaturesSection />
 
       {/* 6. Testimonials */}
-      <Testimonials />
+      <Testimonials items={testimonials ?? []} />
 
       {/* 7. CTA banner — dark block */}
       <CTASection />
