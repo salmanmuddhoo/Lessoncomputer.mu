@@ -35,7 +35,7 @@ function Header() {
     <div className="text-center max-w-xl mx-auto mb-14">
       <p className="text-xs font-semibold tracking-[0.15em] text-primary uppercase mb-3">Student &amp; Parent Stories</p>
       <h2 className="font-serif text-4xl md:text-5xl font-bold text-foreground leading-tight">
-        Trusted by families across Mauritius
+        Trusted by students &amp; families
       </h2>
     </div>
   )
