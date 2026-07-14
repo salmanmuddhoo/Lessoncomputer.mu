@@ -1,7 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle2, XCircle, Clock, AlertCircle, Zap } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, AlertCircle, Zap, Filter } from 'lucide-react'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 
 interface MipsOrder {
   id: string
@@ -16,6 +19,8 @@ interface MipsOrder {
   created_at: string
   metadata?: { failureReason?: string } | null
   studentName?: string | null
+  gradeId?: string | null
+  gradeName?: string | null
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof CheckCircle2; className: string }> = {
@@ -25,9 +30,12 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof CheckCircle2; 
   cancelled: { label: 'Cancelled', icon: AlertCircle,  className: 'text-muted-foreground bg-muted/40' },
 }
 
-export function PaymentsTable({ initialOrders }: { initialOrders: MipsOrder[] }) {
+export function PaymentsTable({ initialOrders, grades = [] }: { initialOrders: MipsOrder[]; grades?: { id: string; name: string }[] }) {
   const [orders, setOrders] = useState(initialOrders)
   const [activating, setActivating] = useState<string | null>(null)
+  const [gradeFilter, setGradeFilter] = useState<string>('all')
+
+  const visibleOrders = gradeFilter === 'all' ? orders : orders.filter((o) => o.gradeId === gradeFilter)
 
   async function activate(orderId: string) {
     setActivating(orderId)
@@ -53,13 +61,27 @@ export function PaymentsTable({ initialOrders }: { initialOrders: MipsOrder[] })
   }
 
   return (
-    <div className="rounded-xl border border-border/60 overflow-hidden">
+    <div className="space-y-3">
+      {grades.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <Select value={gradeFilter} onValueChange={setGradeFilter}>
+            <SelectTrigger className="w-48"><SelectValue placeholder="Filter by grade" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Grades</SelectItem>
+              {grades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      <div className="rounded-xl border border-border/60 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/60 bg-muted/30">
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Student</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grade</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Description</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Type</th>
               <th className="text-right px-4 py-3 font-medium text-muted-foreground">Amount</th>
@@ -69,13 +91,13 @@ export function PaymentsTable({ initialOrders }: { initialOrders: MipsOrder[] })
             </tr>
           </thead>
           <tbody className="divide-y divide-border/40">
-            {orders.length === 0 ? (
+            {visibleOrders.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground text-sm">
-                  No payment transactions yet.
+                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground text-sm">
+                  No payment transactions{gradeFilter !== 'all' ? ' for this grade' : ' yet'}.
                 </td>
               </tr>
-            ) : orders.map((order) => {
+            ) : visibleOrders.map((order) => {
               const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.failed
               const StatusIcon = cfg.icon
               const date = new Date(order.created_at)
@@ -88,6 +110,9 @@ export function PaymentsTable({ initialOrders }: { initialOrders: MipsOrder[] })
                   </td>
                   <td className="px-4 py-3 font-medium">
                     {order.studentName ?? <span className="text-muted-foreground italic">Unknown</span>}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                    {order.gradeName ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate">
                     {order.description ?? '—'}
@@ -130,6 +155,7 @@ export function PaymentsTable({ initialOrders }: { initialOrders: MipsOrder[] })
             })}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   )
