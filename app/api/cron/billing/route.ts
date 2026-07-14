@@ -18,11 +18,17 @@ export async function GET(req: NextRequest) {
   // Use service-role for all DB operations — no user session in cron context
   const admin = createServiceRoleClient()
 
-  // Check billing_day from settings — bail if today isn't the billing day
+  // Check billing_day from settings — bail if today isn't the billing day.
+  // The Vercel cron runs daily (see vercel.json); this gate decides the actual day.
   const { billingDay } = await getBillingSettings(admin)
   const now = new Date()
-  if (now.getDate() !== billingDay) {
-    return NextResponse.json({ ok: true, skipped: true, reason: `today is ${now.getDate()}, billing_day is ${billingDay}` })
+  const today = now.getDate()
+  // Last day of the current month — so a billing_day of 29/30/31 still fires in
+  // shorter months (e.g. billing_day 31 charges on 28 Feb).
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const effectiveBillingDay = Math.min(billingDay, daysInMonth)
+  if (today !== effectiveBillingDay) {
+    return NextResponse.json({ ok: true, skipped: true, reason: `today is ${today}, billing_day is ${billingDay} (effective ${effectiveBillingDay})` })
   }
 
   // Determine next month — the period students are paying for today
