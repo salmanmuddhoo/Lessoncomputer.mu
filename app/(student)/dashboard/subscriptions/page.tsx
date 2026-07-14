@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { BookOpen, ArrowRight } from 'lucide-react'
+import { BookOpen, ArrowRight, AlertTriangle } from 'lucide-react'
 import type { Metadata } from 'next'
 import { SubscriptionCard } from '@/components/lc/subscription-card'
 
@@ -13,7 +13,7 @@ export default async function StudentSubscriptionsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [subsResult, ordersResult] = await Promise.all([
+  const [subsResult, ordersResult, failedResult] = await Promise.all([
     supabase
       .from('student_subscriptions')
       .select(`
@@ -39,10 +39,21 @@ export default async function StudentSubscriptionsPage() {
       .eq('student_id', user.id)
       .eq('status', 'paid')
       .order('created_at', { ascending: false }),
+
+    // Failed recurring charges — so the student knows a payment didn't go through
+    (supabase as any)
+      .from('mips_orders')
+      .select('id, description, amount, currency, created_at, metadata')
+      .eq('student_id', user.id)
+      .eq('status', 'failed')
+      .eq('is_recurring', true)
+      .order('created_at', { ascending: false })
+      .limit(5),
   ])
 
   const activeSubs = ((subsResult.data ?? []) as any[]).filter((s) => s.package_id && s.package)
   const paidOrders = (ordersResult.data ?? []) as { id: string; package_ids: string[] }[]
+  const failedOrders = (failedResult.data ?? []) as { id: string; description: string | null; amount: number; currency: string; created_at: string; metadata: { failureReason?: string } | null }[]
 
   // For each subscription, find its most recent paid order
   function findOrderId(packageId: string): string | null {
@@ -88,6 +99,34 @@ export default async function StudentSubscriptionsPage() {
         <h1 className="text-2xl font-bold">My Subscriptions</h1>
         <p className="text-muted-foreground text-sm mt-0.5">Your active and upcoming subscriptions</p>
       </div>
+
+      {/* Failed recurring payments */}
+      {failedOrders.length > 0 && (
+        <div className="mb-8 rounded-xl border border-red-300 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+            <h2 className="font-semibold text-sm text-red-600 dark:text-red-400">Payment issue</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            A recurring payment for your live classes could not be processed, so it was not renewed.
+            Re-subscribe from your grade page to regain access.
+          </p>
+          <div className="space-y-2">
+            {failedOrders.map((o) => (
+              <div key={o.id} className="flex items-center justify-between gap-3 text-xs bg-background/60 rounded-lg px-3 py-2 border border-red-200 dark:border-red-900/40">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{o.description ?? 'Live classes (auto-renewal)'}</p>
+                  <p className="text-muted-foreground">
+                    {new Date(o.created_at).toLocaleDateString('en-MU', { dateStyle: 'medium' })}
+                    {o.metadata?.failureReason ? ` · ${o.metadata.failureReason}` : ''}
+                  </p>
+                </div>
+                <span className="font-semibold text-red-500 shrink-0">Failed · {o.currency} {Number(o.amount).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {activeSubs.length === 0 ? (
         <div className="py-16 text-center rounded-xl border border-border/60">
