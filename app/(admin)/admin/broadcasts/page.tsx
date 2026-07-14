@@ -132,7 +132,7 @@ export default function AdminBroadcastsPage() {
     if (error) {
       toast.error(`Failed: ${error.message}`)
     } else {
-      toast.success('Notice sent')
+      toast.success('Message sent')
       setDialogOpen(false)
       load()
     }
@@ -143,7 +143,7 @@ export default function AdminBroadcastsPage() {
     const { error } = await (supabase as any).from('broadcasts').delete().eq('id', id)
     if (error) toast.error(error.message)
     else {
-      toast.success('Notice deleted')
+      toast.success('Message deleted')
       setBroadcasts((prev) => prev.filter((b) => b.id !== id))
     }
     setDeleteId(null)
@@ -159,7 +159,7 @@ export default function AdminBroadcastsPage() {
           </p>
         </div>
         <Button size="sm" className="bg-primary text-primary-foreground hover:bg-accent" onClick={openNew}>
-          <Plus className="w-4 h-4 mr-1" /> New Notice
+          <Plus className="w-4 h-4 mr-1" /> New Message
         </Button>
       </div>
 
@@ -170,9 +170,9 @@ export default function AdminBroadcastsPage() {
       ) : broadcasts.length === 0 ? (
         <div className="py-20 text-center rounded-xl border border-border/60">
           <Megaphone className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground mb-4">No notices sent yet.</p>
+          <p className="text-muted-foreground mb-4">No messages sent yet.</p>
           <Button size="sm" className="bg-primary text-primary-foreground hover:bg-accent" onClick={openNew}>
-            <Plus className="w-4 h-4 mr-1" /> Send First Notice
+            <Plus className="w-4 h-4 mr-1" /> Send First Message
           </Button>
         </div>
       ) : (
@@ -252,7 +252,7 @@ export default function AdminBroadcastsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Send Notice / Homework</DialogTitle>
+            <DialogTitle>Send Message / Homework</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-3">
@@ -321,7 +321,7 @@ export default function AdminBroadcastsPage() {
               className="bg-primary text-primary-foreground hover:bg-accent"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Send Notice
+              Send Message
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -331,9 +331,9 @@ export default function AdminBroadcastsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null) }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this notice?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this message?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the notice from all students&apos; inboxes.
+              This will permanently remove the message from all students&apos; inboxes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

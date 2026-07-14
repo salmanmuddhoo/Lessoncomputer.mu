@@ -1,4 +1,4 @@
-import { Star, PlayCircle, FileText } from 'lucide-react'
+import { Star, PlayCircle } from 'lucide-react'
 
 export interface TestimonialItem {
   id: string
@@ -97,13 +97,8 @@ export function Testimonials({ items = [] }: { items?: TestimonialItem[] }) {
                     />
                   </div>
                 ) : t.type === 'result' ? (
-                  <a href={t.media_url} target="_blank" rel="noopener noreferrer" className="block relative group">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={t.media_url} alt={`Result — ${t.author_name ?? 'student'}`} className="w-full aspect-[4/3] object-cover" />
-                    <span className="absolute top-3 left-3 inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-background/90 border border-border text-foreground">
-                      <FileText className="w-3 h-3 text-primary" /> Verified result
-                    </span>
-                  </a>
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={t.media_url} alt={`Result — ${t.author_name ?? 'student'}`} className="w-full aspect-[4/3] object-cover" />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={t.media_url} alt={t.author_name ?? 'Testimonial'} className="w-full aspect-[4/3] object-cover" />

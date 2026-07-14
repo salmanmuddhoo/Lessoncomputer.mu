@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
 import { AccountForm } from './account-form'
 import { SiteSettingsForm } from '@/components/lc/site-settings-form'
-import { MipsSettingsForm } from '@/components/lc/mips-settings-form'
 import { WhatsAppSettingsForm } from '@/components/lc/whatsapp-settings-form'
 import { BillingSettingsForm } from '@/components/lc/billing-settings-form'
 
@@ -43,34 +42,37 @@ export default async function AdminSettingsPage() {
         <p className="text-muted-foreground text-sm mt-0.5">Manage your admin account and site configuration.</p>
       </div>
 
-      <div className="max-w-lg space-y-8">
-        <AccountForm
-          userId={user!.id}
-          email={user!.email ?? ''}
-          fullName={profile?.full_name ?? ''}
-        />
+      {/* 2-column grid on desktop to use the horizontal space */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Left column */}
+        <div className="space-y-6">
+          <AccountForm
+            userId={user!.id}
+            email={user!.email ?? ''}
+            fullName={profile?.full_name ?? ''}
+          />
 
-        <SiteSettingsForm
-          initial={{
-            facebook_url: ss.facebook_url ?? '',
-            instagram_url: ss.instagram_url ?? '',
-            tiktok_url: ss.tiktok_url ?? '',
-            whatsapp_number: ss.whatsapp_number ?? '',
-          }}
-        />
+          <SiteSettingsForm
+            initial={{
+              facebook_url: ss.facebook_url ?? '',
+              instagram_url: ss.instagram_url ?? '',
+              tiktok_url: ss.tiktok_url ?? '',
+              whatsapp_number: ss.whatsapp_number ?? '',
+            }}
+          />
+        </div>
 
-        <MipsSettingsForm
-          initialEnvironment={(ss.mips_environment as 'test' | 'production') ?? 'test'}
-        />
+        {/* Right column */}
+        <div className="space-y-6">
+          <WhatsAppSettingsForm
+            initialGroupUrl={ss.whatsapp_group_url ?? ''}
+          />
 
-        <WhatsAppSettingsForm
-          initialGroupUrl={ss.whatsapp_group_url ?? ''}
-        />
-
-        <BillingSettingsForm
-          initialBillingDay={ss.billing_day ?? 28}
-          initialCutoffDay={ss.cutoff_day ?? 20}
-        />
+          <BillingSettingsForm
+            initialBillingDay={ss.billing_day ?? 28}
+            initialCutoffDay={ss.cutoff_day ?? 20}
+          />
+        </div>
       </div>
     </div>
   )

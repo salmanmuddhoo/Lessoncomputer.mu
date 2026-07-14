@@ -78,14 +78,14 @@ export default async function StudentNoticesPage() {
           </p>
         </div>
         {items.length > 0 && (
-          <span className="ml-auto text-xs text-muted-foreground">{items.length} notice{items.length !== 1 ? 's' : ''}</span>
+          <span className="ml-auto text-xs text-muted-foreground">{items.length} message{items.length !== 1 ? 's' : ''}</span>
         )}
       </div>
 
       {items.length === 0 ? (
         <div className="py-20 text-center rounded-xl border border-border/60">
           <Megaphone className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">No notices yet. Check back later!</p>
+          <p className="text-muted-foreground">No messages yet. Check back later!</p>
         </div>
       ) : (
         <NoticesList items={items} />

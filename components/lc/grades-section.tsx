@@ -14,9 +14,22 @@ const PLACEHOLDER_GRADES: (Grade & { videoCount?: number; liveClassCount?: numbe
 
 interface GradesSectionProps {
   grades?: (Grade & { videoCount?: number; liveClassCount?: number })[]
+  // Render just the grid (no section padding / header / "view all") when the
+  // surrounding page already provides a heading and container (e.g. /grades).
+  embedded?: boolean
 }
 
-export function GradesSection({ grades = PLACEHOLDER_GRADES }: GradesSectionProps) {
+export function GradesSection({ grades = PLACEHOLDER_GRADES, embedded = false }: GradesSectionProps) {
+  const grid = (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {grades.map((grade) => (
+        <GradeCard key={grade.id} grade={grade} />
+      ))}
+    </div>
+  )
+
+  if (embedded) return grid
+
   return (
     <section className="py-20 md:py-24 bg-background border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -37,12 +50,7 @@ export function GradesSection({ grades = PLACEHOLDER_GRADES }: GradesSectionProp
           </Link>
         </div>
 
-        {/* The "boxes" — 3-column grid like Boty product grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {grades.map((grade) => (
-            <GradeCard key={grade.id} grade={grade} />
-          ))}
-        </div>
+        {grid}
 
         <div className="mt-8 text-center sm:hidden">
           <Link href="/grades" className="text-sm font-medium text-primary hover:underline">
