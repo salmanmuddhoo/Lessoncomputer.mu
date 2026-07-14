@@ -97,6 +97,14 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
     }
   }
 
+  // Record that the student watched this video (open = watched) for the
+  // dashboard completion %. Idempotent per (student, video).
+  if (user && hasAccess) {
+    await (supabase as any)
+      .from('video_progress')
+      .upsert({ student_id: user.id, video_id: video.id, watched_at: new Date().toISOString() }, { onConflict: 'student_id,video_id' })
+  }
+
   // Build playlist for authenticated users with subscriptions
   let playlistData: PlaylistPackage[] = []
   if (user && pkgIds.length > 0) {

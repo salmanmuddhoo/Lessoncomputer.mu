@@ -58,6 +58,16 @@ export default async function StudentNoticesPage() {
     chapter: { title: string } | null
   }>
 
+  // Mark all visible messages as read so the dashboard's unread badge clears.
+  if (items.length > 0) {
+    await (supabase as any)
+      .from('broadcast_reads')
+      .upsert(
+        items.map((i) => ({ student_id: user.id, broadcast_id: i.id })),
+        { onConflict: 'student_id,broadcast_id' }
+      )
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center gap-3">
