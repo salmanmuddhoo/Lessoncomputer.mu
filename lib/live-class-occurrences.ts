@@ -9,19 +9,26 @@ export interface OccurrenceClass {
   end_time?: string | null
 }
 
-function timeOfDay(scheduledAt: string): { h: number; m: number } {
+// A live class belongs to the month/year encoded in scheduled_at; recurring classes
+// repeat weekly ONLY within that month (e.g. a January class must not appear in August).
+function classInfo(scheduledAt: string) {
   const d = new Date(scheduledAt)
-  return { h: d.getHours(), m: d.getMinutes() }
+  return { year: d.getFullYear(), month: d.getMonth(), h: d.getHours(), m: d.getMinutes() }
 }
 
 // All start-times for `cls` that fall within [start, end] (inclusive).
 export function occurrencesInRange(cls: OccurrenceClass, start: Date, end: Date): Date[] {
-  const { h, m } = timeOfDay(cls.scheduled_at)
+  const { year, month, h, m } = classInfo(cls.scheduled_at)
   const out: Date[] = []
 
   if (cls.is_recurring && cls.recurrence_day_of_week != null) {
-    const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate())
-    while (cursor <= end) {
+    // Clamp the scan to the intersection of [start, end] and the class's own month.
+    const monthStart = new Date(year, month, 1)
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59)
+    const lo = start > monthStart ? start : monthStart
+    const hi = end < monthEnd ? end : monthEnd
+    const cursor = new Date(lo.getFullYear(), lo.getMonth(), lo.getDate())
+    while (cursor <= hi) {
       if (cursor.getDay() === cls.recurrence_day_of_week) {
         out.push(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), h, m))
       }
@@ -36,12 +43,17 @@ export function occurrencesInRange(cls: OccurrenceClass, start: Date, end: Date)
 
 // The soonest occurrence start-time at or after `from`, or null if none upcoming.
 export function nextOccurrence(cls: OccurrenceClass, from: Date): Date | null {
-  const { h, m } = timeOfDay(cls.scheduled_at)
+  const { year, month, h, m } = classInfo(cls.scheduled_at)
 
   if (cls.is_recurring && cls.recurrence_day_of_week != null) {
-    // Scan the next two weeks for the matching weekday at/after `from`.
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i, h, m)
+    const monthStart = new Date(year, month, 1)
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59)
+    if (monthEnd < from) return null // the class's month has already passed
+    const lo = from > monthStart ? from : monthStart
+    // Scan within the class's month for the first matching weekday at/after `from`.
+    for (let i = 0; i <= 31; i++) {
+      const d = new Date(lo.getFullYear(), lo.getMonth(), lo.getDate() + i, h, m)
+      if (d > monthEnd) return null
       if (d.getDay() === cls.recurrence_day_of_week && d >= from) return d
     }
     return null
