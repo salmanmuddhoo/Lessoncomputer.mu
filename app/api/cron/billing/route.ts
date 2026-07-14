@@ -184,9 +184,10 @@ export async function GET(req: NextRequest) {
 
         results.push({ studentId: token.student_id, status: 'SUCCESS' })
       } else {
+        // Record the failure with its reason so admin & student can see why.
         await (admin as any)
           .from('mips_orders')
-          .update({ status: 'failed', updated_at: new Date().toISOString() })
+          .update({ status: 'failed', metadata: { env, claim: true, cron: true, failureReason: claimResult.reason }, updated_at: new Date().toISOString() })
           .eq('id', claimOrderId)
 
         if (['DECLINED', 'BLOCKED'].includes(claimResult.reason)) {
@@ -201,7 +202,7 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       await (admin as any)
         .from('mips_orders')
-        .update({ status: 'failed', updated_at: new Date().toISOString() })
+        .update({ status: 'failed', metadata: { env, claim: true, cron: true, failureReason: String(err) }, updated_at: new Date().toISOString() })
         .eq('id', claimOrderId)
       results.push({ studentId: token.student_id, status: 'error', reason: String(err) })
     }

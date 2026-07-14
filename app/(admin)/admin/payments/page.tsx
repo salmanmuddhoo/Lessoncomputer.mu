@@ -17,6 +17,7 @@ interface MipsOrder {
   mips_transaction_id: string | null
   is_recurring: boolean
   created_at: string
+  metadata?: { failureReason?: string } | null
   studentName?: string | null
 }
 
@@ -33,7 +34,7 @@ export default async function AdminPaymentsPage() {
 
   const { data: ordersRaw, error: ordersError } = await (supabase as any)
     .from('mips_orders')
-    .select('id, student_id, order_type, amount, currency, description, status, mips_transaction_id, is_recurring, created_at')
+    .select('id, student_id, order_type, amount, currency, description, status, mips_transaction_id, is_recurring, created_at, metadata')
     .order('created_at', { ascending: false })
     .limit(200)
 

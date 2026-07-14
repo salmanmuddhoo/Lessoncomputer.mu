@@ -14,6 +14,7 @@ interface MipsOrder {
   mips_transaction_id: string | null
   is_recurring: boolean
   created_at: string
+  metadata?: { failureReason?: string } | null
   studentName?: string | null
 }
 
@@ -105,6 +106,9 @@ export function PaymentsTable({ initialOrders }: { initialOrders: MipsOrder[] })
                       <StatusIcon className="w-3 h-3" />
                       {cfg.label}
                     </span>
+                    {order.status === 'failed' && order.metadata?.failureReason && (
+                      <p className="text-[11px] text-red-500 mt-1 max-w-[160px]">{order.metadata.failureReason}</p>
+                    )}
                   </td>
                   <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
                     {order.mips_transaction_id ?? '—'}
