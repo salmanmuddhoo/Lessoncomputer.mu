@@ -109,14 +109,14 @@ function Chip({ occ }: { occ: Occ }) {
   return (
     <button
       onClick={() => openMeet(occ.cls.meet_url)}
-      title={`${occ.cls.title} · ${timeLabel(occ)}${occ.cls.grade ? ' · ' + occ.cls.grade.name : ''}`}
+      title={`${occ.cls.grade?.name ?? 'Live class'} · ${timeLabel(occ)}${occ.cls.title ? ' · ' + occ.cls.title : ''}`}
       className={`w-full flex items-center gap-1 px-1.5 py-1 rounded text-left text-[11px] leading-tight ${
         occ.cls.meet_url ? 'hover:bg-muted/60 cursor-pointer' : 'cursor-default'
       } ${occ.cls.is_published === false ? 'opacity-50' : ''}`}
     >
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
       <span className="font-medium shrink-0">{format(occ.start, 'h:mm')}</span>
-      <span className="truncate text-muted-foreground">{occ.cls.title}</span>
+      <span className="truncate" style={{ color }}>{occ.cls.grade?.name ?? 'Live class'}</span>
     </button>
   )
 }
@@ -188,12 +188,12 @@ function DayView({ cursor, byDay }: { cursor: Date; byDay: Map<string, Occ[]> })
         <div key={i} className="flex items-center gap-4 px-4 py-3">
           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: o.cls.grade?.color ?? '#888' }} />
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm truncate">{o.cls.title}</p>
-            <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> {timeLabel(o)}</span>
-              {o.cls.grade && <span>· {o.cls.grade.name}</span>}
-              {o.cls.is_published === false && <span className="text-amber-600">· Draft</span>}
+            <p className="font-semibold text-sm flex items-center gap-2 flex-wrap">
+              <span style={{ color: o.cls.grade?.color ?? undefined }}>{o.cls.grade?.name ?? 'Live class'}</span>
+              <span className="inline-flex items-center gap-1 text-muted-foreground font-normal"><Clock className="w-3 h-3" /> {timeLabel(o)}</span>
+              {o.cls.is_published === false && <span className="text-amber-600 font-normal">· Draft</span>}
             </p>
+            {o.cls.title && <p className="text-xs text-muted-foreground truncate">{o.cls.title}</p>}
           </div>
           {o.cls.meet_url && (
             <Button size="sm" variant="outline" onClick={() => openMeet(o.cls.meet_url)}>
