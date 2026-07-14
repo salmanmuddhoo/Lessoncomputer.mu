@@ -36,7 +36,7 @@ export default async function GradesPage() {
           Select your grade to access video lessons and live classes tailored to the Mauritian curriculum.
         </p>
       </div>
-      <GradesSection grades={grades ?? undefined} />
+      <GradesSection grades={grades ?? undefined} embedded />
     </div>
   )
 }
