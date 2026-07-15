@@ -76,22 +76,26 @@ export default async function StudentSubscriptionsPage() {
   function canResubscribeLive(sub: any): boolean {
     if (sub.subscription_type !== 'live') return false
     if (sub.is_recurring) return false
+    // If another month is already recurring (e.g. next month was auto-renewed),
+    // there's nothing to restore — the subscription is already active going forward.
+    if (latestLiveRecurringId) return false
     // Only show re-subscribe for current/upcoming periods, not expired past months
     if (sub.valid_until && sub.valid_until < today) return false
     return true
   }
 
-  // Deduplicate: when multiple subscriptions share the same order, only the first
-  // card for that orderId shows the Receipt button (not one button per subscription)
-  const seenOrderIds = new Set<string>()
-  const dedupedOrderIds = activeSubs.map((sub: any) => {
+  // Each paid order shows its Receipt once, on its MOST CURRENT month (latest valid_until),
+  // so renewing next month never hides the current month's receipt. Separate orders
+  // (e.g. the initial purchase vs. a cron renewal) each keep their own receipt.
+  const receiptForSub = new Map<string, string>()
+  const seenReceiptOrders = new Set<string>()
+  for (const sub of [...activeSubs].sort((a: any, b: any) => String(b.valid_until ?? '').localeCompare(String(a.valid_until ?? '')))) {
     const orderId = findOrderId(sub.package_id)
-    if (orderId && !seenOrderIds.has(orderId)) {
-      seenOrderIds.add(orderId)
-      return orderId
+    if (orderId && !seenReceiptOrders.has(orderId)) {
+      seenReceiptOrders.add(orderId)
+      receiptForSub.set(sub.id, orderId)
     }
-    return null
-  })
+  }
 
   return (
     <div>
@@ -141,7 +145,7 @@ export default async function StudentSubscriptionsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {activeSubs.map((sub: any, i: number) => (
+          {activeSubs.map((sub: any) => (
             <SubscriptionCard
               key={sub.id}
               id={sub.id}
@@ -153,7 +157,7 @@ export default async function StudentSubscriptionsPage() {
               gradeSlug={sub.package?.grade?.slug ?? null}
               purchasedAt={sub.purchased_at}
               pkg={sub.package}
-              orderId={dedupedOrderIds[i] ?? null}
+              orderId={receiptForSub.get(sub.id) ?? null}
             />
           ))}
         </div>
