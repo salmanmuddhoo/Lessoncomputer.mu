@@ -18,18 +18,17 @@ export async function GET(req: NextRequest) {
   // Use service-role for all DB operations — no user session in cron context
   const admin = createServiceRoleClient()
 
-  // Bill on the configured day AND hour, in Mauritius time (UTC+4, no DST).
-  // The Vercel cron runs hourly (see vercel.json); this gate decides the exact hour.
-  const { billingDay, billingHour } = await getBillingSettings(admin)
+  // Bill on the configured day, in Mauritius time (UTC+4, no DST). The Vercel cron
+  // runs once daily (Hobby plan); this gate decides the day.
+  const { billingDay } = await getBillingSettings(admin)
   const mu = new Date(Date.now() + 4 * 60 * 60 * 1000) // shift so UTC getters read Mauritius wall-clock
   const today = mu.getUTCDate()
-  const hour = mu.getUTCHours()
   // Last day of the (Mauritius) month — so a billing_day of 29/30/31 still fires in
   // shorter months (e.g. billing_day 31 charges on 28 Feb).
   const daysInMonth = new Date(Date.UTC(mu.getUTCFullYear(), mu.getUTCMonth() + 1, 0)).getUTCDate()
   const effectiveBillingDay = Math.min(billingDay, daysInMonth)
-  if (today !== effectiveBillingDay || hour !== billingHour) {
-    return NextResponse.json({ ok: true, skipped: true, reason: `Mauritius day ${today} ${hour}:00; billing on day ${billingDay} (eff ${effectiveBillingDay}) at ${billingHour}:00` })
+  if (today !== effectiveBillingDay) {
+    return NextResponse.json({ ok: true, skipped: true, reason: `Mauritius day ${today}; billing on day ${billingDay} (eff ${effectiveBillingDay})` })
   }
 
   // Determine next month — the period students are paying for today
