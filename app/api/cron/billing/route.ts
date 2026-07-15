@@ -190,13 +190,13 @@ export async function GET(req: NextRequest) {
             valid_until:       validUntil,
           }, { onConflict: 'student_id,package_id' })
 
-        // Previous months' live subscriptions are no longer the active recurring one —
-        // clear is_recurring so MIPS only charges against the latest token/subscription.
+        // Previous months are no longer the active recurring one — clear is_recurring on
+        // every other recurring row (only live subs are ever recurring, so no need to
+        // filter by subscription_type, which may be inconsistent on older rows).
         await (admin as any)
           .from('student_subscriptions')
           .update({ is_recurring: false, updated_at: new Date().toISOString() })
           .eq('student_id', token.student_id)
-          .eq('subscription_type', 'live')
           .eq('is_recurring', true)
           .neq('package_id', nextPkg.id)
 

@@ -152,14 +152,14 @@ export async function POST(req: NextRequest) {
         return imn('fail')
       }
 
-      // If this order includes a recurring live purchase, clear is_recurring on all previous live
-      // subscriptions so only the latest one triggers future billing cron charges.
+      // If this order includes a recurring live purchase, clear is_recurring on every other
+      // recurring subscription so only the latest one triggers future billing cron charges.
+      // (Only live subs are ever recurring, so no subscription_type filter is needed.)
       if (order.is_recurring && (order.order_type === 'live' || order.order_type === 'mixed')) {
         await (admin as any)
           .from('student_subscriptions')
           .update({ is_recurring: false, updated_at: new Date().toISOString() })
           .eq('student_id', order.student_id)
-          .eq('subscription_type', 'live')
           .eq('is_recurring', true)
           .not('package_id', 'in', `(${order.package_ids.join(',')})`)
       }
