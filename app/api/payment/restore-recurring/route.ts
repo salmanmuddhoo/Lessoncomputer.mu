@@ -25,23 +25,31 @@ export async function POST(req: NextRequest) {
     if (!sub) return NextResponse.json({ error: 'Subscription not found' }, { status: 404 })
     if (sub.is_recurring) return NextResponse.json({ ok: true }) // already recurring
 
-    const { data: token } = await (supabase as any)
+    // student_payment_tokens is admin-only under RLS, so read it with the service role.
+    // The token row persists even after a soft-cancel / billing-day cleanup deactivated it.
+    const admin = createServiceRoleClient()
+    const { data: token } = await (admin as any)
       .from('student_payment_tokens')
       .select('id')
       .eq('student_id', user.id)
-      .eq('is_active', true)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     if (!token) {
       return NextResponse.json(
-        { error: 'No active payment method on file. Please subscribe again from your grade page to set up recurring billing.' },
+        { error: 'No payment method on file. Please subscribe again from your grade page to set up recurring billing.' },
         { status: 400 }
       )
     }
 
-    // Students have no UPDATE policy on student_subscriptions — use the service role
-    // for the write (ownership + active token already verified above).
-    const admin = createServiceRoleClient()
+    // Re-activate the stored ODRP token (a billing-day cleanup may have deactivated it)
+    // and resume recurring. Both writes use the service role (RLS blocks the student).
+    await (admin as any)
+      .from('student_payment_tokens')
+      .update({ is_active: true, updated_at: new Date().toISOString() })
+      .eq('id', token.id)
+
     const { error: updateError } = await (admin as any)
       .from('student_subscriptions')
       .update({ is_recurring: true, updated_at: new Date().toISOString() })
