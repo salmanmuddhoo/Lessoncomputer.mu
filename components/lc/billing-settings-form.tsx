@@ -9,26 +9,36 @@ import { toast } from 'sonner'
 interface Props {
   initialBillingDay: number
   initialCutoffDay: number
+  initialBillingHour: number
 }
 
-export function BillingSettingsForm({ initialBillingDay, initialCutoffDay }: Props) {
+function hourLabel(h: number) {
+  const suffix = h < 12 ? 'AM' : 'PM'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:00 ${suffix}`
+}
+
+export function BillingSettingsForm({ initialBillingDay, initialCutoffDay, initialBillingHour }: Props) {
   const [billingDay, setBillingDay] = useState(String(initialBillingDay))
   const [cutoffDay, setCutoffDay]   = useState(String(initialCutoffDay))
+  const [billingHour, setBillingHour] = useState(String(initialBillingHour))
   const [saving, setSaving] = useState(false)
 
   async function save() {
     const bd = parseInt(billingDay, 10)
     const cd = parseInt(cutoffDay, 10)
+    const bh = parseInt(billingHour, 10)
     if (isNaN(bd) || bd < 1 || bd > 28) { toast.error('Billing day must be 1–28'); return }
     if (isNaN(cd) || cd < 1 || cd > 28) { toast.error('Cutoff day must be 1–28'); return }
     if (cd >= bd) { toast.error('Cutoff day must be before billing day'); return }
+    if (isNaN(bh) || bh < 0 || bh > 23) { toast.error('Billing time must be 0–23'); return }
 
     setSaving(true)
     try {
       const res = await fetch('/api/admin/billing-settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ billingDay: bd, cutoffDay: cd }),
+        body: JSON.stringify({ billingDay: bd, cutoffDay: cd, billingHour: bh }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Save failed'); return }
@@ -85,11 +95,30 @@ export function BillingSettingsForm({ initialBillingDay, initialCutoffDay }: Pro
         </div>
       </div>
 
+      <div className="space-y-1.5">
+        <Label htmlFor="billing-hour" className="text-sm">
+          Billing time (Mauritius)
+        </Label>
+        <select
+          id="billing-hour"
+          value={billingHour}
+          onChange={(e) => setBillingHour(e.target.value)}
+          className="w-full sm:w-48 h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"
+        >
+          {Array.from({ length: 24 }, (_, h) => (
+            <option key={h} value={h}>{hourLabel(h)}</option>
+          ))}
+        </select>
+        <p className="text-xs text-muted-foreground">
+          Hour of day (Mauritius time) when the recurring charge runs on the billing day.
+        </p>
+      </div>
+
       <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg p-3 space-y-1">
-        <p><strong>Example with cutoff {cutoffDay}, billing {billingDay}:</strong></p>
+        <p><strong>Example with cutoff {cutoffDay}, billing {billingDay} at {hourLabel(parseInt(billingHour, 10) || 0)}:</strong></p>
         <p>• On or before day {cutoffDay} → buy current month, immediate access</p>
         <p>• After day {cutoffDay} → buy next month, access from 1st of that month</p>
-        <p>• On day {billingDay} → recurring charge collected for next month</p>
+        <p>• On day {billingDay} at {hourLabel(parseInt(billingHour, 10) || 0)} → recurring charge collected for next month</p>
       </div>
 
       <Button onClick={save} disabled={saving} size="sm">

@@ -19,7 +19,7 @@ export default async function AdminSettingsPage() {
       .single(),
     (supabase as any)
       .from('site_settings')
-      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, whatsapp_group_url, billing_day, cutoff_day')
+      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, whatsapp_group_url, billing_day, cutoff_day, billing_hour')
       .eq('id', 1)
       .single(),
   ])
@@ -33,6 +33,7 @@ export default async function AdminSettingsPage() {
     whatsapp_group_url: string | null
     billing_day: number | null
     cutoff_day: number | null
+    billing_hour: number | null
   }
 
   return (
@@ -71,6 +72,7 @@ export default async function AdminSettingsPage() {
           <BillingSettingsForm
             initialBillingDay={ss.billing_day ?? 28}
             initialCutoffDay={ss.cutoff_day ?? 20}
+            initialBillingHour={ss.billing_hour ?? 6}
           />
         </div>
       </div>
