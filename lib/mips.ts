@@ -186,14 +186,24 @@ export async function claimMipsPayment(params: ClaimPaymentParams): Promise<Clai
   })
 
   const claimText = await response.text()
-  console.error('[mips] claim_payment_request response', { status: response.status, body: claimText.slice(0, 500) })
+  console.error('[mips] claim_payment_request response', { status: response.status, body: claimText.slice(0, 1000) })
 
   if (!response.ok) {
     throw new Error(`MIPS claim error ${response.status}: ${claimText}`)
   }
 
-  const data = JSON.parse(claimText) as { payment_status: string; Reason: string }
-  return { status: data.payment_status as ClaimPaymentResult['status'], reason: data.Reason }
+  // MIPS field names vary; read defensively and fall back to the raw body so the
+  // real outcome is always visible rather than silently becoming `undefined`.
+  let data: any = {}
+  try { data = JSON.parse(claimText) } catch { /* non-JSON response */ }
+  const rawStatus = String(
+    data.payment_status ?? data.status ?? data.transaction_status ?? data.operation_status ?? ''
+  ).toUpperCase()
+  const status = (rawStatus || 'UNKNOWN') as ClaimPaymentResult['status']
+  const reason = String(
+    data.Reason ?? data.reason ?? data.operation_details ?? data.message ?? claimText.slice(0, 400)
+  )
+  return { status, reason }
 }
 
 // ─── Cancel ODRP token ────────────────────────────────────────
