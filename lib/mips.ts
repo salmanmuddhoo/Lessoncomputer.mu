@@ -158,6 +158,8 @@ export async function claimMipsPayment(params: ClaimPaymentParams): Promise<Clai
   const baseUrl = getBaseUrl(env)
   const mipsOrderId = toMipsOrderId(orderId)
 
+  // Per MIPS docs, id_token is a TOP-LEVEL field (sibling of `order`), NOT inside
+  // `order`. Nesting it caused MIPS to ignore the token and return {"original_string":""}.
   const body = {
     authentify: {
       id_merchant:       creds.idMerchant,
@@ -169,8 +171,8 @@ export async function claimMipsPayment(params: ClaimPaymentParams): Promise<Clai
       id_order:  mipsOrderId,
       currency,
       amount,
-      id_token:  idToken,
     },
+    id_token: idToken,
   }
 
   console.error('[mips] CLAIM', `${baseUrl}/api/claim_payment_request`, {
