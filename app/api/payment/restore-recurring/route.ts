@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 
 // POST /api/payment/restore-recurring
 // Reverses a soft-cancel: sets is_recurring = true so the cron resumes billing
@@ -39,10 +39,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    await (supabase as any)
+    // Students have no UPDATE policy on student_subscriptions — use the service role
+    // for the write (ownership + active token already verified above).
+    const admin = createServiceRoleClient()
+    const { error: updateError } = await (admin as any)
       .from('student_subscriptions')
       .update({ is_recurring: true, updated_at: new Date().toISOString() })
       .eq('id', subscriptionId)
+
+    if (updateError) {
+      console.error('[payment/restore-recurring] update failed:', updateError)
+      return NextResponse.json({ error: updateError.message }, { status: 500 })
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
