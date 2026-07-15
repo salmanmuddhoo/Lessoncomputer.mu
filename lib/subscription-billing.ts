@@ -1,6 +1,7 @@
 export interface BillingSettings {
   billingDay: number
   cutoffDay: number
+  billingHour: number
 }
 
 export interface TargetMonth {
@@ -15,12 +16,13 @@ export interface TargetMonth {
 export async function getBillingSettings(supabase: any): Promise<BillingSettings> {
   const { data } = await supabase
     .from('site_settings')
-    .select('billing_day, cutoff_day')
+    .select('billing_day, cutoff_day, billing_hour')
     .eq('id', 1)
     .single()
   return {
-    billingDay: data?.billing_day ?? 28,
-    cutoffDay:  data?.cutoff_day  ?? 20,
+    billingDay:  data?.billing_day  ?? 28,
+    cutoffDay:   data?.cutoff_day   ?? 20,
+    billingHour: data?.billing_hour ?? 6,
   }
 }
 

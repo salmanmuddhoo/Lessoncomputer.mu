@@ -9,13 +9,16 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if ((profile as any)?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { billingDay, cutoffDay } = await req.json() as { billingDay: number; cutoffDay: number }
+  const { billingDay, cutoffDay, billingHour } = await req.json() as { billingDay: number; cutoffDay: number; billingHour?: number }
   if (!billingDay || !cutoffDay) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+
+  const hour = Number(billingHour ?? 6)
+  if (isNaN(hour) || hour < 0 || hour > 23) return NextResponse.json({ error: 'Billing hour must be 0–23' }, { status: 400 })
 
   const admin = createServiceRoleClient()
   const { error } = await (admin as any)
     .from('site_settings')
-    .update({ billing_day: billingDay, cutoff_day: cutoffDay, updated_at: new Date().toISOString() })
+    .update({ billing_day: billingDay, cutoff_day: cutoffDay, billing_hour: hour, updated_at: new Date().toISOString() })
     .eq('id', 1)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
