@@ -44,11 +44,15 @@ export async function GET(req: NextRequest) {
     .single()
   const env: MipsEnvironment = (settings?.mips_environment as MipsEnvironment) ?? 'test'
 
-  // Fetch all active tokens with student grade info (incl. the monthly live price)
-  const { data: tokensRaw } = await (admin as any)
+  // Fetch all active tokens. NOTE: student_payment_tokens.student_id → auth.users,
+  // so we do NOT embed profiles here (that cross-table embed can fail); grade/price
+  // are resolved with a separate lookup below.
+  const { data: tokensRaw, error: tokensError } = await (admin as any)
     .from('student_payment_tokens')
-    .select('id, student_id, id_token, max_amount, currency, profiles(grade_id, grade:grades(live_subscription_price))')
+    .select('id, student_id, id_token, max_amount, currency')
     .eq('is_active', true)
+
+  if (tokensError) console.error('[cron/billing] token fetch error:', tokensError)
 
   const tokens = (tokensRaw ?? []) as Array<{
     id: string
@@ -56,13 +60,26 @@ export async function GET(req: NextRequest) {
     id_token: string
     max_amount: number
     currency: string
-    profiles: { grade_id: string | null; grade: { live_subscription_price: number | null } | null } | null
   }>
+
+  // Resolve each student's grade + monthly live price in one lookup.
+  const tokenStudentIds = [...new Set(tokens.map((t) => t.student_id))]
+  const gradeByStudent = new Map<string, { gradeId: string | null; gradePrice: number }>()
+  if (tokenStudentIds.length > 0) {
+    const { data: profs } = await (admin as any)
+      .from('profiles')
+      .select('id, grade_id, grade:grades(live_subscription_price)')
+      .in('id', tokenStudentIds)
+    for (const p of (profs ?? []) as any[]) {
+      gradeByStudent.set(p.id, { gradeId: p.grade_id ?? null, gradePrice: Number(p.grade?.live_subscription_price ?? 0) })
+    }
+  }
 
   const results: Array<{ studentId: string; status: string; reason?: string }> = []
 
   for (const token of tokens) {
-    const gradeId = token.profiles?.grade_id
+    const studentInfo = gradeByStudent.get(token.student_id)
+    const gradeId = studentInfo?.gradeId
     if (!gradeId) {
       results.push({ studentId: token.student_id, status: 'skipped', reason: 'no grade' })
       continue
@@ -121,7 +138,7 @@ export async function GET(req: NextRequest) {
     // The live-month package's `price` column is 0 — the real monthly price lives on
     // the grade. Charge the grade's live_subscription_price, capped at what the student
     // authorised (token.max_amount); fall back to the token cap if the grade price is unset.
-    const gradePrice = Number(token.profiles?.grade?.live_subscription_price ?? 0)
+    const gradePrice = Number(studentInfo?.gradePrice ?? 0)
     const tokenMax = Number(token.max_amount ?? 0)
     const amount = gradePrice > 0 ? Math.min(gradePrice, tokenMax || gradePrice) : tokenMax
 
@@ -219,6 +236,8 @@ export async function GET(req: NextRequest) {
     success:   results.filter(r => r.status === 'SUCCESS').length,
     skipped:   results.filter(r => r.status === 'skipped').length,
     failed:    results.filter(r => !['SUCCESS', 'skipped'].includes(r.status)).length,
+    activeTokens: tokens.length,
+    tokensError: tokensError ? String(tokensError.message ?? tokensError) : null,
     billingDay,
     nextMonth,
     nextYear,
