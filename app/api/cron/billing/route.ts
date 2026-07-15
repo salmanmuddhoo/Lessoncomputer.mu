@@ -44,10 +44,10 @@ export async function GET(req: NextRequest) {
     .single()
   const env: MipsEnvironment = (settings?.mips_environment as MipsEnvironment) ?? 'test'
 
-  // Fetch all active tokens with student grade info
+  // Fetch all active tokens with student grade info (incl. the monthly live price)
   const { data: tokensRaw } = await (admin as any)
     .from('student_payment_tokens')
-    .select('id, student_id, id_token, max_amount, currency, profiles(grade_id)')
+    .select('id, student_id, id_token, max_amount, currency, profiles(grade_id, grade:grades(live_subscription_price))')
     .eq('is_active', true)
 
   const tokens = (tokensRaw ?? []) as Array<{
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     id_token: string
     max_amount: number
     currency: string
-    profiles: { grade_id: string | null } | null
+    profiles: { grade_id: string | null; grade: { live_subscription_price: number | null } | null } | null
   }>
 
   const results: Array<{ studentId: string; status: string; reason?: string }> = []
@@ -118,9 +118,15 @@ export async function GET(req: NextRequest) {
       continue
     }
 
-    const amount = Number(nextPkg.price)
-    if (amount > token.max_amount) {
-      results.push({ studentId: token.student_id, status: 'skipped', reason: `amount ${amount} > token max ${token.max_amount}` })
+    // The live-month package's `price` column is 0 — the real monthly price lives on
+    // the grade. Charge the grade's live_subscription_price, capped at what the student
+    // authorised (token.max_amount); fall back to the token cap if the grade price is unset.
+    const gradePrice = Number(token.profiles?.grade?.live_subscription_price ?? 0)
+    const tokenMax = Number(token.max_amount ?? 0)
+    const amount = gradePrice > 0 ? Math.min(gradePrice, tokenMax || gradePrice) : tokenMax
+
+    if (!amount || amount <= 0) {
+      results.push({ studentId: token.student_id, status: 'skipped', reason: `no recurring price (grade ${gradePrice}, token max ${tokenMax})` })
       continue
     }
 
