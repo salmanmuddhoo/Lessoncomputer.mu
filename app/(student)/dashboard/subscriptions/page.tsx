@@ -61,25 +61,24 @@ export default async function StudentSubscriptionsPage() {
     return order?.id ?? null
   }
 
-  // Only the latest live recurring subscription should show the cancel button.
-  // Past months are already over — cancelling them would have no effect.
-  const latestLiveRecurringId = activeSubs
-    .filter((s: any) => s.is_recurring && s.package?.month != null && s.package?.year != null)
-    .sort((a: any, b: any) =>
-      b.package.year !== a.package.year
-        ? b.package.year - a.package.year
-        : b.package.month - a.package.month
-    )[0]?.id ?? null
+  // Sort helper: latest month/year first.
+  const byLatestMonth = (a: any, b: any) =>
+    b.package.year !== a.package.year ? b.package.year - a.package.year : b.package.month - a.package.month
+
+  const liveSubs = activeSubs.filter((s: any) => s.subscription_type === 'live' && s.package?.month != null && s.package?.year != null)
+
+  // Only the latest live recurring subscription shows the Cancel button.
+  const latestLiveRecurringId = liveSubs.filter((s: any) => s.is_recurring).sort(byLatestMonth)[0]?.id ?? null
+  // The latest live subscription overall — the only one that can show Restore.
+  const latestLiveSubId = [...liveSubs].sort(byLatestMonth)[0]?.id ?? null
 
   const today = new Date().toISOString().split('T')[0]
 
+  // Restore only on the LATEST month, and only when it's the one that was cancelled
+  // (past months keep no recurring control — cancelling/restoring them is meaningless).
   function canResubscribeLive(sub: any): boolean {
-    if (sub.subscription_type !== 'live') return false
+    if (sub.id !== latestLiveSubId) return false
     if (sub.is_recurring) return false
-    // If another month is already recurring (e.g. next month was auto-renewed),
-    // there's nothing to restore — the subscription is already active going forward.
-    if (latestLiveRecurringId) return false
-    // Only show re-subscribe for current/upcoming periods, not expired past months
     if (sub.valid_until && sub.valid_until < today) return false
     return true
   }
