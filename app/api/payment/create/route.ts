@@ -25,6 +25,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // Guarantee a profiles row exists: mips_orders.student_id has an FK to profiles,
+    // so a user whose signup trigger never created their profile would otherwise fail
+    // the order insert with a foreign-key violation. Create it (from signup metadata)
+    // if missing; leave an existing profile untouched (ON CONFLICT DO NOTHING).
+    {
+      const meta = (user.user_metadata ?? {}) as { full_name?: string; grade_id?: string }
+      const profileAdmin = createServiceRoleClient()
+      const { error: profileError } = await (profileAdmin as any)
+        .from('profiles')
+        .upsert(
+          { id: user.id, full_name: meta.full_name ?? null, grade_id: meta.grade_id ?? null },
+          { onConflict: 'id', ignoreDuplicates: true }
+        )
+      if (profileError) console.error('[payment/create] ensure profile failed:', profileError)
+    }
+
     // Video packages are always one-off; only live subscriptions can be recurring
     const effectiveRecurring = (orderType === 'live' || orderType === 'mixed') ? isRecurring : false
 
