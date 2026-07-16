@@ -23,7 +23,7 @@ export default async function StudentDashboardPage() {
       .single(),
     (supabase as any)
       .from('student_subscriptions')
-      .select('package_id, is_recurring, subscription_type, package:subscription_packages(id, name, package_type, month, year, subscription_package_chapters(chapter_id))')
+      .select('package_id, is_recurring, subscription_type, valid_from, valid_until, package:subscription_packages(id, name, package_type, month, year, subscription_package_chapters(chapter_id))')
       .eq('student_id', user!.id)
       .eq('status', 'active'),
     (supabase as any)
@@ -40,7 +40,13 @@ export default async function StudentDashboardPage() {
   const subs = (subsRaw ?? []) as any[]
   const watchedSet = new Set((watchedRaw ?? []).map((w: any) => w.video_id))
 
-  const hasLive = subs.some((s) => s.is_recurring && (s.subscription_type === 'live' || s.package?.package_type === 'live_month'))
+  // Live access lasts for the paid month (valid_until), not only while recurring is on.
+  const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
+  const hasLive = subs.some((s) =>
+    (s.subscription_type === 'live' || s.package?.package_type === 'live_month') &&
+    (!s.valid_from || s.valid_from <= muToday) &&
+    (!s.valid_until || s.valid_until >= muToday)
+  )
   const hasAnyLivePkg = subs.some((s) => s.package?.package_type === 'live_month')
   const hasVideo = subs.some((s) => s.package && s.package.package_type !== 'live_month')
   const subscribedPackageIds = new Set(subs.map((s) => s.package_id).filter(Boolean))

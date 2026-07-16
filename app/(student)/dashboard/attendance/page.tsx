@@ -27,15 +27,20 @@ export default async function StudentAttendancePage() {
     )
   }
 
-  // Require an ACTIVE recurring live subscription (same gate as Live Classes)
+  // Access lasts for the paid month (valid_until), not only while recurring is on —
+  // a student who cancelled recurring keeps access to the month they already paid for.
   const { data: subs } = await supabase
     .from('student_subscriptions')
-    .select('is_recurring, subscription_type, package:subscription_packages(package_type)')
+    .select('is_recurring, subscription_type, valid_from, valid_until, package:subscription_packages(package_type)')
     .eq('student_id', user.id)
     .eq('status', 'active')
 
+  const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
   const hasRecurringLive = (subs ?? []).some(
-    (s: any) => s.is_recurring && (s.subscription_type === 'live' || s.package?.package_type === 'live_month')
+    (s: any) =>
+      (s.subscription_type === 'live' || s.package?.package_type === 'live_month') &&
+      (!s.valid_from || s.valid_from <= muToday) &&
+      (!s.valid_until || s.valid_until >= muToday)
   )
   if (!hasRecurringLive) {
     return (

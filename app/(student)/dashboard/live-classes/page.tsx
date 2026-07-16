@@ -88,7 +88,7 @@ export default async function StudentLiveClassesPage() {
       .order('name', { ascending: true }),
     supabase
       .from('student_subscriptions')
-      .select('package_id, purchased_at, is_recurring, subscription_type')
+      .select('package_id, purchased_at, is_recurring, subscription_type, valid_from, valid_until')
       .eq('student_id', user.id)
       .eq('status', 'active'),
     supabase
@@ -119,10 +119,15 @@ export default async function StudentLiveClassesPage() {
   )
   const isSubscribedCurrentMonth = currentMonthPkg ? subscribedPackageIds.has(currentMonthPkg.id) : false
 
-  // Access to live-class resources requires an ACTIVE recurring subscription.
-  // Without it, hide all resources and prompt the student to subscribe again.
+  // Access to live-class resources lasts for the paid month (valid_until), not only
+  // while recurring is on. A student who cancelled recurring keeps access to the
+  // month they already paid for; access ends when that month lapses.
+  const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
   const hasRecurringLive = (subs ?? []).some(
-    (s: any) => s.is_recurring && s.subscription_type === 'live'
+    (s: any) =>
+      s.subscription_type === 'live' &&
+      (!s.valid_from || s.valid_from <= muToday) &&
+      (!s.valid_until || s.valid_until >= muToday)
   )
 
   if (!hasRecurringLive) {
