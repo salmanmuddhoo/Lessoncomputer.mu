@@ -48,11 +48,15 @@ function useUnreadNotificationCount() {
     let active = true
     const supabase = createClient()
     async function fetchCount() {
-      const { count: c } = await (supabase as any)
+      // Fetch the unread rows and count them — more reliable than the exact/head count,
+      // which can come back null under some PostgREST/RLS configurations.
+      const { data, error } = await (supabase as any)
         .from('admin_notifications')
-        .select('id', { count: 'exact', head: true })
+        .select('id')
         .is('read_at', null)
-      if (active && typeof c === 'number') setCount(c)
+        .limit(1000)
+      if (error) { console.error('[admin-sidebar] unread count failed:', error.message); return }
+      if (active) setCount(Array.isArray(data) ? data.length : 0)
     }
     fetchCount()
     const interval = setInterval(fetchCount, 60_000)
