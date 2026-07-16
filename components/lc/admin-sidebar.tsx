@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ElementType } from 'react'
+import { useState, useEffect, type ElementType } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -39,7 +39,31 @@ const NAV: NavEntry[] = [
   { type: 'link', label: 'Testimonials', href: '/admin/testimonials', icon: MessageSquareQuote },
 ]
 
-function NavContent({ onNav }: { onNav?: () => void }) {
+// Unread admin notifications (e.g. subscription cancellations) shown as a badge on
+// the Messages menu. Refetches on navigation, window focus, and every 60s.
+function useUnreadNotificationCount() {
+  const [count, setCount] = useState(0)
+  const pathname = usePathname()
+  useEffect(() => {
+    let active = true
+    const supabase = createClient()
+    async function fetchCount() {
+      const { count: c } = await (supabase as any)
+        .from('admin_notifications')
+        .select('id', { count: 'exact', head: true })
+        .is('read_at', null)
+      if (active && typeof c === 'number') setCount(c)
+    }
+    fetchCount()
+    const interval = setInterval(fetchCount, 60_000)
+    const onFocus = () => fetchCount()
+    window.addEventListener('focus', onFocus)
+    return () => { active = false; clearInterval(interval); window.removeEventListener('focus', onFocus) }
+  }, [pathname])
+  return count
+}
+
+function NavContent({ onNav, unreadCount = 0 }: { onNav?: () => void; unreadCount?: number }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -82,7 +106,13 @@ function NavContent({ onNav }: { onNav?: () => void }) {
               >
                 <entry.icon className="w-4 h-4 shrink-0" />
                 {entry.label}
-                {isActive(entry.href, entry.exact) && <ChevronRight className="w-3 h-3 ml-auto" />}
+                {entry.href === '/admin/broadcasts' && unreadCount > 0 ? (
+                  <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                ) : isActive(entry.href, entry.exact) ? (
+                  <ChevronRight className="w-3 h-3 ml-auto" />
+                ) : null}
               </Link>
             )
           }
@@ -150,6 +180,7 @@ function NavContent({ onNav }: { onNav?: () => void }) {
 
 export function AdminSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const unreadCount = useUnreadNotificationCount()
 
   return (
     <>
@@ -159,7 +190,7 @@ export function AdminSidebar() {
           <Logo size="sm" onDark />
           <span className="text-xs text-muted-foreground mt-1 block">Admin Panel</span>
         </div>
-        <NavContent />
+        <NavContent unreadCount={unreadCount} />
       </aside>
 
       {/* ── Mobile top bar ── */}
@@ -167,10 +198,15 @@ export function AdminSidebar() {
         <Logo size="sm" onDark />
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-          aria-label="Open menu"
+          className="relative p-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          aria-label={unreadCount > 0 ? `Open menu (${unreadCount} unread)` : 'Open menu'}
         >
           <Menu className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -188,7 +224,7 @@ export function AdminSidebar() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <NavContent onNav={() => setMobileOpen(false)} />
+            <NavContent onNav={() => setMobileOpen(false)} unreadCount={unreadCount} />
           </aside>
         </div>
       )}
