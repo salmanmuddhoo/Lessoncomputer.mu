@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { BookOpen, ArrowRight, AlertTriangle } from 'lucide-react'
 import type { Metadata } from 'next'
 import { SubscriptionCard } from '@/components/lc/subscription-card'
+import { RetryPaymentButton } from '@/components/lc/retry-payment-button'
 
 export const metadata: Metadata = { title: 'My Subscriptions' }
 
@@ -43,7 +44,7 @@ export default async function StudentSubscriptionsPage() {
     // Failed recurring charges — so the student knows a payment didn't go through
     (supabase as any)
       .from('mips_orders')
-      .select('id, description, amount, currency, created_at, metadata')
+      .select('id, description, amount, currency, created_at, metadata, package_ids')
       .eq('student_id', user.id)
       .eq('status', 'failed')
       .eq('is_recurring', true)
@@ -53,7 +54,14 @@ export default async function StudentSubscriptionsPage() {
 
   const activeSubs = ((subsResult.data ?? []) as any[]).filter((s) => s.package_id && s.package)
   const paidOrders = (ordersResult.data ?? []) as { id: string; package_ids: string[] }[]
-  const failedOrders = (failedResult.data ?? []) as { id: string; description: string | null; amount: number; currency: string; created_at: string; metadata: { failureReason?: string } | null }[]
+  const allFailedOrders = (failedResult.data ?? []) as { id: string; description: string | null; amount: number; currency: string; created_at: string; metadata: ({ failureReason?: string; resolved?: boolean } | null); package_ids: string[] | null }[]
+
+  // Hide a failure once it's been resolved — either retried successfully or the student
+  // re-subscribed to that package (so an active subscription now covers it).
+  const activePackageIds = new Set(activeSubs.map((s) => s.package_id))
+  const failedOrders = allFailedOrders.filter(
+    (o) => !o.metadata?.resolved && !(o.package_ids ?? []).some((pid) => activePackageIds.has(pid))
+  )
 
   // For each subscription, find its most recent paid order
   function findOrderId(packageId: string): string | null {
@@ -111,8 +119,9 @@ export default async function StudentSubscriptionsPage() {
             <h2 className="font-semibold text-sm text-red-600 dark:text-red-400">Payment issue</h2>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            A recurring payment for your live classes could not be processed, so it was not renewed.
-            Re-subscribe from your grade page to regain access.
+            A recurring payment for your live classes could not be processed. If your card now
+            has sufficient funds, tap <span className="font-medium">Retry payment</span> to try
+            again — or re-subscribe from your grade page.
           </p>
           <div className="space-y-2">
             {failedOrders.map((o) => (
@@ -124,7 +133,10 @@ export default async function StudentSubscriptionsPage() {
                     {o.metadata?.failureReason ? ` · ${o.metadata.failureReason}` : ''}
                   </p>
                 </div>
-                <span className="font-semibold text-red-500 shrink-0">Failed · {o.currency} {Number(o.amount).toFixed(2)}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="font-semibold text-red-500">Failed · {o.currency} {Number(o.amount).toFixed(2)}</span>
+                  <RetryPaymentButton orderId={o.id} />
+                </div>
               </div>
             ))}
           </div>
