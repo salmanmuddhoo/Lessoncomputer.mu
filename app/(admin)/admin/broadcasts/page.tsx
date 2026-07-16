@@ -17,7 +17,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Loader2, Plus, Trash2, Megaphone, Users, Radio, Video, FolderOpen } from 'lucide-react'
+import { Loader2, Plus, Trash2, Megaphone, Users, Radio, Video, FolderOpen, Bell } from 'lucide-react'
 import { toast } from 'sonner'
 
 const AUDIENCE_LABELS: Record<string, { label: string; icon: React.ElementType; className: string }> = {
@@ -40,8 +40,11 @@ interface Broadcast {
   chapter: { title: string } | null
 }
 
+interface AdminNotification { id: string; message: string; created_at: string; type: string }
+
 export default function AdminBroadcastsPage() {
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
+  const [notifications, setNotifications] = useState<AdminNotification[]>([])
   const [grades, setGrades] = useState<Grade[]>([])
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,14 +63,21 @@ export default function AdminBroadcastsPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: bData }, { data: gData }] = await Promise.all([
+    const [{ data: bData }, { data: gData }, { data: nData }] = await Promise.all([
       (supabase as any)
         .from('broadcasts')
         .select('id, title, body, grade_id, chapter_id, target_audience, created_at, grade:grades(name, color), chapter:chapters(title)')
         .order('created_at', { ascending: false }),
       supabase.from('grades').select('id, name, color').eq('is_active', true).order('order_index'),
+      (supabase as any)
+        .from('admin_notifications')
+        .select('id, message, created_at, type')
+        .is('read_at', null)
+        .order('created_at', { ascending: false })
+        .limit(50),
     ])
     setBroadcasts((bData ?? []) as Broadcast[])
+    setNotifications((nData ?? []) as AdminNotification[])
     const gs = (gData ?? []) as Grade[]
     setGrades(gs)
     if (gs.length > 0 && !gradeId) setGradeId(gs[0].id)
@@ -105,6 +115,11 @@ export default function AdminBroadcastsPage() {
     }
     fetchChapters()
   }, [gradeId])
+
+  async function dismissNotification(id: string) {
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
+    await (supabase as any).from('admin_notifications').update({ read_at: new Date().toISOString() }).eq('id', id)
+  }
 
   function openNew() {
     setTitle('')
@@ -162,6 +177,35 @@ export default function AdminBroadcastsPage() {
           <Plus className="w-4 h-4 mr-1" /> New Message
         </Button>
       </div>
+
+      {/* System notifications (e.g. subscription cancellations) */}
+      {!loading && notifications.length > 0 && (
+        <div className="mb-8 rounded-xl border border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Bell className="w-4 h-4 text-amber-500 shrink-0" />
+            <h2 className="font-semibold text-sm">Notifications</h2>
+            <span className="text-xs text-muted-foreground">({notifications.length})</span>
+          </div>
+          <div className="space-y-2">
+            {notifications.map((n) => (
+              <div key={n.id} className="flex items-start justify-between gap-3 text-sm bg-background/60 rounded-lg px-3 py-2 border border-amber-200 dark:border-amber-900/40">
+                <div className="min-w-0">
+                  <p>{n.message}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {new Date(n.created_at).toLocaleString('en-MU', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => dismissNotification(n.id)}
+                  className="text-xs text-muted-foreground hover:text-foreground shrink-0 underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16">
