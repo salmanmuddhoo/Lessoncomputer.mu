@@ -182,8 +182,10 @@ export function BuySubscribeDialog({
           </DialogHeader>
 
           <div className="space-y-4 py-1 overflow-y-auto flex-1 min-h-0">
-            {/* Live subscription section */}
-            {liveSubscriptionEnabled && liveMonthPackageId && (
+            {/* Live subscription section — only when the dialog was opened from a live
+                "Subscribe" entry point (defaultMode='live'). Video entry points show
+                only video packages, and vice versa. */}
+            {defaultMode === 'live' && liveSubscriptionEnabled && liveMonthPackageId && (
               <div>
                 {isCurrentMonthSubscribed ? (
                   <div className="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-muted/20 opacity-60">
@@ -262,8 +264,9 @@ export function BuySubscribeDialog({
               </div>
             )}
 
-            {/* Video packages section */}
-            {videoPackages.length > 0 && (
+            {/* Video packages section — only when opened from a video entry point
+                (defaultMode='video'). Hidden for live "Subscribe" flows. */}
+            {defaultMode === 'video' && videoPackages.length > 0 && (
               <div>
                 {liveSubscriptionEnabled && (
                   <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
