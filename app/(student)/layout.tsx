@@ -38,20 +38,35 @@ export default async function StudentLayout({ children }: { children: React.Reac
   // trigger wasn't applied), backfill it here from the auth metadata. Uses the
   // service role so it works regardless of RLS, and is a no-op once populated.
   const meta = (user.user_metadata ?? {}) as { full_name?: string; grade_id?: string }
+  const noProfileRow = !profile
   const missingName = !userName && meta.full_name
   const missingGrade = !(profile as any)?.grade_id && meta.grade_id
-  if (profile && (missingName || missingGrade)) {
+  if (noProfileRow || missingName || missingGrade) {
     try {
       const admin = createServiceRoleClient()
-      const patch: Record<string, unknown> = {}
-      if (missingName) patch.full_name = meta.full_name
-      if (missingGrade) patch.grade_id = meta.grade_id
-      const { error } = await (admin as any).from('profiles').update(patch).eq('id', user.id)
-      if (!error) {
-        if (patch.full_name) userName = patch.full_name as string
-        if (patch.grade_id) {
-          const { data: g } = await (admin as any).from('grades').select('name').eq('id', patch.grade_id).single()
+      // Upsert so a user with no profiles row at all also gets one created (ON CONFLICT
+      // DO NOTHING preserves any values an existing row already has).
+      if (noProfileRow) {
+        await (admin as any).from('profiles').upsert(
+          { id: user.id, full_name: meta.full_name ?? null, grade_id: meta.grade_id ?? null },
+          { onConflict: 'id', ignoreDuplicates: true }
+        )
+        if (meta.full_name) userName = meta.full_name
+        if (meta.grade_id) {
+          const { data: g } = await (admin as any).from('grades').select('name').eq('id', meta.grade_id).single()
           gradeName = g?.name ?? gradeName
+        }
+      } else {
+        const patch: Record<string, unknown> = {}
+        if (missingName) patch.full_name = meta.full_name
+        if (missingGrade) patch.grade_id = meta.grade_id
+        const { error } = await (admin as any).from('profiles').update(patch).eq('id', user.id)
+        if (!error) {
+          if (patch.full_name) userName = patch.full_name as string
+          if (patch.grade_id) {
+            const { data: g } = await (admin as any).from('grades').select('name').eq('id', patch.grade_id).single()
+            gradeName = g?.name ?? gradeName
+          }
         }
       }
     } catch (e) {
