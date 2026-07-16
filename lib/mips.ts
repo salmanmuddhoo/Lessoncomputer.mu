@@ -116,7 +116,6 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
     status: response.status,
     statusText: response.statusText,
     body: responseText.slice(0, 500), // first 500 chars to avoid log bloat
-    headers: Object.fromEntries(response.headers.entries()),
   })
 
   if (!response.ok) {
@@ -301,14 +300,14 @@ export async function decryptImnCallback(
   }
 
   const parsed = JSON.parse(decryptText) as ImnTransactionDetails
-  // Log the full key structure (not truncated) so we can see where MIPS puts the
-  // ODRP token — the field name varies across MIPS environments/versions.
+  // Log only the (non-sensitive) key structure so we can see where MIPS puts the
+  // ODRP token — NEVER the values. The decrypted payload contains a reusable
+  // card-on-file token (id_token) and card_last_four_digit; logging it verbatim
+  // would leave chargeable credentials in the log sink.
   console.error('[mips] decrypt_imn_data ok', {
     status: response.status,
     keys: Object.keys(parsed),
-    id_token: parsed.id_token ?? null,
-    nested_token: parsed.token ?? null,
-    full: decryptText,
+    has_id_token: Boolean(parsed.id_token ?? parsed.token?.id_token),
   })
 
   return parsed
