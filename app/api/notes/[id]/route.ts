@@ -58,6 +58,13 @@ export async function GET(request: Request, { params }: RouteProps) {
     })
   }
 
+  // A deactivated (suspended) student loses access to content, even via a direct link.
+  const { data: prof } = await (supabase as any)
+    .from('profiles').select('is_active').eq('id', user.id).single()
+  if (prof?.is_active === false) {
+    return new NextResponse('This account is suspended.', { status: 403 })
+  }
+
   const { id } = await params
   const { searchParams } = new URL(request.url)
   const isLive = searchParams.get('live') === '1'

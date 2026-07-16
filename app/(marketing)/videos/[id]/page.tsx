@@ -68,10 +68,18 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  // A deactivated (suspended) student loses access to paid content, even via a direct
+  // link — treat them like a non-subscriber (free/demo content still shows).
+  let isActiveStudent = true
+  if (user) {
+    const { data: prof } = await supabase.from('profiles').select('is_active').eq('id', user.id).single()
+    isActiveStudent = (prof as any)?.is_active !== false
+  }
+
   let hasAccess = video.is_free || video.is_demo
   let pkgIds: string[] = []
 
-  if (user && video.chapter_id) {
+  if (user && isActiveStudent && video.chapter_id) {
     const today = new Date().toISOString().split('T')[0]
     const { data: subs } = await supabase
       .from('student_subscriptions')

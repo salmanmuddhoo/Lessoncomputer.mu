@@ -123,12 +123,22 @@ export default function AdminStudentsPage() {
   useEffect(() => { load() }, [])
 
   async function toggleActive(student: Student) {
-    const supabase = createClient()
     const newValue = !student.is_active
-    const { error } = await supabase.from('profiles').update({ is_active: newValue }).eq('id', student.id)
-    if (error) { toast.error(error.message); return }
-    toast.success(newValue ? 'Student activated' : 'Student deactivated')
-    load()
+    // Admins have no RLS policy to update another user's profile, so this goes through
+    // a service-role admin route instead of a direct client update (which silently no-ops).
+    try {
+      const res = await fetch('/api/admin/toggle-student-active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: student.id, isActive: newValue }),
+      })
+      const data = await res.json() as { ok?: boolean; error?: string }
+      if (!res.ok || !data.ok) { toast.error(data.error ?? 'Could not update the student.'); return }
+      toast.success(newValue ? 'Student activated' : 'Student deactivated')
+      load()
+    } catch {
+      toast.error('Network error. Please try again.')
+    }
   }
 
   async function deleteStudent(id: string, name: string | null) {
