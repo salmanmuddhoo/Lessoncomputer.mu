@@ -4,6 +4,14 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const pathname = request.nextUrl.pathname
+
+  // API routes authenticate themselves (each handler calls getUser and returns JSON
+  // errors). Running the auth/redirect logic here for them adds a network round-trip
+  // and, if getUser throws, can crash the request into an empty response. Pass through.
+  if (pathname.startsWith('/api')) {
+    return NextResponse.next({ request })
+  }
 
   // Pass through if Supabase is not yet configured (e.g. before env vars are set in Vercel)
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -29,8 +37,15 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const pathname = request.nextUrl.pathname
+  // Never let an auth/network hiccup here crash the whole request into an empty
+  // response — fall through as unauthenticated and let the page/route decide.
+  let user = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch (e) {
+    console.error('[middleware] getUser failed:', e)
+  }
 
   // Redirect unauthenticated users away from protected routes
   const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/admin')
