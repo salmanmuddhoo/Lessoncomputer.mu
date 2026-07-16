@@ -72,10 +72,16 @@ export async function POST(req: NextRequest) {
       return imn('fail')
     }
 
-    const checksumValid = verifyImnChecksum(details)
-    if (!checksumValid) {
-      console.error('[payment/callback] Checksum mismatch for order:', details.merchant_order_id)
-      // Log but don't block — some MIPS environments don't send checksum
+    // Integrity check. MIPS' checksum hashes amount+currency+status+ids+salt, so a
+    // valid checksum also proves the amount/status weren't tampered. Enforce it when
+    // present; some MIPS environments legitimately omit it, so only reject on mismatch.
+    if (details.checksum) {
+      if (!verifyImnChecksum(details)) {
+        console.error('[payment/callback] Checksum mismatch — rejecting order:', details.merchant_order_id)
+        return imn('fail')
+      }
+    } else {
+      console.error('[payment/callback] No checksum in callback (environment may omit it):', details.merchant_order_id)
     }
 
     // Look up by merchant_order_id (our toMipsOrderId value), not id_order (MIPS-generated)
@@ -156,12 +162,15 @@ export async function POST(req: NextRequest) {
       // recurring subscription so only the latest one triggers future billing cron charges.
       // (Only live subs are ever recurring, so no subscription_type filter is needed.)
       if (order.is_recurring && (order.order_type === 'live' || order.order_type === 'mixed')) {
-        await (admin as any)
-          .from('student_subscriptions')
-          .update({ is_recurring: false, updated_at: new Date().toISOString() })
-          .eq('student_id', order.student_id)
-          .eq('is_recurring', true)
-          .not('package_id', 'in', `(${order.package_ids.join(',')})`)
+        const validPkgIds = order.package_ids.filter((id) => typeof id === 'string' && id.trim())
+        if (validPkgIds.length) {
+          await (admin as any)
+            .from('student_subscriptions')
+            .update({ is_recurring: false, updated_at: new Date().toISOString() })
+            .eq('student_id', order.student_id)
+            .eq('is_recurring', true)
+            .not('package_id', 'in', `(${validPkgIds.join(',')})`)
+        }
       }
 
       await (admin as any)
@@ -183,7 +192,10 @@ export async function POST(req: NextRequest) {
             student_id:           order.student_id,
             id_token:             idToken,
             card_last_four_digit: details.card_last_four_digit ?? null,
-            max_amount:           order.metadata?.recurringAmount ?? Number(details.amount) / 100,
+            // recurringAmount is set server-side at order creation for every recurring
+            // order; the fallback stays in the same whole-rupee unit (no /100) so the
+            // per-claim cap is never accidentally set 100× too small.
+            max_amount:           order.metadata?.recurringAmount ?? Number(details.amount),
             currency:             details.currency,
             is_active:            true,
             source_order_id:      order.id,

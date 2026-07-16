@@ -13,15 +13,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json() as {
       orderType: 'video' | 'live' | 'mixed'
       packageIds: string[]
-      amount: number
+      amount?: number
       description: string
       isRecurring?: boolean
       liveAmount?: number
     }
 
-    const { orderType, packageIds, amount, description, isRecurring = false, liveAmount } = body
+    const { orderType, packageIds, description, isRecurring = false } = body
 
-    if (!orderType || !packageIds?.length || !amount) {
+    if (!orderType || !packageIds?.length) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -75,6 +75,51 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Authoritative server-side pricing ──────────────────────────────────
+    // NEVER trust the client's `amount`/`liveAmount`. Recompute from the real
+    // prices so a tampered request can't unlock content for less than it costs.
+    // Video packages use their own `price`; live_month packages are priced per
+    // grade via `grades.live_subscription_price` (their own price column is 0).
+    const { data: pricePkgs, error: priceErr } = await (supabase as any)
+      .from('subscription_packages')
+      .select('id, price, package_type, grade_id')
+      .in('id', packageIds)
+
+    if (priceErr || !pricePkgs || pricePkgs.length !== packageIds.length) {
+      return NextResponse.json({ error: 'Invalid packages selected' }, { status: 400 })
+    }
+
+    const liveGradeIds = Array.from(
+      new Set(pricePkgs.filter((p: any) => p.package_type === 'live_month').map((p: any) => p.grade_id).filter(Boolean))
+    )
+    let liveByGrade: Record<string, number> = {}
+    if (liveGradeIds.length) {
+      const { data: gradeRows } = await (supabase as any)
+        .from('grades')
+        .select('id, live_subscription_price')
+        .in('id', liveGradeIds)
+      liveByGrade = Object.fromEntries(
+        (gradeRows ?? []).map((g: any) => [g.id, Number(g.live_subscription_price) || 0])
+      )
+    }
+
+    let amount = 0
+    let serverLiveAmount: number | null = null
+    for (const p of pricePkgs as any[]) {
+      if (p.package_type === 'live_month') {
+        const monthPrice = liveByGrade[p.grade_id] ?? 0
+        amount += monthPrice
+        serverLiveAmount = monthPrice // single-month live price (uniform per grade)
+      } else {
+        amount += Number(p.price) || 0
+      }
+    }
+    amount = Math.round(amount * 100) / 100 // guard float drift on numeric(10,2)
+
+    if (amount <= 0) {
+      return NextResponse.json({ error: 'Selected packages have no price configured' }, { status: 400 })
+    }
+
     // Read MIPS environment from site_settings
     const { data: settings } = await (supabase as any)
       .from('site_settings')
@@ -95,7 +140,7 @@ export async function POST(req: NextRequest) {
         currency:    'MUR',
         description,
         status:      'pending',
-        metadata:    { env, recurringAmount: effectiveRecurring ? (liveAmount ?? null) : null },
+        metadata:    { env, recurringAmount: effectiveRecurring ? serverLiveAmount : null },
       })
       .select('id')
       .single()
@@ -103,40 +148,33 @@ export async function POST(req: NextRequest) {
     if (orderError || !order) {
       const msg = orderError?.message ?? 'unknown'
       console.error('[payment/create] Failed to create order:', msg)
-      // Only flag a missing migration when the table itself is absent — NOT for
-      // constraint violations (whose message also contains the word "relation").
-      if (msg.includes('mips_orders') && msg.includes('does not exist')) {
-        return NextResponse.json(
-          { error: 'Database migration 024 not applied. Run the migration in Supabase SQL Editor.' },
-          { status: 500 }
-        )
-      }
-      return NextResponse.json({ error: `Failed to create order: ${msg}` }, { status: 500 })
+      return NextResponse.json({ error: 'Could not start payment. Please try again.' }, { status: 500 })
     }
 
     const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_SITE_URL ?? ''
     const orderId = (order as { id: string }).id
 
-    // Debug: confirm env vars are present (lengths only, never log values)
-    console.error('[payment/create] env check', {
-      MIPS_ID_MERCHANT:        process.env.MIPS_ID_MERCHANT        ? `set(${process.env.MIPS_ID_MERCHANT.length})`        : 'MISSING',
-      MIPS_ID_ENTITY:          process.env.MIPS_ID_ENTITY          ? `set(${process.env.MIPS_ID_ENTITY.length})`          : 'MISSING',
-      MIPS_ID_OPERATOR:        process.env.MIPS_ID_OPERATOR        ? `set(${process.env.MIPS_ID_OPERATOR.length})`        : 'MISSING',
-      MIPS_OPERATOR_PASSWORD:  process.env.MIPS_OPERATOR_PASSWORD  ? `set(${process.env.MIPS_OPERATOR_PASSWORD.length})`  : 'MISSING',
-      MIPS_AUTH_USERNAME:      process.env.MIPS_AUTH_USERNAME      ? `set(${process.env.MIPS_AUTH_USERNAME.length})`      : 'MISSING',
-      MIPS_AUTH_PASSWORD:      process.env.MIPS_AUTH_PASSWORD      ? `set(${process.env.MIPS_AUTH_PASSWORD.length})`      : 'MISSING',
-      MIPS_HASH_SALT:          process.env.MIPS_HASH_SALT          ? `set(${process.env.MIPS_HASH_SALT.length})`          : 'MISSING',
-      MIPS_CIPHER_KEY:         process.env.MIPS_CIPHER_KEY         ? `set(${process.env.MIPS_CIPHER_KEY.length})`         : 'MISSING',
-      NEXT_PUBLIC_SITE_URL:    process.env.NEXT_PUBLIC_SITE_URL    ?? 'MISSING',
-      notificationUrl: `${(process.env.NEXT_PUBLIC_SITE_URL ?? origin).replace(/\/$/, '')}/api/payment/callback`,
-      env,
-    })
+    // Debug: confirm env vars are present (lengths only, never values). Off by default.
+    if (process.env.DEBUG_PAYMENTS === 'true') {
+      console.error('[payment/create] env check', {
+        MIPS_ID_MERCHANT:        process.env.MIPS_ID_MERCHANT        ? `set(${process.env.MIPS_ID_MERCHANT.length})`        : 'MISSING',
+        MIPS_ID_ENTITY:          process.env.MIPS_ID_ENTITY          ? `set(${process.env.MIPS_ID_ENTITY.length})`          : 'MISSING',
+        MIPS_ID_OPERATOR:        process.env.MIPS_ID_OPERATOR        ? `set(${process.env.MIPS_ID_OPERATOR.length})`        : 'MISSING',
+        MIPS_OPERATOR_PASSWORD:  process.env.MIPS_OPERATOR_PASSWORD  ? `set(${process.env.MIPS_OPERATOR_PASSWORD.length})`  : 'MISSING',
+        MIPS_AUTH_USERNAME:      process.env.MIPS_AUTH_USERNAME      ? `set(${process.env.MIPS_AUTH_USERNAME.length})`      : 'MISSING',
+        MIPS_AUTH_PASSWORD:      process.env.MIPS_AUTH_PASSWORD      ? `set(${process.env.MIPS_AUTH_PASSWORD.length})`      : 'MISSING',
+        MIPS_HASH_SALT:          process.env.MIPS_HASH_SALT          ? `set(${process.env.MIPS_HASH_SALT.length})`          : 'MISSING',
+        MIPS_CIPHER_KEY:         process.env.MIPS_CIPHER_KEY         ? `set(${process.env.MIPS_CIPHER_KEY.length})`         : 'MISSING',
+        NEXT_PUBLIC_SITE_URL:    process.env.NEXT_PUBLIC_SITE_URL    ?? 'MISSING',
+        env,
+      })
+    }
 
     // For recurring live subscriptions, use ODRP mode to tokenize the card so
     // future months can be claimed server-side without the student re-entering details.
-    // Use liveAmount (monthly live price) for maxAmountPerClaim, not the full order total
-    // which may include one-time video packages or past months.
-    const recurringMonthlyAmount = liveAmount ?? amount
+    // Use the server-computed monthly live price for maxAmountPerClaim, not the full
+    // order total which may include one-time video packages or past months.
+    const recurringMonthlyAmount = serverLiveAmount ?? amount
     const odrpParams = effectiveRecurring ? {
       maxAmountTotal:    recurringMonthlyAmount * 24,  // up to 24 months total
       maxAmountPerClaim: recurringMonthlyAmount,
@@ -166,8 +204,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ paymentUrl: result.paymentUrl })
   } catch (err) {
-    const msg = String(err)
-    console.error('[payment/create]', msg)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    console.error('[payment/create]', err)
+    return NextResponse.json({ error: 'Could not start payment. Please try again.' }, { status: 500 })
   }
 }

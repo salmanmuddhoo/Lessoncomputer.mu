@@ -29,6 +29,24 @@ const LOGIN_HTML = `<!DOCTYPE html>
 </body>
 </html>`
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function sanitiseHtml(raw: string): string {
+  // Strip embedded scripts/styles/links so stored content can't run JS or override
+  // the page. Inline formatting is preserved.
+  const bodyContent = raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? raw
+  return bodyContent
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<link[^>]*>/gi, '')
+}
+
 export async function GET(request: Request, { params }: RouteProps) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -44,9 +62,11 @@ export async function GET(request: Request, { params }: RouteProps) {
   const { searchParams } = new URL(request.url)
   const isLive = searchParams.get('live') === '1'
 
+  // RLS (student_read_revision_notes) already restricts this row to students with an
+  // active subscription covering the note's chapter — a non-subscriber gets no row.
   const { data: note } = await (supabase as any)
     .from('revision_notes')
-    .select('title, content, content_live')
+    .select('title, content, content_live, is_published, is_published_for_live')
     .eq('id', id)
     .single()
 
@@ -54,18 +74,26 @@ export async function GET(request: Request, { params }: RouteProps) {
     return new NextResponse('Not found', { status: 404 })
   }
 
-  const html = isLive ? (note.content_live || note.content) : note.content
+  // Only serve content that is actually published in the requested mode.
+  const publishedInMode = isLive ? note.is_published_for_live : note.is_published
+  if (!publishedInMode) {
+    return new NextResponse('Not found', { status: 404 })
+  }
 
-  if (!html) {
+  const rawHtml = isLive ? (note.content_live || note.content) : note.content
+
+  if (!rawHtml) {
     return new NextResponse('No content', { status: 404 })
   }
+
+  const html = sanitiseHtml(rawHtml)
 
   const page = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${note.title}</title>
+  <title>${escapeHtml(note.title ?? '')}</title>
   <style>
     body {
       font-family: system-ui, -apple-system, sans-serif;
@@ -92,7 +120,7 @@ export async function GET(request: Request, { params }: RouteProps) {
   </style>
 </head>
 <body>
-  <h1>${note.title}</h1>
+  <h1>${escapeHtml(note.title ?? '')}</h1>
   ${html}
 </body>
 </html>`

@@ -4,10 +4,23 @@ import { claimMipsPayment, toMipsOrderId, type MipsEnvironment } from '@/lib/mip
 import { getBillingSettings, getMonthDateRange } from '@/lib/subscription-billing'
 import crypto from 'crypto'
 
+// Allow up to 5 minutes — the loop charges cards sequentially via MIPS.
+export const maxDuration = 300
+export const dynamic = 'force-dynamic'
+
+// Deterministic, idempotent order id for a given student + package + billing period.
+// Re-deriving the same id means a duplicate/overlapping cron run tries to INSERT the
+// same primary key, hits a unique violation, and is skipped instead of charging twice.
+function periodOrderId(studentId: string, packageId: string, year: number, month: number): string {
+  const h = crypto.createHash('sha256').update(`${studentId}:${packageId}:${year}-${month}`).digest('hex')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`
+}
+
 // GET /api/cron/billing
-// Runs on the 28th of each month (see vercel.json).
-// For every student with an active ODRP token, claims payment for the NEXT
-// month's live package so access is granted before the new month begins.
+// The Vercel cron runs once daily (Hobby plan); this route bills on the configured
+// billing day (Mauritius time) AND on any later day of the month for students not yet
+// billed, so a single failed/missed run no longer skips the whole month. Charging is
+// idempotent per student+package+month (see periodOrderId), so re-runs never double-charge.
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   const expectedSecret = process.env.CRON_SECRET
@@ -27,8 +40,11 @@ export async function GET(req: NextRequest) {
   // shorter months (e.g. billing_day 31 charges on 28 Feb).
   const daysInMonth = new Date(Date.UTC(mu.getUTCFullYear(), mu.getUTCMonth() + 1, 0)).getUTCDate()
   const effectiveBillingDay = Math.min(billingDay, daysInMonth)
-  if (today !== effectiveBillingDay) {
-    return NextResponse.json({ ok: true, skipped: true, reason: `Mauritius day ${today}; billing on day ${billingDay} (eff ${effectiveBillingDay})` })
+  // Run on the billing day OR any later day of the month (self-healing: a missed/failed
+  // run on the exact day is picked up on subsequent days). Idempotency prevents re-charging
+  // students who were already billed this cycle.
+  if (today < effectiveBillingDay) {
+    return NextResponse.json({ ok: true, skipped: true, reason: `Mauritius day ${today}; billing from day ${billingDay} (eff ${effectiveBillingDay})` })
   }
 
   // Determine next month — the period students are paying for today
@@ -147,7 +163,10 @@ export async function GET(req: NextRequest) {
       continue
     }
 
-    const claimOrderId = crypto.randomUUID()
+    // Idempotent per student+package+month: a duplicate/overlapping run derives the
+    // same id and the INSERT fails with a unique violation, so we skip instead of
+    // charging the card a second time.
+    const claimOrderId = periodOrderId(token.student_id, nextPkg.id, nextYear, nextMonth)
     const { error: orderError } = await (admin as any)
       .from('mips_orders')
       .insert({
@@ -164,7 +183,13 @@ export async function GET(req: NextRequest) {
       })
 
     if (orderError) {
-      results.push({ studentId: token.student_id, status: 'error', reason: orderError.message })
+      // 23505 = unique_violation → this student+package+month was already processed
+      // by an earlier/overlapping run. Skip to avoid a double charge.
+      if ((orderError as any).code === '23505') {
+        results.push({ studentId: token.student_id, status: 'skipped', reason: 'already processed this period' })
+      } else {
+        results.push({ studentId: token.student_id, status: 'error', reason: orderError.message })
+      }
       continue
     }
 
@@ -231,11 +256,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const success = results.filter(r => r.status === 'SUCCESS').length
+  const failed  = results.filter(r => !['SUCCESS', 'skipped'].includes(r.status)).length
   const summary = {
     processed: results.length,
-    success:   results.filter(r => r.status === 'SUCCESS').length,
+    success,
     skipped:   results.filter(r => r.status === 'skipped').length,
-    failed:    results.filter(r => !['SUCCESS', 'skipped'].includes(r.status)).length,
+    failed,
     activeTokens: tokens.length,
     tokensError: tokensError ? String(tokensError.message ?? tokensError) : null,
     billingDay,
@@ -246,5 +273,14 @@ export async function GET(req: NextRequest) {
   }
 
   console.log('[cron/billing]', summary, results)
+
+  // Surface systemic failures as a non-2xx status so Vercel Cron alerting fires.
+  // A total wipe-out (couldn't even read tokens, or every charge attempt failed) is a
+  // real incident; isolated declines among successes are normal and stay 200.
+  const attempted = success + failed
+  const hardFailure = Boolean(tokensError) || (attempted > 0 && success === 0)
+  if (hardFailure) {
+    return NextResponse.json({ ok: false, ...summary, results }, { status: 500 })
+  }
   return NextResponse.json({ ok: true, ...summary, results })
 }

@@ -33,12 +33,12 @@ export async function POST(req: NextRequest) {
 
     if (updateError) {
       console.error('[payment/cancel-recurring] update failed:', updateError)
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Could not cancel recurring billing. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[payment/cancel-recurring]', err)
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    return NextResponse.json({ error: 'Could not cancel recurring billing. Please try again.' }, { status: 500 })
   }
 }
