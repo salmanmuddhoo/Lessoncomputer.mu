@@ -177,8 +177,12 @@ export default async function GradePage({ params }: PageProps) {
           isLiveSubscribed = true
           subscribedLivePackageIds.push(s.package_id)
         }
-        if (pastLiveIds.has(s.package_id)) subscribedLivePackageIds.push(s.package_id)
       }
+
+      // A past live month the student already PAID for must not be offered for
+      // re-purchase in "Also add past months" — this is independent of the date gate
+      // (a past month's access window has closed, so it is not "accessible" today).
+      if (pastLiveIds.has(s.package_id)) subscribedLivePackageIds.push(s.package_id)
 
       // Track next month subscription (accessible or upcoming)
       if (nextMonthLivePackage && s.package_id === (nextMonthLivePackage as any).id) {
