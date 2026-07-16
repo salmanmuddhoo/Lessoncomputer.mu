@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { StudentSidebar } from '@/components/lc/student-sidebar'
 import { WhatsAppButton } from '@/components/lc/whatsapp-button'
 
@@ -12,7 +12,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
   const [{ data: profile }, { data: subs }, { data: siteSettingsRaw }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('role, full_name, grade:grades(name)')
+      .select('role, full_name, grade_id, grade:grades(name)')
       .eq('id', user.id)
       .single(),
     supabase
@@ -30,7 +30,35 @@ export default async function StudentLayout({ children }: { children: React.Reac
   // Redirect admins to the admin panel
   if (profile?.role === 'admin') redirect('/admin')
 
-  const gradeName = (profile?.grade as { name: string } | null)?.name ?? null
+  let userName = (profile as any)?.full_name ?? null
+  let gradeName = (profile?.grade as { name: string } | null)?.name ?? null
+
+  // Safety net: if the name/grade captured at signup never landed on the profile
+  // (e.g. the confirmation-email redirect skipped /api/auth/callback, or the DB
+  // trigger wasn't applied), backfill it here from the auth metadata. Uses the
+  // service role so it works regardless of RLS, and is a no-op once populated.
+  const meta = (user.user_metadata ?? {}) as { full_name?: string; grade_id?: string }
+  const missingName = !userName && meta.full_name
+  const missingGrade = !(profile as any)?.grade_id && meta.grade_id
+  if (profile && (missingName || missingGrade)) {
+    try {
+      const admin = createServiceRoleClient()
+      const patch: Record<string, unknown> = {}
+      if (missingName) patch.full_name = meta.full_name
+      if (missingGrade) patch.grade_id = meta.grade_id
+      const { error } = await (admin as any).from('profiles').update(patch).eq('id', user.id)
+      if (!error) {
+        if (patch.full_name) userName = patch.full_name as string
+        if (patch.grade_id) {
+          const { data: g } = await (admin as any).from('grades').select('name').eq('id', patch.grade_id).single()
+          gradeName = g?.name ?? gradeName
+        }
+      }
+    } catch (e) {
+      console.error('[student/layout] profile backfill failed:', e)
+    }
+  }
+
   const whatsappNumber = (siteSettingsRaw as any)?.whatsapp_number ?? null
 
   // Live-class resources require an ONGOING recurring subscription. Once a student
@@ -46,7 +74,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
   return (
     <div className="flex bg-background h-screen overflow-hidden">
       <StudentSidebar
-        userName={profile?.full_name}
+        userName={userName}
         gradeName={gradeName}
         hasLiveSubscription={hasLiveSubscription}
         hasVideoSubscription={hasVideoSubscription}
