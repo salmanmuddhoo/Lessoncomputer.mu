@@ -90,6 +90,25 @@ export default async function StudentLayout({ children }: { children: React.Reac
     (s: any) => s.package?.package_type !== 'live_month'
   )
 
+  // Unread messages (admin broadcasts) badge for the Messages menu — broadcasts for
+  // this student's grade + audience that they haven't opened yet (no broadcast_reads row).
+  const gradeId = (profile as any)?.grade_id ?? null
+  let unreadMessages = 0
+  if (gradeId) {
+    const audienceFilter = ['all']
+    if ((subs ?? []).some((s: any) => s.package?.package_type === 'live_month')) audienceFilter.push('live')
+    if ((subs ?? []).some((s: any) => s.package?.package_type !== 'live_month')) audienceFilter.push('video')
+    const { data: bIds } = await (supabase as any)
+      .from('broadcasts').select('id').eq('grade_id', gradeId).in('target_audience', audienceFilter)
+    const ids = ((bIds ?? []) as any[]).map((b) => b.id)
+    if (ids.length > 0) {
+      const { data: reads } = await (supabase as any)
+        .from('broadcast_reads').select('broadcast_id').eq('student_id', user.id).in('broadcast_id', ids)
+      const readSet = new Set(((reads ?? []) as any[]).map((r) => r.broadcast_id))
+      unreadMessages = ids.filter((id) => !readSet.has(id)).length
+    }
+  }
+
   return (
     <div className="flex bg-background h-screen overflow-hidden">
       <StudentSidebar
@@ -97,6 +116,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
         gradeName={gradeName}
         hasLiveSubscription={hasLiveSubscription}
         hasVideoSubscription={hasVideoSubscription}
+        unreadMessages={unreadMessages}
       />
       {/* Only the main area scrolls — the sidebar stays fixed on every page */}
       <main className="flex-1 h-screen overflow-y-auto pt-14 md:pt-0">

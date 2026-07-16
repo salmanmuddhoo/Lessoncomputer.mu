@@ -17,9 +17,10 @@ interface StudentSidebarProps {
   gradeName?: string | null
   hasLiveSubscription?: boolean
   hasVideoSubscription?: boolean
+  unreadMessages?: number
 }
 
-function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscription, onNav }: StudentSidebarProps & { onNav?: () => void }) {
+function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscription, unreadMessages = 0, onNav }: StudentSidebarProps & { onNav?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -62,9 +63,13 @@ function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscrip
           >
             <item.icon className="w-4 h-4 shrink-0" />
             {item.label}
-            {isActive(item.href, item.exact) && (
+            {item.href === '/dashboard/notices' && unreadMessages > 0 ? (
+              <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                {unreadMessages > 99 ? '99+' : unreadMessages}
+              </span>
+            ) : isActive(item.href, item.exact) ? (
               <ChevronRight className="w-3 h-3 ml-auto" />
-            )}
+            ) : null}
           </Link>
         ))}
       </nav>
@@ -85,7 +90,7 @@ function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscrip
   )
 }
 
-export function StudentSidebar({ userName, gradeName, hasLiveSubscription, hasVideoSubscription }: StudentSidebarProps) {
+export function StudentSidebar({ userName, gradeName, hasLiveSubscription, hasVideoSubscription, unreadMessages = 0 }: StudentSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
@@ -98,7 +103,7 @@ export function StudentSidebar({ userName, gradeName, hasLiveSubscription, hasVi
             <p className="text-xs text-muted-foreground mt-1 truncate">Hi, {userName.split(' ')[0]}</p>
           )}
         </div>
-        <NavContent userName={userName} gradeName={gradeName} hasLiveSubscription={hasLiveSubscription} hasVideoSubscription={hasVideoSubscription} />
+        <NavContent userName={userName} gradeName={gradeName} hasLiveSubscription={hasLiveSubscription} hasVideoSubscription={hasVideoSubscription} unreadMessages={unreadMessages} />
       </aside>
 
       {/* ── Mobile top bar ── */}
@@ -108,10 +113,15 @@ export function StudentSidebar({ userName, gradeName, hasLiveSubscription, hasVi
         </div>
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-          aria-label="Open menu"
+          className="relative p-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          aria-label={unreadMessages > 0 ? `Open menu (${unreadMessages} unread)` : 'Open menu'}
         >
           <Menu className="w-5 h-5" />
+          {unreadMessages > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+              {unreadMessages > 99 ? '99+' : unreadMessages}
+            </span>
+          )}
         </button>
       </div>
 
@@ -131,7 +141,7 @@ export function StudentSidebar({ userName, gradeName, hasLiveSubscription, hasVi
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <NavContent userName={userName} gradeName={gradeName} hasLiveSubscription={hasLiveSubscription} hasVideoSubscription={hasVideoSubscription} onNav={() => setMobileOpen(false)} />
+            <NavContent userName={userName} gradeName={gradeName} hasLiveSubscription={hasLiveSubscription} hasVideoSubscription={hasVideoSubscription} unreadMessages={unreadMessages} onNav={() => setMobileOpen(false)} />
           </aside>
         </div>
       )}
