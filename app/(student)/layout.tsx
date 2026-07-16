@@ -17,7 +17,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
       .single(),
     supabase
       .from('student_subscriptions')
-      .select('is_recurring, subscription_type, package:subscription_packages(package_type)')
+      .select('is_recurring, subscription_type, valid_from, valid_until, package:subscription_packages(package_type)')
       .eq('student_id', user.id)
       .eq('status', 'active'),
     (supabase as any)
@@ -76,12 +76,16 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
   const whatsappNumber = (siteSettingsRaw as any)?.whatsapp_number ?? null
 
-  // Live-class resources require an ONGOING recurring subscription. Once a student
-  // cancels recurring (or it lapses), the Live Classes & Attendance menus disappear
-  // until they subscribe again.
-  const hasLiveSubscription = (subs ?? []).some(
-    (s: any) => s.is_recurring && (s.subscription_type === 'live' || s.package?.package_type === 'live_month')
-  )
+  // Live access lasts for the month the student PAID for — until valid_until — not
+  // only while recurring is on. Cancelling recurring stops next month's auto-charge
+  // but must NOT revoke access to the current, already-paid month. (is_recurring only
+  // controls renewal; the paid period is valid_from..valid_until.)
+  const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
+  const isCurrentLive = (s: any) =>
+    (s.subscription_type === 'live' || s.package?.package_type === 'live_month') &&
+    (!s.valid_from || s.valid_from <= muToday) &&
+    (!s.valid_until || s.valid_until >= muToday)
+  const hasLiveSubscription = (subs ?? []).some(isCurrentLive)
   const hasVideoSubscription = (subs ?? []).some(
     (s: any) => s.package?.package_type !== 'live_month'
   )
