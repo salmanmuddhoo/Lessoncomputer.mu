@@ -31,8 +31,9 @@ const NAV: NavEntry[] = [
   { type: 'link', label: 'Attendance',   href: '/admin/attendance',   icon: UserCheck },
   { type: 'link', label: 'Finance',      href: '/admin/finance',      icon: Landmark },
   { type: 'group', label: 'Reports', icon: BarChart2, items: [
-    { label: 'Attendance', href: '/admin/reports/attendance', icon: ClipboardList },
-    { label: 'Payments',   href: '/admin/payments',           icon: CreditCard },
+    { label: 'Attendance',        href: '/admin/reports/attendance',         icon: ClipboardList },
+    { label: 'Payments',          href: '/admin/payments',                   icon: CreditCard },
+    { label: 'Live Subscriptions', href: '/admin/reports/live-subscriptions', icon: Radio },
   ] },
   { type: 'link', label: 'Blog',         href: '/admin/blog',         icon: Newspaper },
   { type: 'link', label: 'Testimonials', href: '/admin/testimonials', icon: MessageSquareQuote },
