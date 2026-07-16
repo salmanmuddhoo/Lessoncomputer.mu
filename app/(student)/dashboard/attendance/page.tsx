@@ -160,10 +160,10 @@ export default async function StudentAttendancePage() {
           <h2 className="text-base font-semibold mb-3">Attendance History</h2>
           <div className="rounded-xl border border-border/60 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[440px]">
+              <table className="w-full text-sm min-w-[280px] sm:min-w-[440px]">
                 <thead className="bg-muted/30 border-b border-border/60">
                   <tr>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Class</th>
+                    <th className="hidden sm:table-cell text-left px-4 py-3 font-medium text-muted-foreground">Class</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
                   </tr>
@@ -174,7 +174,7 @@ export default async function StudentAttendancePage() {
                     const present = !!record?.scheduled_end_time
                     return (
                       <tr key={cls.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3 font-medium text-sm max-w-[180px] truncate">{cls.title}</td>
+                        <td className="hidden sm:table-cell px-4 py-3 font-medium text-sm max-w-[180px] truncate">{cls.title}</td>
                         <td className="px-4 py-3 text-muted-foreground text-sm whitespace-nowrap">
                           {new Date(cls.scheduled_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                         </td>

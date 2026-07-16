@@ -34,8 +34,14 @@ export function PaymentsTable({ initialOrders, grades = [] }: { initialOrders: M
   const [orders, setOrders] = useState(initialOrders)
   const [activating, setActivating] = useState<string | null>(null)
   const [gradeFilter, setGradeFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'not_paid'>('all')
 
-  const visibleOrders = gradeFilter === 'all' ? orders : orders.filter((o) => o.gradeId === gradeFilter)
+  const visibleOrders = orders.filter((o) => {
+    if (gradeFilter !== 'all' && o.gradeId !== gradeFilter) return false
+    if (statusFilter === 'paid' && o.status !== 'paid') return false
+    if (statusFilter === 'not_paid' && o.status === 'paid') return false
+    return true
+  })
 
   async function activate(orderId: string) {
     setActivating(orderId)
@@ -62,18 +68,26 @@ export function PaymentsTable({ initialOrders, grades = [] }: { initialOrders: M
 
   return (
     <div className="space-y-3">
-      {grades.length > 0 && (
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-muted-foreground" />
+      <div className="flex flex-wrap items-center gap-2">
+        <Filter className="w-4 h-4 text-muted-foreground" />
+        {grades.length > 0 && (
           <Select value={gradeFilter} onValueChange={setGradeFilter}>
-            <SelectTrigger className="w-48"><SelectValue placeholder="Filter by grade" /></SelectTrigger>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Filter by grade" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Grades</SelectItem>
               {grades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
-      )}
+        )}
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'all' | 'paid' | 'not_paid')}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Filter by status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="not_paid">Not paid</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <div className="rounded-xl border border-border/60 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -94,7 +108,7 @@ export function PaymentsTable({ initialOrders, grades = [] }: { initialOrders: M
             {visibleOrders.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground text-sm">
-                  No payment transactions{gradeFilter !== 'all' ? ' for this grade' : ' yet'}.
+                  {gradeFilter !== 'all' || statusFilter !== 'all' ? 'No payment transactions match these filters.' : 'No payment transactions yet.'}
                 </td>
               </tr>
             ) : visibleOrders.map((order) => {
