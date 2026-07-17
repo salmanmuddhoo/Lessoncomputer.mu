@@ -1,6 +1,9 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const MU_TZ = 'Indian/Mauritius'
 
 interface Props {
   scheduledAt: string
@@ -9,26 +12,52 @@ interface Props {
   endTime: string | null
 }
 
+function fmtTime(d: Date, tz?: string) {
+  return new Intl.DateTimeFormat('en-GB', { hour: 'numeric', minute: '2-digit', ...(tz ? { timeZone: tz } : {}) }).format(d)
+}
+function fmtDate(d: Date, tz?: string) {
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', ...(tz ? { timeZone: tz } : {}) }).format(d)
+}
+
+// end_time is a bare Mauritius time-of-day (HH:MM). Anchor it to the class's Mauritius
+// calendar day and return the real instant, so it converts to the viewer's tz correctly.
+// (Mauritius is a fixed UTC+4, no DST.)
+function endInstant(scheduledAt: string, endTime: string): Date {
+  const muStart = new Date(new Date(scheduledAt).getTime() + 4 * 3600 * 1000) // read UTC parts = Mauritius wall time
+  const [eh, em] = endTime.split(':').map(Number)
+  const muEndWall = Date.UTC(muStart.getUTCFullYear(), muStart.getUTCMonth(), muStart.getUTCDate(), eh, em)
+  return new Date(muEndWall - 4 * 3600 * 1000)
+}
+
 export function LiveClassSchedule({ scheduledAt, isRecurring, recurrenceDayOfWeek, endTime }: Props) {
-  const d = new Date(scheduledAt)
-  const startTime = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  // SSR & first client render use Mauritius time (deterministic — avoids a hydration
+  // mismatch). After mount we switch to the student's local timezone and add a Mauritius
+  // reference so a student anywhere in the world knows exactly when the class is.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  const displayTz = mounted ? undefined : MU_TZ // undefined => the viewer's local timezone
+  const localTz = mounted ? Intl.DateTimeFormat().resolvedOptions().timeZone : MU_TZ
+  const inMauritius = localTz === MU_TZ
+
+  const start = new Date(scheduledAt)
+  const end = endTime ? endInstant(scheduledAt, endTime) : null
+
+  const startStr = fmtTime(start, displayTz)
+  const endStr = end ? fmtTime(end, displayTz) : null
+
+  // Mauritius reference (only when the viewer isn't already in Mauritius time).
+  const muRef = mounted && !inMauritius
+    ? ` (Mauritius: ${fmtTime(start, MU_TZ)}${end ? `–${fmtTime(end, MU_TZ)}` : ''})`
+    : ''
 
   if (isRecurring && recurrenceDayOfWeek != null) {
-    let text = `Every ${DAYS[recurrenceDayOfWeek]} from ${startTime}`
-    if (endTime) {
-      const [h, m] = endTime.split(':').map(Number)
-      const ed = new Date(); ed.setHours(h, m, 0)
-      text += ` to ${ed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-    }
-    return <>{text}</>
+    let text = `Every ${DAYS[recurrenceDayOfWeek]} from ${startStr}`
+    if (endStr) text += ` to ${endStr}`
+    return <>{text}{muRef}</>
   }
 
-  const date = d.toLocaleDateString([], { dateStyle: 'medium' })
-  let text = `${date} · ${startTime}`
-  if (endTime) {
-    const [h, m] = endTime.split(':').map(Number)
-    const ed = new Date(); ed.setHours(h, m, 0)
-    text += ` – ${ed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-  }
-  return <>{text}</>
+  let text = `${fmtDate(start, displayTz)} · ${startStr}`
+  if (endStr) text += ` – ${endStr}`
+  return <>{text}{muRef}</>
 }
