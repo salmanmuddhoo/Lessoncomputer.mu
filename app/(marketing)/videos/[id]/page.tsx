@@ -80,17 +80,25 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
   let pkgIds: string[] = []
 
   if (user && isActiveStudent && video.chapter_id) {
-    const today = new Date().toISOString().split('T')[0]
     const { data: subs } = await supabase
       .from('student_subscriptions')
-      .select('package_id, package:subscription_packages(package_type)')
+      .select('package_id, valid_from, valid_until')
       .eq('student_id', user.id)
       .eq('status', 'active')
       .not('package_id', 'is', null)
-      .or(`valid_from.is.null,valid_from.lte.${today}`)
-      .or(`valid_until.is.null,valid_until.gte.${today}`)
 
-    pkgIds = (subs ?? []).map((s: any) => s.package_id).filter(Boolean)
+    // Currently-valid subscriptions, checked in Mauritius time. Video packages have
+    // null dates (never expire); live subscriptions are valid within their paid month.
+    // A subscription to EITHER a video package or a live package that includes this
+    // chapter grants access — so a live subscriber can watch the videos in that package.
+    const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
+    pkgIds = ((subs ?? []) as any[])
+      .filter((s) =>
+        (!s.valid_from || s.valid_from <= muToday) &&
+        (!s.valid_until || s.valid_until >= muToday)
+      )
+      .map((s) => s.package_id)
+      .filter(Boolean)
 
     if (!hasAccess && pkgIds.length > 0) {
       const { data: link } = await supabase
