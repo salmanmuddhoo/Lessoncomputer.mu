@@ -37,8 +37,6 @@ export function LiveClassSchedule({ scheduledAt, isRecurring, recurrenceDayOfWee
   useEffect(() => setMounted(true), [])
 
   const displayTz = mounted ? undefined : MU_TZ // undefined => the viewer's local timezone
-  const localTz = mounted ? Intl.DateTimeFormat().resolvedOptions().timeZone : MU_TZ
-  const inMauritius = localTz === MU_TZ
 
   const start = new Date(scheduledAt)
   const end = endTime ? endInstant(scheduledAt, endTime) : null
@@ -46,18 +44,13 @@ export function LiveClassSchedule({ scheduledAt, isRecurring, recurrenceDayOfWee
   const startStr = fmtTime(start, displayTz)
   const endStr = end ? fmtTime(end, displayTz) : null
 
-  // Mauritius reference (only when the viewer isn't already in Mauritius time).
-  const muRef = mounted && !inMauritius
-    ? ` (Mauritius: ${fmtTime(start, MU_TZ)}${end ? `–${fmtTime(end, MU_TZ)}` : ''})`
-    : ''
-
   if (isRecurring && recurrenceDayOfWeek != null) {
     let text = `Every ${DAYS[recurrenceDayOfWeek]} from ${startStr}`
     if (endStr) text += ` to ${endStr}`
-    return <>{text}{muRef}</>
+    return <>{text}</>
   }
 
   let text = `${fmtDate(start, displayTz)} · ${startStr}`
   if (endStr) text += ` – ${endStr}`
-  return <>{text}{muRef}</>
+  return <>{text}</>
 }
