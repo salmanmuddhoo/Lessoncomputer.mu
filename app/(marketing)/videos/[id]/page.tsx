@@ -82,21 +82,26 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
   if (user && isActiveStudent && video.chapter_id) {
     const { data: subs } = await supabase
       .from('student_subscriptions')
-      .select('package_id, valid_from, valid_until')
+      .select('package_id, subscription_type, valid_from, valid_until, package:subscription_packages(package_type)')
       .eq('student_id', user.id)
       .eq('status', 'active')
       .not('package_id', 'is', null)
 
-    // Currently-valid subscriptions, checked in Mauritius time. Video packages have
-    // null dates (never expire); live subscriptions are valid within their paid month.
-    // A subscription to EITHER a video package or a live package that includes this
-    // chapter grants access — so a live subscriber can watch the videos in that package.
+    // Access rule, matching the Live Classes dashboard:
+    //  - Video packages: one-time purchase — always grant access (never expire).
+    //  - Live packages: while the student remains an ACTIVE live member (has at least
+    //    one currently-valid live subscription), they can watch content from EVERY live
+    //    month they've subscribed to — not just the current one. Once their live
+    //    membership lapses, all live content locks.
     const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
+    const isLiveSub = (s: any) => s.subscription_type === 'live' || s.package?.package_type === 'live_month'
+    const activeLiveMember = ((subs ?? []) as any[]).some((s) =>
+      isLiveSub(s) &&
+      (!s.valid_from || s.valid_from <= muToday) &&
+      (!s.valid_until || s.valid_until >= muToday)
+    )
     pkgIds = ((subs ?? []) as any[])
-      .filter((s) =>
-        (!s.valid_from || s.valid_from <= muToday) &&
-        (!s.valid_until || s.valid_until >= muToday)
-      )
+      .filter((s) => (isLiveSub(s) ? activeLiveMember : true))
       .map((s) => s.package_id)
       .filter(Boolean)
 
