@@ -66,6 +66,7 @@ export default async function TimetablePage() {
             {grade.name}
           </span>
         </p>
+        <p className="text-xs text-muted-foreground mt-1">All times shown in Mauritius time (GMT+4).</p>
       </div>
 
       {hasTimetable ? (
