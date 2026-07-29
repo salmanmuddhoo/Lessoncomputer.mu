@@ -4,6 +4,7 @@ import { AccountForm } from './account-form'
 import { SiteSettingsForm } from '@/components/lc/site-settings-form'
 import { WhatsAppSettingsForm } from '@/components/lc/whatsapp-settings-form'
 import { BillingSettingsForm } from '@/components/lc/billing-settings-form'
+import { ManageAdmins } from '@/components/lc/manage-admins'
 
 export const metadata: Metadata = { title: 'Admin Settings' }
 
@@ -11,7 +12,7 @@ export default async function AdminSettingsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: profile }, { data: siteSettings }] = await Promise.all([
+  const [{ data: profile }, { data: siteSettings }, { data: adminRows }] = await Promise.all([
     supabase
       .from('profiles')
       .select('full_name, avatar_url, role')
@@ -22,7 +23,14 @@ export default async function AdminSettingsPage() {
       .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, whatsapp_group_url, billing_day, cutoff_day')
       .eq('id', 1)
       .single(),
+    (supabase as any)
+      .from('profiles')
+      .select('id, full_name')
+      .eq('role', 'admin')
+      .order('full_name', { ascending: true }),
   ])
+
+  const admins = ((adminRows ?? []) as any[]).map((a) => ({ id: a.id as string, name: (a.full_name ?? null) as string | null }))
 
   const ss = (siteSettings ?? {}) as {
     facebook_url: string | null
@@ -72,6 +80,8 @@ export default async function AdminSettingsPage() {
             initialBillingDay={ss.billing_day ?? 28}
             initialCutoffDay={ss.cutoff_day ?? 20}
           />
+
+          <ManageAdmins admins={admins} currentUserId={user!.id} />
         </div>
       </div>
     </div>

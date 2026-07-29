@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Megaphone, Users, Radio, Video, Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react'
@@ -23,14 +25,35 @@ interface Broadcast {
 
 interface Props {
   items: Broadcast[]
+  unreadIds?: string[]
+  studentId: string
 }
 
-export function NoticesList({ items }: Props) {
+export function NoticesList({ items, unreadIds = [], studentId }: Props) {
+  const router = useRouter()
   const [selected, setSelected] = useState<Broadcast | null>(null)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
+  const [unread, setUnread] = useState<Set<string>>(() => new Set(unreadIds))
 
   function toggleGroup(key: string) {
     setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  // Open a message and, if it was unread for THIS student, mark it read (per-student
+  // via broadcast_reads). Other students keep their own unread state.
+  async function openMessage(item: Broadcast) {
+    setSelected(item)
+    if (!unread.has(item.id)) return
+    setUnread((prev) => { const next = new Set(prev); next.delete(item.id); return next })
+    try {
+      const supabase = createClient()
+      await (supabase as any)
+        .from('broadcast_reads')
+        .upsert({ student_id: studentId, broadcast_id: item.id }, { onConflict: 'student_id,broadcast_id' })
+      router.refresh() // update the sidebar unread badge
+    } catch {
+      /* best-effort — badge will reconcile on next load */
+    }
   }
 
   // Group by chapter; "General" last
@@ -65,6 +88,14 @@ export function NoticesList({ items }: Props) {
                   ? <FolderOpen className="w-4 h-4 text-primary shrink-0" />
                   : <Folder className="w-4 h-4 text-muted-foreground shrink-0" />}
                 <span className="flex-1 font-medium text-sm">{group.title}</span>
+                {(() => {
+                  const groupUnread = group.items.filter((i) => unread.has(i.id)).length
+                  return groupUnread > 0 ? (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none mr-1">
+                      {groupUnread}
+                    </span>
+                  ) : null
+                })()}
                 <span className="text-xs text-muted-foreground mr-1">
                   {group.items.length} message{group.items.length !== 1 ? 's' : ''}
                 </span>
@@ -79,14 +110,17 @@ export function NoticesList({ items }: Props) {
                   {group.items.map((item) => {
                     const meta = AUDIENCE_META[item.target_audience] ?? AUDIENCE_META.all
                     const Icon = meta.icon
+                    const isUnread = unread.has(item.id)
                     return (
                       <button
                         key={item.id}
-                        onClick={() => setSelected(item)}
-                        className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors text-left"
+                        onClick={() => openMessage(item)}
+                        className={`w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors text-left ${isUnread ? 'bg-primary/5' : ''}`}
                       >
-                        <Megaphone className="w-3.5 h-3.5 text-primary shrink-0" />
-                        <span className="flex-1 text-sm font-medium truncate">{item.title}</span>
+                        {isUnread
+                          ? <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" aria-label="Unread" />
+                          : <Megaphone className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        <span className={`flex-1 text-sm truncate ${isUnread ? 'font-bold' : 'font-medium'}`}>{item.title}</span>
                         <Badge variant="outline" className={`gap-1 text-[10px] px-1.5 py-0 h-4 shrink-0 ${meta.className}`}>
                           <Icon className="w-2.5 h-2.5" />
                           {meta.label}

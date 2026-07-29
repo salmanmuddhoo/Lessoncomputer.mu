@@ -58,14 +58,18 @@ export default async function StudentNoticesPage() {
     chapter: { title: string } | null
   }>
 
-  // Mark all visible messages as read so the dashboard's unread badge clears.
+  // Per-student read state: which of THIS student's messages are still unread. Messages
+  // are marked read when the student opens them (in NoticesList), not on page load, so
+  // each student's read/unread state is independent.
+  let unreadIds: string[] = []
   if (items.length > 0) {
-    await (supabase as any)
+    const { data: reads } = await (supabase as any)
       .from('broadcast_reads')
-      .upsert(
-        items.map((i) => ({ student_id: user.id, broadcast_id: i.id })),
-        { onConflict: 'student_id,broadcast_id' }
-      )
+      .select('broadcast_id')
+      .eq('student_id', user.id)
+      .in('broadcast_id', items.map((i) => i.id))
+    const readSet = new Set(((reads ?? []) as any[]).map((r) => r.broadcast_id))
+    unreadIds = items.filter((i) => !readSet.has(i.id)).map((i) => i.id)
   }
 
   return (
@@ -88,7 +92,7 @@ export default async function StudentNoticesPage() {
           <p className="text-muted-foreground">No messages yet. Check back later!</p>
         </div>
       ) : (
-        <NoticesList items={items} />
+        <NoticesList items={items} unreadIds={unreadIds} studentId={user.id} />
       )}
     </div>
   )
