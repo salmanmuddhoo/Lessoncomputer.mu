@@ -4,6 +4,7 @@ import { DM_Sans, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { CookieConsent } from '@/components/lc/cookie-consent'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 const dmSans = DM_Sans({
@@ -41,7 +42,10 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#FAFAF8',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FAFAF8' },
+    { media: '(prefers-color-scheme: dark)', color: '#0F0F0F' },
+  ],
 }
 
 export default function RootLayout({
@@ -50,12 +54,14 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${dmSans.variable} ${playfairDisplay.variable} font-sans antialiased overflow-x-hidden`}>
-        {children}
-        <CookieConsent />
-        <Toaster richColors />
-        <Analytics />
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+          {children}
+          <CookieConsent />
+          <Toaster richColors />
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   )

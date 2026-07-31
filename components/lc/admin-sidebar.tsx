@@ -9,6 +9,7 @@ import {
   BarChart2, ClipboardList, Megaphone, UserCheck, CreditCard, Newspaper, Landmark, MessageSquareQuote, GraduationCap,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
+import { ThemeToggle } from '@/components/lc/theme-toggle'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -162,6 +163,7 @@ function NavContent({ onNav, unreadCount = 0 }: { onNav?: () => void; unreadCoun
       </nav>
 
       <div className="p-3 border-t border-sidebar-border space-y-0.5">
+        <ThemeToggle showLabel className="text-sidebar-foreground hover:bg-sidebar-accent" />
         <Link
           href="/admin/settings"
           onClick={onNav}
