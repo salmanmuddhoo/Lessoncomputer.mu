@@ -24,10 +24,24 @@ export function GradeCard({ grade }: GradeCardProps) {
               <div className="absolute w-48 h-48 rounded-full opacity-10" style={{ background: grade.color, top: '-20%', right: '-10%' }} />
               <div className="absolute w-32 h-32 rounded-full opacity-8"  style={{ background: grade.color, bottom: '-10%', left: '-5%' }} />
 
-              {/* Grade number — the hero element */}
-              <span className="relative font-serif font-bold text-[5rem] leading-none" style={{ color: grade.color }}>
-                {grade.name.replace('Grade ', '')}
-              </span>
+              {/* Grade number — the hero element. Size adapts to the label length so a
+                  long grade name (e.g. "11 (SC)" or a custom name) fits the card. */}
+              {(() => {
+                const badge = grade.name.replace(/^Grade\s+/i, '').trim() || grade.name
+                const size =
+                  badge.length <= 2 ? 'text-[5rem]' :
+                  badge.length <= 4 ? 'text-6xl' :
+                  badge.length <= 7 ? 'text-4xl' :
+                  badge.length <= 12 ? 'text-2xl' : 'text-xl'
+                return (
+                  <span
+                    className={`relative font-serif font-bold ${size} leading-none text-center break-words max-w-[92%] px-2`}
+                    style={{ color: grade.color }}
+                  >
+                    {badge}
+                  </span>
+                )
+              })()}
               <span className="relative text-xs font-semibold tracking-[0.2em] uppercase mt-1" style={{ color: grade.color, opacity: 0.7 }}>
                 Grade
               </span>
@@ -51,7 +65,7 @@ export function GradeCard({ grade }: GradeCardProps) {
         {/* — Info area (Boty product info equivalent) — */}
         <div className="p-5">
           {/* Grade name — like product name in Boty (serif) */}
-          <h3 className="font-serif font-semibold text-lg text-foreground mb-3 group-hover:text-primary lc-transition">
+          <h3 className="font-serif font-semibold text-lg text-foreground mb-3 group-hover:text-primary lc-transition break-words">
             {grade.name}
             {grade.name.includes('SC') || grade.name.includes('HSC') ? '' : ' — Secondary'}
           </h3>
