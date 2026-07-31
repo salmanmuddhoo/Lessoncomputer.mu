@@ -9,8 +9,9 @@ export const DEFAULT_CURRENCY: CurrencyInfo = { currency: 'MUR', rate: 1 }
 export function formatMoney(mur: number, info: CurrencyInfo = DEFAULT_CURRENCY): string {
   const n = Number(mur) || 0
   if (info.currency === 'USD' && info.rate > 0) {
-    const usd = n / info.rate
-    return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    // USD is shown rounded to the nearest whole dollar (e.g. 14.13 → $14, 11.96 → $12).
+    const usd = Math.round(n / info.rate)
+    return `$${usd.toLocaleString('en-US')}`
   }
   return `Rs ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }

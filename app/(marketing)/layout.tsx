@@ -35,9 +35,19 @@ export default async function MarketingLayout({
 
   const currency = await getCurrencyInfo()
 
+  let grades: { name: string; slug: string }[] = []
+  try {
+    const { data } = await supabase
+      .from('grades')
+      .select('name, slug')
+      .eq('is_active', true)
+      .order('order_index', { ascending: true })
+    grades = (data ?? []) as { name: string; slug: string }[]
+  } catch { /* fall back to empty */ }
+
   return (
     <CurrencyProvider value={currency}>
-      <Header user={user ? { email: user.email, role: profile?.role } : null} />
+      <Header user={user ? { email: user.email, role: profile?.role } : null} grades={grades} />
       <main className="pt-[72px]">{children}</main>
       <Footer />
       {whatsappNumber && <WhatsAppButton phoneNumber={whatsappNumber} />}
