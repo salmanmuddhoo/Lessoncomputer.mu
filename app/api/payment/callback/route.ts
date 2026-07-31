@@ -117,11 +117,28 @@ export async function POST(req: NextRequest) {
       // Resolve valid_from/valid_until for live packages by looking up their month/year
       const { data: pkgRows } = await (admin as any)
         .from('subscription_packages')
-        .select('id, package_type, month, year')
+        .select('id, package_type, month, year, grade_id')
         .in('id', order.package_ids)
-      const pkgMap = new Map<string, { package_type: string; month: number | null; year: number | null }>(
+      const pkgMap = new Map<string, { package_type: string; month: number | null; year: number | null; grade_id: string | null }>(
         (pkgRows ?? []).map((p: any) => [p.id, p])
       )
+
+      // Per-grade video validity (weeks). NULL = unlimited (video access never expires).
+      const videoGradeIds = [...new Set((pkgRows ?? [])
+        .filter((p: any) => p.package_type !== 'live_month' && p.grade_id)
+        .map((p: any) => p.grade_id))]
+      const videoWeeksByGrade = new Map<string, number | null>()
+      if (videoGradeIds.length > 0) {
+        const { data: gradeRows } = await (admin as any)
+          .from('grades').select('id, video_validity_weeks').in('id', videoGradeIds)
+        for (const g of (gradeRows ?? []) as any[]) videoWeeksByGrade.set(g.id, g.video_validity_weeks ?? null)
+      }
+      const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
+      const addWeeks = (isoDate: string, weeks: number) => {
+        const d = new Date(isoDate + 'T00:00:00Z')
+        d.setUTCDate(d.getUTCDate() + weeks * 7)
+        return d.toISOString().split('T')[0]
+      }
 
       // Only the latest live_month package (highest year/month) should be recurring —
       // past months added to the same order are one-time purchases.
@@ -137,9 +154,16 @@ export async function POST(req: NextRequest) {
       const subscriptionRows = order.package_ids.map((packageId: string) => {
         const pkg = pkgMap.get(packageId)
         const isLivePkg = pkg?.package_type === 'live_month'
-        const dates = isLivePkg && pkg.month && pkg.year
-          ? getMonthDateRange(pkg.month, pkg.year)
-          : { validFrom: null, validUntil: null }
+        let dates: { validFrom: string | null; validUntil: string | null }
+        if (isLivePkg && pkg?.month && pkg?.year) {
+          dates = getMonthDateRange(pkg.month, pkg.year)
+        } else {
+          // Video package: apply the grade's validity window (weeks). NULL weeks = unlimited.
+          const weeks = pkg?.grade_id ? videoWeeksByGrade.get(pkg.grade_id) : null
+          dates = (weeks && weeks > 0)
+            ? { validFrom: muToday, validUntil: addWeeks(muToday, weeks) }
+            : { validFrom: null, validUntil: null }
+        }
         return {
           student_id:        order.student_id,
           package_id:        packageId,

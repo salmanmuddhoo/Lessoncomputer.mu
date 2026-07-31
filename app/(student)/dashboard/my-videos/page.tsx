@@ -61,11 +61,17 @@ export default async function MyVideoPackagesPage() {
   // All active subscriptions — no subscription_type filter
   const { data: subs } = await supabase
     .from('student_subscriptions')
-    .select('package_id, purchased_at')
+    .select('package_id, purchased_at, valid_from, valid_until')
     .eq('student_id', user!.id)
     .eq('status', 'active')
 
-  const subsByPackage = new Map((subs ?? []).filter((s: any) => s.package_id).map((s: any) => [s.package_id, s]))
+  // A video subscription grants access only within its validity window; NULL dates =
+  // unlimited. Expired video packages drop out of "subscribed" and become re-purchasable.
+  const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
+  const validSubs = (subs ?? []).filter((s: any) =>
+    (!s.valid_from || s.valid_from <= muToday) && (!s.valid_until || s.valid_until >= muToday)
+  )
+  const subsByPackage = new Map(validSubs.filter((s: any) => s.package_id).map((s: any) => [s.package_id, s]))
   const subscribedPackageIds = new Set(subsByPackage.keys())
 
   const subscribedPackages = (allVideoPackages ?? []).filter((p: any) => subscribedPackageIds.has(p.id))
@@ -113,6 +119,7 @@ export default async function MyVideoPackagesPage() {
     name: pkg.name,
     description: pkg.description ?? null,
     chapters: getChapters(pkg),
+    validUntil: (subsByPackage.get(pkg.id) as any)?.valid_until ?? null,
   }))
 
   const totalVideos = Object.values(videosByChapter).reduce((s, v) => s + v.length, 0)
