@@ -259,7 +259,13 @@ export default async function GradePage({ params }: PageProps) {
             className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0"
             style={{ backgroundColor: `${grade.color}20`, color: grade.color }}
           >
-            {grade.name.replace('Grade ', '')}
+            {(() => {
+              // Compact badge that always fits the icon: leading digits for numeric
+              // grades (7, 10, 11) or the first letter for text names (O level → O).
+              const stripped = grade.name.replace(/^Grade\s+/i, '').trim() || grade.name
+              const digits = stripped.match(/^\d+/)
+              return digits ? digits[0] : stripped.charAt(0).toUpperCase()
+            })()}
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold leading-tight">{grade.name}</h1>
