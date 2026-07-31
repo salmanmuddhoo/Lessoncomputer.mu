@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { Menu, X, ChevronDown, LogOut } from 'lucide-react'
+import { ThemeToggle } from '@/components/lc/theme-toggle'
 import { Logo } from '@/components/lc/logo'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
@@ -82,6 +83,7 @@ export function Header({ user }: HeaderProps) {
 
           {/* Desktop auth — right side */}
           <div className="hidden md:flex items-center gap-2">
+            <ThemeToggle className="text-muted-foreground hover:text-foreground" />
             {user ? (
               <>
                 <Button asChild size="sm" className="bg-foreground text-background hover:bg-foreground/90 font-medium rounded-full px-5">
@@ -103,13 +105,16 @@ export function Header({ user }: HeaderProps) {
             )}
           </div>
 
-          {/* Mobile toggle */}
-          <button
-            className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary lc-transition"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          {/* Mobile actions */}
+          <div className="md:hidden flex items-center gap-1">
+            <ThemeToggle className="text-muted-foreground hover:text-foreground" />
+            <button
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary lc-transition"
+              onClick={() => setMobileOpen(!mobileOpen)}
+            >
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
       </div>
 

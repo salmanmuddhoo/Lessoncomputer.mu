@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { ThemeToggle } from '@/components/lc/theme-toggle'
 import {
   LayoutDashboard, Users, BookOpen, LogOut,
   ChevronRight, User, Menu, X, Package, Bell, ClipboardList,
@@ -74,10 +75,11 @@ function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscrip
         ))}
       </nav>
 
-      <div className="p-3 border-t border-sidebar-border">
+      <div className="p-3 border-t border-sidebar-border space-y-0.5">
         {gradeName && (
           <p className="text-xs text-muted-foreground px-3 pb-2 truncate">{gradeName}</p>
         )}
+        <ThemeToggle showLabel className="text-sidebar-foreground hover:bg-sidebar-accent" />
         <button
           onClick={handleSignOut}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"

@@ -41,6 +41,43 @@
   --sidebar-ring: #FACC15;
 }
 
+/* Dark mode — activated by the `.dark` class on <html> (next-themes) */
+.dark {
+  --background: #0F0F0F;
+  --foreground: #FAFAF8;
+  --card: #1A1A1A;
+  --card-foreground: #FAFAF8;
+  --popover: #1A1A1A;
+  --popover-foreground: #FAFAF8;
+  --primary: #FACC15;
+  --primary-foreground: #1C1C1C;
+  --secondary: #262626;
+  --secondary-foreground: #FAFAF8;
+  --muted: #262626;
+  --muted-foreground: #A3A29B;
+  --accent: #EAB308;
+  --accent-foreground: #1C1C1C;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #2A2A2A;
+  --input: #2A2A2A;
+  --ring: #FACC15;
+  --chart-1: #FACC15;
+  --chart-2: #EAB308;
+  --chart-3: #CA8A04;
+  --chart-4: #FAFAF8;
+  --chart-5: #A3A29B;
+  /* Sidebar: a touch darker than the cards so it still reads as a distinct rail */
+  --sidebar: #0A0A0A;
+  --sidebar-foreground: #FAFAF8;
+  --sidebar-primary: #FACC15;
+  --sidebar-primary-foreground: #1C1C1C;
+  --sidebar-accent: #1F1F1F;
+  --sidebar-accent-foreground: #FAFAF8;
+  --sidebar-border: #262626;
+  --sidebar-ring: #FACC15;
+}
+
 @theme inline {
   --font-sans: 'DM Sans', 'DM Sans Fallback', sans-serif;
   --font-serif: 'Playfair Display', 'Playfair Display Fallback', serif;
