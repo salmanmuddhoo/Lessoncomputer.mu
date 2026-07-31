@@ -20,6 +20,7 @@ interface VideoPackage {
   name: string
   description: string | null
   chapters: Chapter[]
+  validUntil?: string | null
 }
 
 interface Props {
@@ -67,6 +68,11 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
                 </div>
                 {pkg.description && (
                   <p className="text-sm text-muted-foreground mb-1">{pkg.description}</p>
+                )}
+                {pkg.validUntil && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">
+                    Access until {new Date(pkg.validUntil + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })}
+                  </p>
                 )}
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge

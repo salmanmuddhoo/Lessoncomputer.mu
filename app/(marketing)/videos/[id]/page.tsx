@@ -87,21 +87,19 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
       .eq('status', 'active')
       .not('package_id', 'is', null)
 
-    // Access rule, matching the Live Classes dashboard:
-    //  - Video packages: one-time purchase — always grant access (never expire).
+    // Access rule:
+    //  - Video packages: valid within their validity window (valid_from..valid_until);
+    //    NULL dates = unlimited (grade not configured / legacy purchases).
     //  - Live packages: while the student remains an ACTIVE live member (has at least
     //    one currently-valid live subscription), they can watch content from EVERY live
-    //    month they've subscribed to — not just the current one. Once their live
-    //    membership lapses, all live content locks.
+    //    month they've subscribed to. Once their live membership lapses, live content locks.
     const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
     const isLiveSub = (s: any) => s.subscription_type === 'live' || s.package?.package_type === 'live_month'
-    const activeLiveMember = ((subs ?? []) as any[]).some((s) =>
-      isLiveSub(s) &&
-      (!s.valid_from || s.valid_from <= muToday) &&
-      (!s.valid_until || s.valid_until >= muToday)
-    )
+    const isCurrentlyValid = (s: any) =>
+      (!s.valid_from || s.valid_from <= muToday) && (!s.valid_until || s.valid_until >= muToday)
+    const activeLiveMember = ((subs ?? []) as any[]).some((s) => isLiveSub(s) && isCurrentlyValid(s))
     pkgIds = ((subs ?? []) as any[])
-      .filter((s) => (isLiveSub(s) ? activeLiveMember : true))
+      .filter((s) => (isLiveSub(s) ? activeLiveMember : isCurrentlyValid(s)))
       .map((s) => s.package_id)
       .filter(Boolean)
 

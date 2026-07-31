@@ -35,6 +35,11 @@ const schema = z.object({
   is_mauritius_only: z.boolean(),
   live_subscription_price: z.coerce.number().min(0),
   live_subscription_enabled: z.boolean(),
+  // Weeks a purchased video package stays valid for this grade. Blank = unlimited.
+  video_validity_weeks: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+    z.number().int().min(1, 'At least 1 week').nullable()
+  ),
 })
 
 type FormData = z.infer<typeof schema>
@@ -61,6 +66,7 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
       is_mauritius_only: (grade as any)?.is_mauritius_only ?? true,
       live_subscription_price: (grade as any)?.live_subscription_price ?? 0,
       live_subscription_enabled: (grade as any)?.live_subscription_enabled ?? false,
+      video_validity_weeks: (grade as any)?.video_validity_weeks ?? ('' as any),
     },
   })
 
@@ -169,6 +175,19 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
                   onCheckedChange={(v) => setValue('live_subscription_enabled', v)}
                 />
               </div>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <p className="text-sm font-semibold mb-3">Video Packages</p>
+            <div className="space-y-2">
+              <Label>Video Access Validity (weeks)</Label>
+              <Input type="number" min="1" step="1" placeholder="Leave blank for unlimited" {...register('video_validity_weeks')} />
+              {errors.video_validity_weeks && <p className="text-xs text-destructive">{String(errors.video_validity_weeks.message)}</p>}
+              <p className="text-xs text-muted-foreground">
+                How long a purchased video package stays accessible for this grade. Blank = unlimited (never expires).
+                Applies to new purchases only.
+              </p>
             </div>
           </div>
 
