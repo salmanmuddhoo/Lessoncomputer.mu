@@ -45,6 +45,21 @@ export async function Footer() {
     // Table may not exist yet — show footer without social icons
   }
 
+  // Grades in the footer follow the configured active grades (fall back to the static
+  // list if the query fails).
+  let gradeLinks = GRADE_LINKS
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('grades')
+      .select('name, slug')
+      .eq('is_active', true)
+      .order('order_index', { ascending: true })
+    if (data && data.length > 0) {
+      gradeLinks = (data as { name: string; slug: string }[]).map((g) => ({ name: g.name, href: `/grades/${g.slug}` }))
+    }
+  } catch { /* keep fallback */ }
+
   const hasSocial = settings?.facebook_url || settings?.instagram_url || settings?.tiktok_url
 
   return (
@@ -105,7 +120,7 @@ export async function Footer() {
           </div>
 
           {[
-            { title: 'Grades', links: GRADE_LINKS },
+            { title: 'Grades', links: gradeLinks },
             { title: 'Company', links: COMPANY_LINKS },
             { title: 'Legal', links: LEGAL_LINKS },
           ].map((col) => (
