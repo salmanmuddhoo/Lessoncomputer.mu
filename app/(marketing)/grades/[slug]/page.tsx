@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrencyInfo } from '@/lib/currency'
+import { formatMoney } from '@/lib/currency-format'
 import { GradePageContent } from '@/components/lc/grade-page-content'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
@@ -230,6 +232,7 @@ export default async function GradePage({ params }: PageProps) {
   const hasPackages = packages.length > 0
   const liveSubscriptionEnabled = (grade as any).live_subscription_enabled ?? false
   const liveSubscriptionPrice = (grade as any).live_subscription_price ?? 0
+  const currency = await getCurrencyInfo()
 
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
   const liveMonthLabel = currentLivePackage
@@ -329,7 +332,7 @@ export default async function GradePage({ params }: PageProps) {
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <span className="text-lg font-bold text-primary">
-                Rs {liveSubscriptionPrice.toFixed(2)}<span className="text-sm font-normal text-muted-foreground">/mo</span>
+                {formatMoney(liveSubscriptionPrice, currency)}<span className="text-sm font-normal text-muted-foreground">/mo</span>
               </span>
               {isLiveSubscribed ? (
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">

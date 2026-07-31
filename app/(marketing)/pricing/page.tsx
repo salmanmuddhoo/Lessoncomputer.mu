@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Check } from 'lucide-react'
+import { getCurrencyInfo } from '@/lib/currency'
+import { formatMoney } from '@/lib/currency-format'
 
 export const metadata: Metadata = {
   title: 'Pricing | LessonComputer.mu',
@@ -28,7 +30,8 @@ const PAID_FEATURES = [
   'Access from any device',
 ]
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const currency = await getCurrencyInfo()
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-12">
@@ -43,7 +46,7 @@ export default function PricingPage() {
         <div className="rounded-2xl border border-border/60 bg-card p-8 flex flex-col">
           <div className="mb-6">
             <p className="text-sm font-medium text-muted-foreground mb-1">Free</p>
-            <p className="text-4xl font-bold">Rs 0</p>
+            <p className="text-4xl font-bold">{formatMoney(0, currency)}</p>
             <p className="text-sm text-muted-foreground mt-1">No credit card needed</p>
           </div>
           <ul className="space-y-3 mb-8 flex-1">
@@ -68,7 +71,7 @@ export default function PricingPage() {
           </div>
           <div className="mb-6">
             <p className="text-sm font-medium text-muted-foreground mb-1">Pay per lesson</p>
-            <p className="text-4xl font-bold">From Rs 50</p>
+            <p className="text-4xl font-bold">From {formatMoney(50, currency)}</p>
             <p className="text-sm text-muted-foreground mt-1">Per video or live class</p>
           </div>
           <ul className="space-y-3 mb-8 flex-1">

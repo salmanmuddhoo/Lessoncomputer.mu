@@ -5,6 +5,7 @@ import { SiteSettingsForm } from '@/components/lc/site-settings-form'
 import { WhatsAppSettingsForm } from '@/components/lc/whatsapp-settings-form'
 import { BillingSettingsForm } from '@/components/lc/billing-settings-form'
 import { ManageAdmins } from '@/components/lc/manage-admins'
+import { CurrencySettingsForm } from '@/components/lc/currency-settings-form'
 
 export const metadata: Metadata = { title: 'Admin Settings' }
 
@@ -20,7 +21,7 @@ export default async function AdminSettingsPage() {
       .single(),
     (supabase as any)
       .from('site_settings')
-      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, whatsapp_group_url, billing_day, cutoff_day')
+      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, whatsapp_group_url, billing_day, cutoff_day, usd_rate')
       .eq('id', 1)
       .single(),
     (supabase as any)
@@ -41,6 +42,7 @@ export default async function AdminSettingsPage() {
     whatsapp_group_url: string | null
     billing_day: number | null
     cutoff_day: number | null
+    usd_rate: number | null
   }
 
   return (
@@ -80,6 +82,8 @@ export default async function AdminSettingsPage() {
             initialBillingDay={ss.billing_day ?? 28}
             initialCutoffDay={ss.cutoff_day ?? 20}
           />
+
+          <CurrencySettingsForm initialUsdRate={ss.usd_rate ?? null} />
 
           <ManageAdmins admins={admins} currentUserId={user!.id} />
         </div>

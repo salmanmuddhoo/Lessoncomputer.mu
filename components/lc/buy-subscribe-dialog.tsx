@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { usePrice, useCurrency } from '@/components/lc/currency-provider'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -62,6 +63,8 @@ export function BuySubscribeDialog({
   isLoggedIn,
   isNextMonthMode = false,
 }: Props) {
+  const price = usePrice()
+  const currency = useCurrency()
   const subscribedSet = new Set(subscribedPackageIds)
   const subscribedLiveSet = new Set(subscribedLivePackageIds)
   const isCurrentMonthSubscribed = !!(liveMonthPackageId && subscribedLiveSet.has(liveMonthPackageId))
@@ -223,7 +226,7 @@ export function BuySubscribeDialog({
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-primary">Rs {liveSubscriptionPrice.toFixed(2)}</span>
+                        <span className="text-lg font-bold text-primary">{price(liveSubscriptionPrice)}</span>
                         <span className="text-xs text-muted-foreground">/month · recurring</span>
                       </div>
                       {isNextMonthMode && (
@@ -251,7 +254,7 @@ export function BuySubscribeDialog({
                                 />
                                 <span className="flex-1 text-xs">{MONTHS[pkg.month - 1]} {pkg.year}</span>
                                 <span className="text-xs font-semibold text-primary shrink-0">
-                                  Rs {liveSubscriptionPrice.toFixed(2)}
+                                  {price(liveSubscriptionPrice)}
                                 </span>
                               </label>
                             ))}
@@ -294,7 +297,7 @@ export function BuySubscribeDialog({
                               </Badge>
                             </div>
                             <div className="flex items-center gap-3 mt-0.5">
-                              <span className="text-sm font-semibold text-primary">Rs {pkg.price.toFixed(2)}</span>
+                              <span className="text-sm font-semibold text-primary">{price(pkg.price)}</span>
                               <span className="text-xs text-muted-foreground">
                                 {pkg.chapterCount} chapter{pkg.chapterCount !== 1 ? 's' : ''}
                               </span>
@@ -330,7 +333,7 @@ export function BuySubscribeDialog({
                             )}
                           </div>
                           <div className="flex items-center gap-3 mt-0.5">
-                            <span className="text-sm font-semibold text-primary">Rs {pkg.price.toFixed(2)}</span>
+                            <span className="text-sm font-semibold text-primary">{price(pkg.price)}</span>
                             <span className="text-xs text-muted-foreground">
                               {pkg.chapterCount} chapter{pkg.chapterCount !== 1 ? 's' : ''}
                             </span>
@@ -349,7 +352,7 @@ export function BuySubscribeDialog({
                 <RefreshCw className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   <span className="font-medium text-foreground">
-                    Auto-renews at Rs {liveSubscriptionPrice.toFixed(2)}/month
+                    Auto-renews at {price(liveSubscriptionPrice)}/month
                   </span>
                   {' '}— live classes renew automatically each month. Cancel anytime from your{' '}
                   <span className="font-medium">Subscriptions</span> page.
@@ -367,26 +370,33 @@ export function BuySubscribeDialog({
                         <td className="px-3 py-2 text-muted-foreground">
                           {liveMonthLabel} Live{liveMonthCount > 1 ? ` × ${liveMonthCount} months` : ''}
                         </td>
-                        <td className="px-3 py-2 text-right font-medium">Rs {liveTotal.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right font-medium">{price(liveTotal)}</td>
                       </tr>
                     )}
                     {selectedPackages.map((p) => (
                       <tr key={p.id} className="border-b border-border/40">
                         <td className="px-3 py-2 text-muted-foreground">{p.name}</td>
-                        <td className="px-3 py-2 text-right font-medium">Rs {p.price.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right font-medium">{price(p.price)}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr className="bg-muted/20">
                       <td className="px-3 py-2 font-semibold">Total</td>
-                      <td className="px-3 py-2 text-right font-bold text-primary">Rs {combinedTotal.toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right font-bold text-primary">{price(combinedTotal)}</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
             )}
           </div>
+
+          {currency.currency === 'USD' && (
+            <p className="text-[11px] text-muted-foreground pt-1">
+              Prices are shown in USD for convenience. Payment is processed in Mauritian Rupees (MUR)
+              at checkout; your bank may apply its own conversion.
+            </p>
+          )}
 
           {/* Terms agreement — required before paying */}
           <label className="flex items-start gap-2 pt-3 border-t border-border/40 cursor-pointer">
@@ -419,7 +429,7 @@ export function BuySubscribeDialog({
                 ? 'Loading…'
                 : paying
                   ? 'Redirecting…'
-                  : `Pay Rs ${combinedTotal.toFixed(2)}`
+                  : `Pay ${price(combinedTotal)}`
               }
             </Button>
           </DialogFooter>

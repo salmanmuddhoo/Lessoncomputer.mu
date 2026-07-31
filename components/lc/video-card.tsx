@@ -1,7 +1,10 @@
+'use client'
+
 import Link from 'next/link'
 import { Play, Clock, Lock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type { Video } from '@/lib/types/database'
+import { usePrice } from '@/components/lc/currency-provider'
 
 interface VideoCardProps {
   video: Video
@@ -9,6 +12,7 @@ interface VideoCardProps {
 }
 
 export function VideoCard({ video, owned }: VideoCardProps) {
+  const price = usePrice()
   return (
     <Link href={`/videos/${video.id}`}>
       <div className="group bg-card rounded-2xl overflow-hidden lc-shadow lc-card-hover border border-border/60 cursor-pointer">
@@ -65,7 +69,7 @@ export function VideoCard({ video, owned }: VideoCardProps) {
               {video.is_free || owned ? (
                 <span className="text-primary">Free</span>
               ) : (
-                `Rs ${video.price}`
+                price(Number((video as any).price) || 0)
               )}
             </span>
           </div>
