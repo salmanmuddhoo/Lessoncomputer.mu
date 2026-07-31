@@ -153,17 +153,27 @@ export default function AdminStudentsPage() {
   async function saveParentPhone() {
     if (!subStudent) return
     setSavingParentPhone(true)
-    const supabase = createClient()
-    const { error } = await (supabase as any)
-      .from('profiles')
-      .update({ parent_phone: editParentPhone.trim() || null })
-      .eq('id', subStudent.id)
-    if (error) { toast.error(error.message) } else {
+    // Admins have no RLS policy to update another user's profile — go through a
+    // service-role admin route instead of a direct client update (which silently no-ops).
+    try {
+      const res = await fetch('/api/admin/update-student-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: subStudent.id, parentPhone: editParentPhone.trim() || null }),
+      })
+      const data = await res.json() as { ok?: boolean; error?: string; parentPhone?: string | null }
+      if (!res.ok || !data.ok) {
+        toast.error(data.error ?? 'Could not update the phone number.')
+        return
+      }
       toast.success('Parent phone updated')
-      setSubStudent({ ...subStudent, parent_phone: editParentPhone.trim() || null })
+      setSubStudent({ ...subStudent, parent_phone: data.parentPhone ?? null })
       load()
+    } catch {
+      toast.error('Network error. Please try again.')
+    } finally {
+      setSavingParentPhone(false)
     }
-    setSavingParentPhone(false)
   }
 
   async function openDialog(student: Student) {
