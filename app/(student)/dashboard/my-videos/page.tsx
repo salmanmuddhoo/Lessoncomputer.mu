@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrencyInfo } from '@/lib/currency'
+import { formatMoney } from '@/lib/currency-format'
 import { VideoPackagesAccordion } from '@/components/lc/video-packages-accordion'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -67,6 +69,7 @@ export default async function MyVideoPackagesPage() {
 
   // A video subscription grants access only within its validity window; NULL dates =
   // unlimited. Expired video packages drop out of "subscribed" and become re-purchasable.
+  const currency = await getCurrencyInfo()
   const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
   const validSubs = (subs ?? []).filter((s: any) =>
     (!s.valid_from || s.valid_from <= muToday) && (!s.valid_until || s.valid_until >= muToday)
@@ -185,7 +188,7 @@ export default async function MyVideoPackagesPage() {
                     </div>
                   </div>
                   <div className="px-5 py-3 border-t border-border/60 flex items-center justify-between">
-                    <span className="text-lg font-bold text-primary">Rs {Number(pkg.price).toFixed(2)}</span>
+                    <span className="text-lg font-bold text-primary">{formatMoney(Number(pkg.price), currency)}</span>
                     <BuySubscribeDialog
                       videoPackages={allVideoPackages.map((p: any) => ({
                         id: p.id,

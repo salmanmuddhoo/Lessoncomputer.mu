@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { usePrice } from '@/components/lc/currency-provider'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
@@ -63,6 +64,7 @@ export function LiveMonthsList({
   liveSubscriptionPrice,
   gradeName,
 }: Props) {
+  const price = usePrice()
   const router = useRouter()
   const subscribedSet = new Set(subscribedPackageIds)
   const [openMonths, setOpenMonths] = useState<Record<string, boolean>>(() =>
@@ -185,7 +187,7 @@ export function LiveMonthsList({
                   {!isSubscribed && (
                     <>
                       <span className="text-sm font-bold text-primary">
-                        Rs {Number(liveSubscriptionPrice).toFixed(2)}
+                        {price(Number(liveSubscriptionPrice))}
                       </span>
                       {isPast ? (
                         <Button
@@ -291,7 +293,7 @@ export function LiveMonthsList({
                       </p>
                     </div>
                     <span className="text-sm font-semibold text-primary shrink-0">
-                      Rs {Number(liveSubscriptionPrice).toFixed(2)}
+                      {price(Number(liveSubscriptionPrice))}
                     </span>
                   </label>
                 )
@@ -302,7 +304,7 @@ export function LiveMonthsList({
               <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-primary/5 border border-primary/20">
                 <span className="text-sm font-medium">Total ({pastDialog.selectedIds.size} months)</span>
                 <span className="text-sm font-bold text-primary">
-                  Rs {(pastDialog.selectedIds.size * Number(liveSubscriptionPrice)).toFixed(2)}
+                  {price(pastDialog.selectedIds.size * Number(liveSubscriptionPrice))}
                 </span>
               </div>
             )}
@@ -325,7 +327,7 @@ export function LiveMonthsList({
               >
                 {paying
                   ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Processing…</>
-                  : `Pay Rs ${(pastDialog.selectedIds.size * Number(liveSubscriptionPrice)).toFixed(2)}`
+                  : `Pay ${price(pastDialog.selectedIds.size * Number(liveSubscriptionPrice))}`
                 }
               </Button>
             </DialogFooter>
@@ -346,7 +348,7 @@ export function LiveMonthsList({
 
             <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 flex items-center justify-between">
               <span className="text-sm font-medium">Live Classes — auto-renewing monthly</span>
-              <span className="text-sm font-bold text-primary shrink-0">Rs {Number(liveSubscriptionPrice).toFixed(2)}</span>
+              <span className="text-sm font-bold text-primary shrink-0">{price(Number(liveSubscriptionPrice))}</span>
             </div>
 
             <label className="flex items-start gap-2 pt-3 mt-1 border-t border-border/40 cursor-pointer">
@@ -367,7 +369,7 @@ export function LiveMonthsList({
               >
                 {paying
                   ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Redirecting…</>
-                  : `Pay Rs ${Number(liveSubscriptionPrice).toFixed(2)}`
+                  : `Pay ${price(Number(liveSubscriptionPrice))}`
                 }
               </Button>
             </DialogFooter>

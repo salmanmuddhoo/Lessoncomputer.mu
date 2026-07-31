@@ -2,6 +2,8 @@ import { Header } from '@/components/lc/header'
 import { Footer } from '@/components/lc/footer'
 import { WhatsAppButton } from '@/components/lc/whatsapp-button'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrencyInfo } from '@/lib/currency'
+import { CurrencyProvider } from '@/components/lc/currency-provider'
 
 export default async function MarketingLayout({
   children,
@@ -31,12 +33,14 @@ export default async function MarketingLayout({
     whatsappNumber = ss?.whatsapp_number ?? null
   } catch { /* table may not exist yet */ }
 
+  const currency = await getCurrencyInfo()
+
   return (
-    <>
+    <CurrencyProvider value={currency}>
       <Header user={user ? { email: user.email, role: profile?.role } : null} />
       <main className="pt-[72px]">{children}</main>
       <Footer />
       {whatsappNumber && <WhatsAppButton phoneNumber={whatsappNumber} />}
-    </>
+    </CurrencyProvider>
   )
 }

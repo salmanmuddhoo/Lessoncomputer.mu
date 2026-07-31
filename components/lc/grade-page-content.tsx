@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { VideoCard } from '@/components/lc/video-card'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
+import { usePrice } from '@/components/lc/currency-provider'
 import { StreamablePlayer } from '@/components/lc/streamable-player'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -84,6 +85,7 @@ export function GradePageContent({
   liveMonthPackageId,
   pastLivePackages = [],
 }: Props) {
+  const price = usePrice()
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
   const [demoModal, setDemoModal] = useState<{ videos: VideoRow[]; activeIdx: number } | null>(null)
 
@@ -192,7 +194,7 @@ export function GradePageContent({
                     </span>
                   ) : (
                     <>
-                      <span className="text-base font-bold text-primary">Rs {pkg.price.toFixed(2)}</span>
+                      <span className="text-base font-bold text-primary">{price(pkg.price)}</span>
                       {isLoggedIn ? (
                         <BuySubscribeDialog
                           videoPackages={dialogPackageList}
