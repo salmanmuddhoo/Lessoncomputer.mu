@@ -93,7 +93,7 @@ export default function AdminLiveMonthsPage() {
 
   const supabase = createClient()
   const currentYear = new Date().getFullYear()
-  const years = [currentYear - 1, currentYear, currentYear + 1]
+  const years = Array.from({ length: 8 }, (_, i) => currentYear - 1 + i)
 
   useEffect(() => {
     supabase.from('grades').select('id,name,color').eq('is_active', true).order('order_index')

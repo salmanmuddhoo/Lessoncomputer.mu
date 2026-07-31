@@ -27,14 +27,15 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
 const currentYear = new Date().getFullYear()
-const YEARS = [currentYear - 1, currentYear, currentYear + 1]
+// Last year through several years ahead, so classes can be scheduled well beyond the current year.
+const YEARS = Array.from({ length: 8 }, (_, i) => currentYear - 1 + i)
 
 const schema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().optional(),
   grade_id: z.string().min(1, 'Please select a grade'),
   month: z.coerce.number().min(1).max(12),
-  year: z.coerce.number().min(2024).max(2030),
+  year: z.coerce.number().min(2024).max(2100),
   class_time: z.string().min(1, 'Please set a start time'),
   meet_url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   is_recurring: z.boolean(),
