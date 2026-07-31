@@ -1,29 +1,38 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Menu, X, ChevronDown, LogOut } from 'lucide-react'
 import { ThemeToggle } from '@/components/lc/theme-toggle'
 import { Logo } from '@/components/lc/logo'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 
-const GRADES = [
-  { name: 'Grade 7',       slug: 'grade-7' },
-  { name: 'Grade 8',       slug: 'grade-8' },
-  { name: 'Grade 9',       slug: 'grade-9' },
-  { name: 'Grade 10',      slug: 'grade-10' },
-  { name: 'Grade 11 (SC)', slug: 'grade-11' },
-  { name: 'Grade 12 (HSC)',slug: 'grade-12' },
-]
+// Fallback if no grades are passed (e.g. before the list loads / on error).
+const DEFAULT_GRADES: { name: string; slug: string }[] = []
 
 interface HeaderProps {
   user?: { email?: string; role?: string } | null
+  grades?: { name: string; slug: string }[]
 }
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user, grades }: HeaderProps) {
+  const gradeList = grades && grades.length > 0 ? grades : DEFAULT_GRADES
   const [mobileOpen, setMobileOpen] = useState(false)
   const [gradesOpen, setGradesOpen] = useState(false)
+  const gradesRef = useRef<HTMLDivElement>(null)
+
+  // Close the desktop Grades dropdown on any click outside it (anywhere on the page).
+  useEffect(() => {
+    if (!gradesOpen) return
+    function onDocClick(e: MouseEvent) {
+      if (gradesRef.current && !gradesRef.current.contains(e.target as Node)) {
+        setGradesOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [gradesOpen])
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -45,30 +54,27 @@ export function Header({ user }: HeaderProps) {
               Home
             </Link>
 
-            {/* Grades dropdown — click-based to avoid hover gap closing */}
-            <div className="relative">
+            {/* Grades dropdown — click-based; closes on any outside click (see effect) */}
+            <div className="relative" ref={gradesRef}>
               <button
                 onClick={() => setGradesOpen((v) => !v)}
                 className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground lc-transition rounded-lg hover:bg-secondary"
               >
                 Grades <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${gradesOpen ? 'rotate-180' : ''}`} />
               </button>
-              {gradesOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setGradesOpen(false)} />
-                  <div className="absolute top-full left-0 mt-1 w-44 bg-card border border-border rounded-xl lc-shadow py-1.5 animate-scale-fade-in z-20">
-                    {GRADES.map((g) => (
-                      <Link
-                        key={g.slug}
-                        href={`/grades/${g.slug}`}
-                        onClick={() => setGradesOpen(false)}
-                        className="block px-4 py-2 text-sm text-foreground/70 hover:text-foreground hover:bg-secondary lc-transition"
-                      >
-                        {g.name}
-                      </Link>
-                    ))}
-                  </div>
-                </>
+              {gradesOpen && gradeList.length > 0 && (
+                <div className="absolute top-full left-0 mt-1 w-44 bg-card border border-border rounded-xl lc-shadow py-1.5 animate-scale-fade-in z-20 max-h-[70vh] overflow-y-auto">
+                  {gradeList.map((g) => (
+                    <Link
+                      key={g.slug}
+                      href={`/grades/${g.slug}`}
+                      onClick={() => setGradesOpen(false)}
+                      className="block px-4 py-2 text-sm text-foreground/70 hover:text-foreground hover:bg-secondary lc-transition"
+                    >
+                      {g.name}
+                    </Link>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -127,8 +133,10 @@ export function Header({ user }: HeaderProps) {
                 {item.label}
               </Link>
             ))}
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-3 pt-3 pb-1">Grades</p>
-            {GRADES.map((g) => (
+            {gradeList.length > 0 && (
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-3 pt-3 pb-1">Grades</p>
+            )}
+            {gradeList.map((g) => (
               <Link key={g.slug} href={`/grades/${g.slug}`} className="block px-3 py-2.5 text-sm hover:bg-secondary rounded-xl lc-transition" onClick={() => setMobileOpen(false)}>
                 {g.name}
               </Link>

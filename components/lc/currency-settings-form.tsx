@@ -36,7 +36,7 @@ export function CurrencySettingsForm({ initialUsdRate }: { initialUsdRate: numbe
 
   const example = (() => {
     const r = Number(rate)
-    return r > 0 ? `e.g. a Rs 1,000 package shows as $${(1000 / r).toFixed(2)}` : ''
+    return r > 0 ? `e.g. a Rs 1,000 package shows as $${Math.round(1000 / r).toLocaleString('en-US')}` : ''
   })()
 
   return (
