@@ -14,7 +14,9 @@ export default async function LiveSubscriptionsReportPage() {
 
   const today = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
 
-  // Active live subscriptions covering the current month (valid_from..valid_until).
+  // Active live subscriptions that are current OR upcoming — i.e. not yet expired.
+  // A student who just bought next month's subscription (valid_from in the future) is
+  // still counted, since their live membership is active going forward.
   const { data: subsRaw } = await (supabase as any)
     .from('student_subscriptions')
     .select('student_id, is_recurring, valid_from, valid_until, subscription_type, package:subscription_packages(package_type)')
@@ -22,8 +24,8 @@ export default async function LiveSubscriptionsReportPage() {
 
   const liveSubs = ((subsRaw ?? []) as any[]).filter((s) => {
     const isLive = s.subscription_type === 'live' || s.package?.package_type === 'live_month'
-    const current = (!s.valid_until || s.valid_until >= today) && (!s.valid_from || s.valid_from <= today)
-    return isLive && current
+    const notExpired = !s.valid_until || s.valid_until >= today
+    return isLive && notExpired
   })
 
   // One row per student — prefer a recurring (active) sub if they have several.
@@ -68,7 +70,7 @@ export default async function LiveSubscriptionsReportPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold">Live Subscriptions</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
-          Students with a live subscription for the current month, by grade — active (auto-renewing) vs cancelled.
+          Students with a current or upcoming live subscription, by grade — active (auto-renewing) vs cancelled.
         </p>
       </div>
 
@@ -86,7 +88,7 @@ export default async function LiveSubscriptionsReportPage() {
       {gradeList.length === 0 ? (
         <div className="py-16 text-center rounded-xl border border-border/60">
           <Radio className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">No live subscriptions for the current month.</p>
+          <p className="text-muted-foreground">No current or upcoming live subscriptions.</p>
         </div>
       ) : (
         <div className="space-y-4">
