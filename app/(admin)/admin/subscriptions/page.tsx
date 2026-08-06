@@ -49,7 +49,7 @@ interface FormState {
   description: string
   grade_id: string
   price: string
-  expires_days: string
+  expires_weeks: string
   is_active: boolean
   chapter_ids: string[]
 }
@@ -59,7 +59,7 @@ const EMPTY_FORM: FormState = {
   description: '',
   grade_id: '',
   price: '0',
-  expires_days: '',
+  expires_weeks: '',
   is_active: true,
   chapter_ids: [],
 }
@@ -165,7 +165,7 @@ export default function AdminSubscriptionsPage() {
       description: pkg.description ?? '',
       grade_id: pkg.grade_id,
       price: String(pkg.price),
-      expires_days: pkg.expires_days != null ? String(pkg.expires_days) : '',
+      expires_weeks: pkg.expires_days != null ? String(Math.max(1, Math.round(pkg.expires_days / 7))) : '',
       is_active: pkg.is_active,
       chapter_ids: pkg.chapters.map((c) => c.id),
     })
@@ -192,7 +192,7 @@ export default function AdminSubscriptionsPage() {
       description: form.description.trim() || null,
       grade_id: form.grade_id,
       price: parseFloat(form.price) || 0,
-      expires_days: form.expires_days.trim() ? parseInt(form.expires_days) : null,
+      expires_days: form.expires_weeks.trim() ? parseInt(form.expires_weeks) * 7 : null,
       is_active: form.is_active,
       package_type: 'video',
     }
@@ -321,7 +321,7 @@ export default function AdminSubscriptionsPage() {
                         Rs {pkg.price.toFixed(2)}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {pkg.expires_days != null ? `${pkg.expires_days} days access` : 'Lifetime access'}
+                        {pkg.expires_days != null ? `${Math.max(1, Math.round(pkg.expires_days / 7))} weeks access` : 'Lifetime access'}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {pkg.chapters.length} chapter{pkg.chapters.length !== 1 ? 's' : ''}
@@ -440,13 +440,13 @@ export default function AdminSubscriptionsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Access duration (days)</Label>
+              <Label>Access duration (weeks)</Label>
               <Input
                 type="number"
                 min="1"
                 placeholder="Leave empty for lifetime access"
-                value={form.expires_days}
-                onChange={(e) => setForm((f) => ({ ...f, expires_days: e.target.value }))}
+                value={form.expires_weeks}
+                onChange={(e) => setForm((f) => ({ ...f, expires_weeks: e.target.value }))}
               />
             </div>
 

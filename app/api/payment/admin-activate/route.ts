@@ -28,9 +28,9 @@ export async function POST(req: NextRequest) {
   // Resolve valid_from/valid_until for live packages
   const { data: pkgRows } = await (admin as any)
     .from('subscription_packages')
-    .select('id, package_type, month, year, grade_id')
+    .select('id, package_type, month, year, grade_id, expires_days')
     .in('id', orderRaw.package_ids)
-  const pkgMap = new Map<string, { package_type: string; month: number | null; year: number | null; grade_id: string | null }>(
+  const pkgMap = new Map<string, { package_type: string; month: number | null; year: number | null; grade_id: string | null; expires_days: number | null }>(
     (pkgRows ?? []).map((p: any) => [p.id, p])
   )
 
@@ -45,9 +45,9 @@ export async function POST(req: NextRequest) {
     for (const g of (gradeRows ?? []) as any[]) videoWeeksByGrade.set(g.id, g.video_validity_weeks ?? null)
   }
   const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
-  const addWeeks = (isoDate: string, weeks: number) => {
+  const addDays = (isoDate: string, days: number) => {
     const d = new Date(isoDate + 'T00:00:00Z')
-    d.setUTCDate(d.getUTCDate() + weeks * 7)
+    d.setUTCDate(d.getUTCDate() + days)
     return d.toISOString().split('T')[0]
   }
 
@@ -58,9 +58,11 @@ export async function POST(req: NextRequest) {
     if (isLivePkg && pkg?.month && pkg?.year) {
       dates = getMonthDateRange(pkg.month, pkg.year)
     } else {
-      const weeks = pkg?.grade_id ? videoWeeksByGrade.get(pkg.grade_id) : null
-      dates = (weeks && weeks > 0)
-        ? { validFrom: muToday, validUntil: addWeeks(muToday, weeks) }
+      // Package's own access duration (expires_days) wins; else the grade default.
+      const gradeWeeks = pkg?.grade_id ? videoWeeksByGrade.get(pkg.grade_id) : null
+      const days = pkg?.expires_days ?? (gradeWeeks && gradeWeeks > 0 ? gradeWeeks * 7 : null)
+      dates = (days && days > 0)
+        ? { validFrom: muToday, validUntil: addDays(muToday, days) }
         : { validFrom: null, validUntil: null }
     }
     return {
