@@ -402,7 +402,9 @@ export default async function GradePage({ params }: PageProps) {
         </div>
       )}
 
-      {(totalVideos > 0 || (chapters?.length ?? 0) > 0 || packages.length > 0) && (
+      {/* Video content is only shown when at least one video package exists — without a
+          package the per-chapter lessons aren't offered to students. */}
+      {hasPackages && (
         <section className="mb-12">
           {/* "Or" separator — only shown when live subscription banner is visible */}
           {liveSubscriptionEnabled && (
@@ -413,16 +415,9 @@ export default async function GradePage({ params }: PageProps) {
             </div>
           )}
 
-          {hasPackages && (
-            <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
-              <Package className="w-5 h-5 text-primary" /> Video Packages
-            </h2>
-          )}
-          {!hasPackages && (
-            <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
-              <Video className="w-5 h-5 text-primary" /> Video Lessons
-            </h2>
-          )}
+          <h2 className="text-lg sm:text-xl font-semibold mb-5 flex items-center gap-2">
+            <Package className="w-5 h-5 text-primary" /> Video Packages
+          </h2>
           <GradePageContent
             packages={packages}
             chapters={chapters ?? []}
@@ -445,7 +440,7 @@ export default async function GradePage({ params }: PageProps) {
         </section>
       )}
 
-      {totalVideos === 0 && (chapters?.length ?? 0) === 0 && packages.length === 0 && (
+      {!hasPackages && !liveSubscriptionEnabled && (
         <div className="py-24 text-center">
           <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-muted-foreground">No content available for this grade yet. Check back soon!</p>
