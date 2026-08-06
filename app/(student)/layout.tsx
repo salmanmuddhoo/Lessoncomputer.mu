@@ -34,6 +34,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
   let userName = (profile as any)?.full_name ?? null
   let gradeName = (profile?.grade as { name: string } | null)?.name ?? null
+  let hasGrade = !!(profile as any)?.grade_id
 
   // Safety net: if the name/grade captured at signup never landed on the profile
   // (e.g. the confirmation-email redirect skipped /api/auth/callback, or the DB
@@ -55,6 +56,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
         )
         if (meta.full_name) userName = meta.full_name
         if (meta.grade_id) {
+          hasGrade = true
           const { data: g } = await (admin as any).from('grades').select('name').eq('id', meta.grade_id).single()
           gradeName = g?.name ?? gradeName
         }
@@ -66,6 +68,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
         if (!error) {
           if (patch.full_name) userName = patch.full_name as string
           if (patch.grade_id) {
+            hasGrade = true
             const { data: g } = await (admin as any).from('grades').select('name').eq('id', patch.grade_id).single()
             gradeName = g?.name ?? gradeName
           }
@@ -75,6 +78,10 @@ export default async function StudentLayout({ children }: { children: React.Reac
       console.error('[student/layout] profile backfill failed:', e)
     }
   }
+
+  // A student MUST have a grade to use the dashboard. Email signups capture it; Google
+  // one-click sign-ups don't, so send them to onboarding to pick their grade first.
+  if (!hasGrade) redirect('/onboarding')
 
   const whatsappNumber = (siteSettingsRaw as any)?.whatsapp_number ?? null
 
