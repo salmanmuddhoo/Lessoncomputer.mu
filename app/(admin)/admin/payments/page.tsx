@@ -110,6 +110,10 @@ export default async function AdminPaymentsPage() {
     }))
     .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
 
+  // Global upcoming recurring payments across all students (next billing cycle).
+  const upcomingTotal = upcoming.reduce((sum, u) => sum + (Number.isFinite(u.amount) ? u.amount : 0), 0)
+  const upcomingCount = upcoming.length
+
   const totals = orders.reduce((acc, o) => {
     if (o.status === 'paid') acc.revenue += o.amount
     acc[o.status] = (acc[o.status] ?? 0) + 1
@@ -127,10 +131,15 @@ export default async function AdminPaymentsPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="rounded-xl border border-border/60 p-4 space-y-1">
           <p className="text-xs text-muted-foreground">Total Revenue</p>
           <p className="text-2xl font-bold text-primary">Rs {totals.revenue.toFixed(2)}</p>
+        </div>
+        <div className="rounded-xl border border-border/60 p-4 space-y-1">
+          <p className="text-xs text-muted-foreground flex items-center gap-1"><CalendarClock className="w-3 h-3" /> Upcoming recurring</p>
+          <p className="text-2xl font-bold">Rs {upcomingTotal.toFixed(2)}</p>
+          <p className="text-[11px] text-muted-foreground">{upcomingCount} student{upcomingCount !== 1 ? 's' : ''} · next {nextDate.toLocaleDateString('en-MU', { dateStyle: 'medium' })}</p>
         </div>
         {(['paid', 'pending', 'failed'] as const).map((s) => {
           const cfg = STATUS_CONFIG[s]

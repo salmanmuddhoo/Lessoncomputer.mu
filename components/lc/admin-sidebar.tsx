@@ -21,11 +21,11 @@ type NavEntry = NavLink | NavGroup
 const NAV: NavEntry[] = [
   { type: 'link', label: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true },
   { type: 'group', label: 'Tuition Setup', icon: GraduationCap, items: [
-    { label: 'Tuition Content', href: '/admin/videos',        icon: Video },
     { label: 'Live Classes',    href: '/admin/live-classes',  icon: Radio },
-    { label: 'Grades',          href: '/admin/grades',        icon: BookOpen },
+    { label: 'Tuition Content', href: '/admin/videos',        icon: Video },
     { label: 'Monthly Content', href: '/admin/live-months',   icon: CalendarDays },
     { label: 'Video Packages',  href: '/admin/subscriptions', icon: Package },
+    { label: 'Grades',          href: '/admin/grades',        icon: BookOpen },
   ] },
   { type: 'link', label: 'Students',     href: '/admin/students',     icon: Users },
   { type: 'link', label: 'Messages',     href: '/admin/broadcasts',   icon: Megaphone },
