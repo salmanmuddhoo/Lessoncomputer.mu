@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
+import { GoogleSignInButton } from '@/components/lc/google-signin-button'
 
 const schema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
@@ -113,6 +114,15 @@ export function RegisterForm({ grades }: RegisterFormProps) {
       </CardHeader>
 
       <CardContent>
+        <GoogleSignInButton label="Sign up with Google" />
+        <p className="text-xs text-muted-foreground text-center mt-2">
+          You&apos;ll pick your grade right after — takes a second.
+        </p>
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 border-t border-border/60" />
+          <span className="text-xs text-muted-foreground">or sign up with email</span>
+          <div className="flex-1 border-t border-border/60" />
+        </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">Full name</Label>

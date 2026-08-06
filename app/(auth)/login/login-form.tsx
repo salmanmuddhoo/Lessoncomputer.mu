@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { GoogleSignInButton } from '@/components/lc/google-signin-button'
 import { toast } from 'sonner'
 
 const schema = z.object({
@@ -77,6 +78,12 @@ export function LoginForm() {
       </CardHeader>
 
       <CardContent>
+        <GoogleSignInButton label="Sign in with Google" />
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 border-t border-border/60" />
+          <span className="text-xs text-muted-foreground">or</span>
+          <div className="flex-1 border-t border-border/60" />
+        </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email address</Label>

@@ -14,14 +14,16 @@ export async function GET(request: Request) {
       // should do this, but we backfill here (service role) so it's reliable regardless.
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        const meta = (user?.user_metadata ?? {}) as { full_name?: string; grade_id?: string }
-        if (user && (meta.full_name || meta.grade_id)) {
+        const meta = (user?.user_metadata ?? {}) as { full_name?: string; name?: string; grade_id?: string }
+        // Google returns `name` (and sometimes `full_name`); email signup sends full_name/grade_id.
+        const metaName = meta.full_name ?? meta.name
+        if (user && (metaName || meta.grade_id)) {
           const admin = createServiceRoleClient()
           const { data: existing } = await (admin as any)
             .from('profiles').select('full_name, grade_id').eq('id', user.id).maybeSingle()
 
           const patch: Record<string, unknown> = {}
-          if (!existing?.full_name && meta.full_name) patch.full_name = meta.full_name
+          if (!existing?.full_name && metaName) patch.full_name = metaName
           if (!existing?.grade_id && meta.grade_id) patch.grade_id = meta.grade_id
 
           if (Object.keys(patch).length > 0) {
