@@ -1,48 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { addParentToCurrentCohort } from '@/lib/parent-groups'
+import { sendWhatsAppText } from '@/lib/whatsapp'
 
-async function sendWhatsApp(to: string, groupUrl: string): Promise<void> {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
-  const accessToken  = process.env.WHATSAPP_ACCESS_TOKEN
-
-  if (!phoneNumberId || !accessToken) {
-    console.warn('[parent-contact] WhatsApp env vars not configured — skipping send')
-    return
-  }
-
-  // Normalise to E.164 digits only (strip +, spaces, dashes)
-  const digits = to.replace(/[^\d]/g, '')
-
-  const body = {
-    messaging_product: 'whatsapp',
-    to: digits,
-    type: 'text',
-    text: {
-      body:
-        `Hello! Your child has enrolled in live classes at Lesson Computer. ` +
-        `Join our parents' WhatsApp group to stay updated:\n\n${groupUrl}`,
-    },
-  }
-
-  const res = await fetch(
-    `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    }
-  )
-
-  if (!res.ok) {
-    const err = await res.text()
-    console.error('[parent-contact] WhatsApp API error', res.status, err)
-    throw new Error(`WhatsApp API returned ${res.status}`)
-  }
-}
-
+// POST /api/parent-contact  { phone }
+// A student provides their parent's number (mandatory to join live classes). We save it,
+// enrol the parent into their grade's CURRENT-year WhatsApp cohort, and — if that cohort
+// has a real WhatsApp group invite link — send it so the parent can self-join (the WhatsApp
+// API cannot add them automatically). Cooldown prevents send-spam.
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -52,41 +17,55 @@ export async function POST(req: NextRequest) {
   if (!phone || phone.trim().length < 7) {
     return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 })
   }
-
   const trimmedPhone = phone.trim()
 
-  // Save parent phone
+  // The student may only set their OWN parent phone (RLS also enforces this).
   const { error: profileError } = await (supabase as any)
     .from('profiles')
     .update({ parent_phone: trimmedPhone })
     .eq('id', user.id)
-
   if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 })
+    console.error('[parent-contact] save failed', profileError)
+    return NextResponse.json({ error: 'Could not save the number. Please try again.' }, { status: 500 })
   }
 
-  // Fetch WhatsApp group URL from site_settings
-  const { data: settings } = await (supabase as any)
-    .from('site_settings')
-    .select('whatsapp_group_url')
-    .eq('id', 1)
-    .single()
+  const admin = createServiceRoleClient()
 
-  const groupUrl = settings?.whatsapp_group_url as string | null
+  // Which grade does this student belong to? (Needed to pick the right cohort.)
+  const { data: prof } = await (admin as any)
+    .from('profiles')
+    .select('grade_id, parent_whatsapp_sent_at')
+    .eq('id', user.id)
+    .maybeSingle()
+  const gradeId = (prof as any)?.grade_id as string | null
 
-  if (groupUrl) {
-    try {
-      await sendWhatsApp(trimmedPhone, groupUrl)
-      await (supabase as any)
-        .from('profiles')
-        .update({ parent_whatsapp_sent_at: new Date().toISOString() })
-        .eq('id', user.id)
-    } catch (err) {
-      // Non-fatal: phone is saved, WA message failed — log and continue
-      console.error('[parent-contact] Failed to send WhatsApp:', err)
+  let groupUrl: string | null = null
+  let cohortId: string | null = null
+  if (gradeId) {
+    const res = await addParentToCurrentCohort(admin, user.id, gradeId, trimmedPhone)
+    groupUrl = res?.groupUrl ?? null
+    cohortId = res?.cohortId ?? null
+  }
+
+  // Send the grade's group invite link — but at most once (don't re-spam on every edit).
+  const alreadySent = !!(prof as any)?.parent_whatsapp_sent_at
+  if (groupUrl && !alreadySent) {
+    const sent = await sendWhatsAppText(
+      trimmedPhone,
+      `Hello! Your child has enrolled in live classes at Lesson Computer. ` +
+      `Join the parents' WhatsApp group for their class to stay updated:\n\n${groupUrl}`
+    )
+    if (sent.ok) {
+      const now = new Date().toISOString()
+      await (admin as any).from('profiles').update({ parent_whatsapp_sent_at: now }).eq('id', user.id)
+      if (cohortId) {
+        await (admin as any)
+          .from('parent_group_members')
+          .update({ invite_sent_at: now })
+          .eq('parent_group_id', cohortId)
+          .eq('student_id', user.id)
+      }
     }
-  } else {
-    console.warn('[parent-contact] No whatsapp_group_url configured in site_settings')
   }
 
   return NextResponse.json({ ok: true })

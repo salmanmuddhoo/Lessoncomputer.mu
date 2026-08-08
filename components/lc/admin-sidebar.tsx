@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Video, Users, BookOpen,
   LogOut, Settings, ChevronRight, ChevronDown, Radio, Menu, X, Package, CalendarDays,
-  BarChart2, ClipboardList, Megaphone, UserCheck, CreditCard, Newspaper, Landmark, MessageSquareQuote, GraduationCap,
+  BarChart2, ClipboardList, Megaphone, UserCheck, CreditCard, Newspaper, Landmark, MessageSquareQuote, GraduationCap, Contact,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { ThemeToggle } from '@/components/lc/theme-toggle'
@@ -29,6 +29,7 @@ const NAV: NavEntry[] = [
   ] },
   { type: 'link', label: 'Students',     href: '/admin/students',     icon: Users },
   { type: 'link', label: 'Messages',     href: '/admin/broadcasts',   icon: Megaphone },
+  { type: 'link', label: 'Parent Groups', href: '/admin/parent-groups', icon: Contact },
   { type: 'link', label: 'Attendance',   href: '/admin/attendance',   icon: UserCheck },
   { type: 'link', label: 'Finance',      href: '/admin/finance',      icon: Landmark },
   { type: 'group', label: 'Reports', icon: BarChart2, items: [
