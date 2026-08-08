@@ -137,6 +137,7 @@ function GradeCohortCard({
   const [inviteUrl, setInviteUrl] = useState(cohort?.whatsappGroupUrl ?? '')
   const [savingUrl, setSavingUrl] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [broadcastOpen, setBroadcastOpen] = useState(false)
   const [reportFor, setReportFor] = useState<Member | null>(null)
 
@@ -164,6 +165,20 @@ function GradeCohortCard({
     setSavingUrl(false)
     if (res.ok) { toast.success('Invite link saved.'); onChanged() }
     else toast.error((await res.json().catch(() => ({}))).error ?? 'Could not save.')
+  }
+
+  async function syncStudents() {
+    setSyncing(true)
+    const res = await fetch('/api/admin/parent-groups/sync', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gradeId: grade.id, academicYear: year }),
+    })
+    setSyncing(false)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      toast.success(data.added > 0 ? `Added ${data.added} parent${data.added === 1 ? '' : 's'} to the cohort.` : (data.message ?? 'Nothing to add.'))
+      onChanged()
+    } else toast.error(data.error ?? 'Could not sync.')
   }
 
   return (
@@ -202,6 +217,10 @@ function GradeCohortCard({
             <Button size="sm" onClick={() => setBroadcastOpen(true)} disabled={withPhone === 0}>
               <MessageSquare className="w-4 h-4 mr-2" /> Broadcast to all parents
             </Button>
+            <Button size="sm" variant="outline" onClick={syncStudents} disabled={syncing}>
+              {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Users className="w-4 h-4 mr-2" />}
+              Sync current students
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => setExpanded((e) => !e)}>
               {expanded ? <ChevronDown className="w-4 h-4 mr-1" /> : <ChevronRight className="w-4 h-4 mr-1" />}
               {expanded ? 'Hide' : 'Show'} parents
@@ -210,7 +229,13 @@ function GradeCohortCard({
 
           {expanded && (
             <div className="border rounded-lg divide-y">
-              {cohort.members.length === 0 && <p className="text-sm text-muted-foreground p-3">No parents in this cohort yet.</p>}
+              {cohort.members.length === 0 && (
+                <p className="text-sm text-muted-foreground p-3">
+                  No parents yet. Parents are added automatically when a student submits their number to join a
+                  live class — or click <strong>Sync current students</strong> to add existing students of this grade
+                  who already have a parent number on file.
+                </p>
+              )}
               {cohort.members.map((m) => (
                 <div key={m.id} className="flex items-center justify-between gap-3 p-3">
                   <div className="min-w-0">
