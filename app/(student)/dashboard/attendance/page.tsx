@@ -53,10 +53,9 @@ export default async function StudentAttendancePage() {
 
   // Fetch all published live classes for this grade (most recent first)
   const { data: classesRaw } = await (supabase as any)
-    .from('live_classes')
+    .from('live_classes_catalogue')
     .select('id, title, scheduled_at, attendance_open')
     .eq('grade_id', gradeId)
-    .eq('is_published', true)
     .order('scheduled_at', { ascending: false })
     .limit(200)
 

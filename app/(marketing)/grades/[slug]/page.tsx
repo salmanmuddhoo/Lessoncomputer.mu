@@ -81,17 +81,19 @@ export default async function GradePage({ params }: PageProps) {
     { data: pastLivePackages },
     { data: nextMonthLivePackage },
   ] = await Promise.all([
+    // Catalogue view: lists every published video WITHOUT streamable_url (paid stream
+    // URLs must never reach the browser). Demo URLs are fetched separately below.
     supabase
-      .from('videos')
-      .select('*, grade:grades(*), chapter:chapters(*)')
+      .from('videos_catalogue')
+      .select('*')
       .eq('grade_id', grade.id)
       .eq('is_published', true)
       .order('created_at', { ascending: false }),
+    // Catalogue view: schedule/title only, no meet_url / streamable_replay_url.
     supabase
-      .from('live_classes')
-      .select('*, grade:grades(*)')
+      .from('live_classes_catalogue')
+      .select('*')
       .eq('grade_id', grade.id)
-      .eq('is_published', true)
       .gte('scheduled_at', monthStart)
       .lt('scheduled_at', monthEnd)
       .order('scheduled_at', { ascending: true }),
@@ -199,10 +201,25 @@ export default async function GradePage({ params }: PageProps) {
     }
   }
 
+  // Demo videos are publicly previewable, so we DO need their stream URL — but only theirs.
+  // RLS allows anon to read streamable_url for is_demo rows; paid rows return nothing.
+  const demoUrlById = new Map<string, string>()
+  const demoIds = (videos ?? []).filter((v: any) => v.is_demo).map((v: any) => v.id)
+  if (demoIds.length > 0) {
+    const { data: demoRows } = await supabase
+      .from('videos')
+      .select('id, streamable_url')
+      .in('id', demoIds)
+    for (const d of (demoRows ?? []) as any[]) if (d.streamable_url) demoUrlById.set(d.id, d.streamable_url)
+  }
+
+  const gradeRef = { name: (grade as any).name, color: (grade as any).color, slug: (grade as any).slug }
   const videosByChapter: Record<string, any[]> = {}
   const unchapteredVideos: any[] = []
 
-  for (const v of videos ?? []) {
+  for (const raw of videos ?? []) {
+    // Attach the grade (VideoCard renders video.grade.name) and the demo URL where allowed.
+    const v = { ...raw, grade: gradeRef, streamable_url: demoUrlById.get(raw.id) ?? null }
     if (v.chapter_id) {
       videosByChapter[v.chapter_id] ??= []
       videosByChapter[v.chapter_id]!.push(v)
