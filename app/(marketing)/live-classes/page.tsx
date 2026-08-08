@@ -19,11 +19,16 @@ export const metadata: Metadata = {
 export default async function LiveClassesPage() {
   const supabase = await createClient()
 
-  const { data: liveClasses } = await supabase
-    .from('live_classes')
-    .select('*, grade:grades(name, color, slug)')
-    .eq('is_published', true)
+  // Catalogue view: no meet_url / streamable_replay_url reaches the public page.
+  const { data: liveClassesRaw } = await supabase
+    .from('live_classes_catalogue')
+    .select('*')
     .order('scheduled_at', { ascending: true })
+
+  const liveClasses = (liveClassesRaw ?? []).map((lc: any) => ({
+    ...lc,
+    grade: { name: lc.grade_name, color: lc.grade_color, slug: lc.grade_slug },
+  }))
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">

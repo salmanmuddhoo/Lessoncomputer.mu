@@ -18,14 +18,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params
   const supabase = await createClient()
   const { data } = await supabase
-    .from('videos')
-    .select('title, description, grade:grades(name)')
+    .from('videos_catalogue')
+    .select('title, description, grade_id')
     .eq('id', id)
-    .single()
+    .maybeSingle()
 
   if (!data) return { title: 'Video Lesson | LessonComputer.mu' }
 
-  const grade = data.grade as { name: string } | null
+  const { data: gradeRow } = await supabase
+    .from('grades').select('name').eq('id', (data as any).grade_id).maybeSingle()
+  const grade = gradeRow as { name: string } | null
   const title = `${data.title}${grade ? ` — ${grade.name}` : ''} | LessonComputer.mu`
   const description =
     data.description ??
@@ -45,26 +47,36 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
   const isLiveContext = live === '1'
   const supabase = await createClient()
 
-  let video: any = null
+  // Read catalogue metadata first (never contains streamable_url). This lets the page
+  // render the "Subscription required" upsell to non-subscribers instead of 404-ing.
+  let meta: any = null
   if (isLiveContext) {
     const { data } = await supabase
-      .from('videos')
-      .select('*, grade:grades(*), chapter:chapters(*)')
+      .from('videos_catalogue')
+      .select('*')
       .eq('id', id)
       .or('is_published.eq.true,is_published_for_live.eq.true' as any)
-      .single()
-    video = data
+      .maybeSingle()
+    meta = data
   } else {
     const { data } = await supabase
-      .from('videos')
-      .select('*, grade:grades(*), chapter:chapters(*)')
+      .from('videos_catalogue')
+      .select('*')
       .eq('id', id)
       .eq('is_published', true)
-      .single()
-    video = data
+      .maybeSingle()
+    meta = data
   }
 
-  if (!video) notFound()
+  if (!meta) notFound()
+
+  const [{ data: gradeRow }, { data: chapterRow }] = await Promise.all([
+    supabase.from('grades').select('name, color, slug').eq('id', meta.grade_id).maybeSingle(),
+    meta.chapter_id
+      ? supabase.from('chapters').select('title').eq('id', meta.chapter_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  const video: any = { ...meta, grade: gradeRow, chapter: chapterRow }
 
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -236,7 +248,20 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
 
   const grade = video.grade as { name: string; color: string; slug: string } | null
   const chapter = video.chapter as { title: string } | null
-  const playerUrl = (isLiveContext && video.streamable_url_live) ? video.streamable_url_live : video.streamable_url
+  // Only now — after access is confirmed — fetch the secret stream URL. RLS returns it
+  // solely to entitled callers (free/demo or an active matching subscription), so a
+  // non-subscriber never receives it even via this server component.
+  let playerUrl: string | null = null
+  if (hasAccess) {
+    const { data: urlRow } = await supabase
+      .from('videos')
+      .select('streamable_url, streamable_url_live')
+      .eq('id', id)
+      .maybeSingle()
+    playerUrl = (isLiveContext && (urlRow as any)?.streamable_url_live)
+      ? (urlRow as any).streamable_url_live
+      : ((urlRow as any)?.streamable_url ?? null)
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -261,7 +286,7 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
             {/* Player */}
             {hasAccess ? (
               <div className="w-full rounded-xl overflow-hidden bg-black shadow-lg">
-                <StreamablePlayer url={playerUrl} title={video.title} />
+                <StreamablePlayer url={playerUrl ?? ''} title={video.title} />
               </div>
             ) : (
               <div className="aspect-video rounded-xl bg-zinc-900 border border-border/40 flex flex-col items-center justify-center gap-4 px-6 text-center">
