@@ -23,7 +23,9 @@ function formatDuration(entryIso: string, endIso: string | null): string {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+  // Timestamps are stored as UTC; render them in Mauritius time (this runs on the server/UTC
+  // runtime, so an explicit timeZone is required to avoid showing times 4 hours early).
+  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Indian/Mauritius' })
 }
 
 export default async function AttendanceReportPage({ searchParams }: PageProps) {

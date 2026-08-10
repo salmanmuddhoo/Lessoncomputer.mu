@@ -17,18 +17,23 @@ interface Props {
 }
 
 export function ParentContactDialog({ open, onClose, onSuccess }: Props) {
+  const [countryCode, setCountryCode] = useState('230') // Mauritius by default
   const [phone, setPhone] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Full international number, digits only (country code + local number).
+  const fullNumber = `${countryCode}${phone}`.replace(/[^\d]/g, '')
+  const isValid = fullNumber.length >= 8
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!phone.trim()) return
+    if (!isValid) return
     setSaving(true)
     try {
       const res = await fetch('/api/parent-contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim() }),
+        body: JSON.stringify({ phone: fullNumber }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -62,22 +67,32 @@ export function ParentContactDialog({ open, onClose, onSuccess }: Props) {
           <div className="space-y-1.5">
             <Label htmlFor="parent-phone">Parent&apos;s WhatsApp Number</Label>
             <div className="flex gap-2">
-              <span className="inline-flex items-center px-3 rounded-lg border border-border/60 bg-muted text-sm text-muted-foreground shrink-0">
-                +230
-              </span>
+              <div className="inline-flex items-center rounded-lg border border-border/60 bg-muted pl-2.5 shrink-0 focus-within:ring-2 focus-within:ring-ring">
+                <span className="text-sm text-muted-foreground">+</span>
+                <Input
+                  aria-label="Country code"
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="230"
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value.replace(/[^\d]/g, ''))}
+                  disabled={saving}
+                  className="w-16 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+                />
+              </div>
               <Input
                 id="parent-phone"
                 type="tel"
                 inputMode="numeric"
                 placeholder="5XXXXXXX"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, ''))}
                 disabled={saving}
                 required
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Enter the number without the country code. E.g. 57123456
+              Include the country code. Mauritius is 230 (e.g. +230 57123456).
             </p>
           </div>
 
@@ -95,7 +110,7 @@ export function ParentContactDialog({ open, onClose, onSuccess }: Props) {
             </Button>
             <Button
               type="submit"
-              disabled={saving || !phone.trim()}
+              disabled={saving || !isValid}
               className="bg-primary text-primary-foreground hover:bg-accent"
             >
               {saving

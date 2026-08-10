@@ -32,11 +32,13 @@ interface AttendeeRow {
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
+// Timestamps are stored as UTC; always render them in Mauritius time so the displayed time
+// matches the local clock regardless of the admin's browser/server timezone.
 function fmt(iso: string) {
-  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Indian/Mauritius' })
 }
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-GB', { timeStyle: 'short' })
+  return new Date(iso).toLocaleTimeString('en-GB', { timeStyle: 'short', timeZone: 'Indian/Mauritius' })
 }
 
 /** Returns true if the class has started (based on scheduled time and recurrence). */
