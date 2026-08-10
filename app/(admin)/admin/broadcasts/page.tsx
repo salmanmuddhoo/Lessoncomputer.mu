@@ -17,7 +17,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Loader2, Plus, Trash2, Megaphone, Users, Radio, Video, FolderOpen, Bell } from 'lucide-react'
+import { Loader2, Plus, Trash2, Megaphone, Users, Radio, Video, Folder, FolderOpen, ChevronRight, ChevronDown, Bell } from 'lucide-react'
 import { toast } from 'sonner'
 
 const AUDIENCE_LABELS: Record<string, { label: string; icon: React.ElementType; className: string }> = {
@@ -51,6 +51,8 @@ export default function AdminBroadcastsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [openGrades, setOpenGrades] = useState<Record<string, boolean>>({})
+  const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
 
   // Form state
   const [title, setTitle] = useState('')
@@ -164,6 +166,38 @@ export default function AdminBroadcastsPage() {
     setDeleteId(null)
   }
 
+  function toggleGrade(k: string) { setOpenGrades((p) => ({ ...p, [k]: !p[k] })) }
+  function toggleChapter(k: string) { setOpenChapters((p) => ({ ...p, [k]: !p[k] })) }
+
+  // Organise messages into a grade → (General + chapter) folder tree. Grades follow their
+  // configured order; within a grade, chapter folders are alphabetical with "General" last.
+  const gradeOrder = new Map(grades.map((g, i) => [g.id, i]))
+  const gradeGroups = (() => {
+    const byGrade = new Map<string, { id: string; name: string; color: string; items: Broadcast[] }>()
+    for (const b of broadcasts) {
+      let g = byGrade.get(b.grade_id)
+      if (!g) { g = { id: b.grade_id, name: b.grade?.name ?? 'Unknown Grade', color: b.grade?.color ?? '#888888', items: [] }; byGrade.set(b.grade_id, g) }
+      g.items.push(b)
+    }
+    return Array.from(byGrade.values())
+      .sort((a, b) => (gradeOrder.get(a.id) ?? 999) - (gradeOrder.get(b.id) ?? 999))
+      .map((g) => {
+        const byChapter = new Map<string, { key: string; title: string; items: Broadcast[] }>()
+        for (const b of g.items) {
+          const ck = b.chapter_id ?? '__general__'
+          let c = byChapter.get(ck)
+          if (!c) { c = { key: ck, title: b.chapter?.title ?? 'General', items: [] }; byChapter.set(ck, c) }
+          c.items.push(b)
+        }
+        const chapters = Array.from(byChapter.values()).sort((a, b) => {
+          if (a.key === '__general__') return 1
+          if (b.key === '__general__') return -1
+          return a.title.localeCompare(b.title)
+        })
+        return { ...g, chapters }
+      })
+  })()
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -220,75 +254,100 @@ export default function AdminBroadcastsPage() {
           </Button>
         </div>
       ) : (
-        <div className="rounded-xl border border-border/60 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[620px]">
-              <thead className="bg-muted/30 border-b border-border/60">
-                <tr>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Title</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grade</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Chapter</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Audience</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Sent</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {broadcasts.map((b) => {
-                  const aud = AUDIENCE_LABELS[b.target_audience] ?? AUDIENCE_LABELS.all
-                  const AudIcon = aud.icon
-                  const grade = b.grade
-                  return (
-                    <tr key={b.id} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3">
-                        <p className="font-medium line-clamp-1 max-w-[220px]">{b.title}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-1 max-w-[220px] mt-0.5">{b.body}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        {grade && (
-                          <Badge
-                            variant="outline"
-                            style={{ borderColor: `${grade.color}40`, color: grade.color, backgroundColor: `${grade.color}10` }}
+        <div className="space-y-3">
+          {gradeGroups.map((g) => {
+            const gradeOpen = openGrades[g.id] ?? false
+            return (
+              <div key={g.id} className="rounded-xl border border-border/60 overflow-hidden">
+                {/* Grade folder */}
+                <button
+                  onClick={() => toggleGrade(g.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left"
+                >
+                  {gradeOpen
+                    ? <FolderOpen className="w-4 h-4 shrink-0" style={{ color: g.color }} />
+                    : <Folder className="w-4 h-4 shrink-0" style={{ color: g.color }} />}
+                  <Badge
+                    variant="outline"
+                    style={{ borderColor: `${g.color}40`, color: g.color, backgroundColor: `${g.color}10` }}
+                  >
+                    {g.name}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground ml-auto mr-1">
+                    {g.items.length} message{g.items.length !== 1 ? 's' : ''}
+                  </span>
+                  {gradeOpen
+                    ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+                </button>
+
+                {/* Chapter sub-folders */}
+                {gradeOpen && (
+                  <div className="border-t border-border/40 bg-muted/10 px-2 py-2 space-y-1.5">
+                    {g.chapters.map((ch) => {
+                      const chKey = `${g.id}::${ch.key}`
+                      const chOpen = openChapters[chKey] ?? false
+                      return (
+                        <div key={chKey} className="rounded-lg border border-border/50 bg-background overflow-hidden">
+                          <button
+                            onClick={() => toggleChapter(chKey)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-muted/30 transition-colors text-left"
                           >
-                            {grade.name}
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {b.chapter ? (
-                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <FolderOpen className="w-3 h-3" />
-                            {b.chapter.title}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">General</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className={`gap-1 text-xs ${aud.className}`}>
-                          <AudIcon className="w-3 h-3" />
-                          {aud.label}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
-                        {new Date(b.created_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:bg-destructive/10 h-7 w-7 p-0"
-                          onClick={() => setDeleteId(b.id)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                            {chOpen
+                              ? <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
+                              : <Folder className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                            <span className="text-sm font-medium flex-1">{ch.title}</span>
+                            <span className="text-xs text-muted-foreground mr-1">
+                              {ch.items.length} message{ch.items.length !== 1 ? 's' : ''}
+                            </span>
+                            {chOpen
+                              ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                          </button>
+
+                          {/* Messages inside the chapter */}
+                          {chOpen && (
+                            <div className="border-t border-border/30 divide-y divide-border/30">
+                              {ch.items.map((b) => {
+                                const aud = AUDIENCE_LABELS[b.target_audience] ?? AUDIENCE_LABELS.all
+                                const AudIcon = aud.icon
+                                return (
+                                  <div key={b.id} className="flex items-start gap-3 px-3 py-2.5">
+                                    <Megaphone className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-medium text-sm line-clamp-1">{b.title}</p>
+                                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{b.body}</p>
+                                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                        <Badge variant="outline" className={`gap-1 text-[10px] px-1.5 py-0 h-4 ${aud.className}`}>
+                                          <AudIcon className="w-2.5 h-2.5" />
+                                          {aud.label}
+                                        </Badge>
+                                        <span className="text-[11px] text-muted-foreground">
+                                          {new Date(b.created_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive hover:bg-destructive/10 h-7 w-7 p-0 shrink-0"
+                                      onClick={() => setDeleteId(b.id)}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 

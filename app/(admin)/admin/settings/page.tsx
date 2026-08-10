@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
 import { AccountForm } from './account-form'
 import { SiteSettingsForm } from '@/components/lc/site-settings-form'
-import { WhatsAppSettingsForm } from '@/components/lc/whatsapp-settings-form'
 import { BillingSettingsForm } from '@/components/lc/billing-settings-form'
 import { ManageAdmins } from '@/components/lc/manage-admins'
 import { CurrencySettingsForm } from '@/components/lc/currency-settings-form'
@@ -21,7 +20,7 @@ export default async function AdminSettingsPage() {
       .single(),
     (supabase as any)
       .from('site_settings')
-      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, whatsapp_group_url, billing_day, cutoff_day, usd_rate')
+      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, billing_day, cutoff_day, usd_rate')
       .eq('id', 1)
       .single(),
     (supabase as any)
@@ -39,7 +38,6 @@ export default async function AdminSettingsPage() {
     tiktok_url: string | null
     whatsapp_number: string | null
     mips_environment: string | null
-    whatsapp_group_url: string | null
     billing_day: number | null
     cutoff_day: number | null
     usd_rate: number | null
@@ -74,10 +72,6 @@ export default async function AdminSettingsPage() {
 
         {/* Right column */}
         <div className="space-y-6">
-          <WhatsAppSettingsForm
-            initialGroupUrl={ss.whatsapp_group_url ?? ''}
-          />
-
           <BillingSettingsForm
             initialBillingDay={ss.billing_day ?? 28}
             initialCutoffDay={ss.cutoff_day ?? 20}
