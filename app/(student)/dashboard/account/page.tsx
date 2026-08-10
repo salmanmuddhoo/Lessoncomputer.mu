@@ -17,14 +17,30 @@ export default async function AccountPage() {
     { data: profile },
     { data: grades },
     { data: purchases },
+    { data: subsRaw },
   ] = await Promise.all([
     supabase.from('profiles').select('*, grade:grades(id, name)').eq('id', user.id).single(),
     supabase.from('grades').select('id, name').eq('is_active', true).order('order_index'),
     supabase.from('purchases').select('id').eq('student_id', user.id).eq('status', 'completed'),
+    (supabase as any)
+      .from('student_subscriptions')
+      .select('package:subscription_packages(grade:grades(id, name))')
+      .eq('student_id', user.id)
+      .eq('status', 'active'),
   ])
 
   const currentGrade = profile?.grade as { id: string; name: string } | null
   const parentPhone = (profile as any)?.parent_phone as string | null
+
+  // Every grade the student is actively subscribed in (a student can hold live/video
+  // subscriptions in more than one grade), falling back to the profile grade.
+  const enrolledGrades: { id: string; name: string }[] = []
+  const seenGrade = new Set<string>()
+  for (const s of (subsRaw ?? []) as any[]) {
+    const g = s.package?.grade
+    if (g?.id && !seenGrade.has(g.id)) { seenGrade.add(g.id); enrolledGrades.push(g) }
+  }
+  if (enrolledGrades.length === 0 && currentGrade) enrolledGrades.push(currentGrade)
 
   return (
     <div>
@@ -45,9 +61,9 @@ export default async function AccountPage() {
               <p className="text-muted-foreground text-sm truncate">{user.email}</p>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <Badge variant="secondary" className="text-xs capitalize">{profile?.role}</Badge>
-                {currentGrade && (
-                  <Badge variant="outline" className="text-xs">{currentGrade.name}</Badge>
-                )}
+                {enrolledGrades.map((g) => (
+                  <Badge key={g.id} variant="outline" className="text-xs">{g.name}</Badge>
+                ))}
               </div>
             </div>
             <div className="ml-auto hidden sm:grid grid-cols-2 gap-x-8 gap-y-1 text-sm shrink-0">

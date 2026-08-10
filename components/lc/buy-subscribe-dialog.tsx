@@ -182,7 +182,7 @@ export function BuySubscribeDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md flex flex-col max-h-[90vh]" aria-describedby={undefined}>
+        <DialogContent className="max-w-md flex flex-col max-h-[85dvh] z-[60]" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Complete your purchase</DialogTitle>
           </DialogHeader>

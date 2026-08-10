@@ -4,14 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Badge } from '@/components/ui/badge'
-import { Megaphone, Users, Radio, Video, Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react'
-
-const AUDIENCE_META: Record<string, { label: string; icon: React.ElementType; className: string }> = {
-  all:   { label: 'All Students',   icon: Users,  className: 'bg-primary/10 text-primary border-primary/20' },
-  live:  { label: 'Live Classes',   icon: Radio,  className: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800' },
-  video: { label: 'Video Packages', icon: Video,  className: 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-800' },
-}
+import { Megaphone, Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react'
 
 interface Broadcast {
   id: string
@@ -108,8 +101,6 @@ export function NoticesList({ items, unreadIds = [], studentId }: Props) {
               {isOpen && (
                 <div className="border-t border-border/40 divide-y divide-border/30">
                   {group.items.map((item) => {
-                    const meta = AUDIENCE_META[item.target_audience] ?? AUDIENCE_META.all
-                    const Icon = meta.icon
                     const isUnread = unread.has(item.id)
                     return (
                       <button
@@ -121,10 +112,6 @@ export function NoticesList({ items, unreadIds = [], studentId }: Props) {
                           ? <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" aria-label="Unread" />
                           : <Megaphone className="w-3.5 h-3.5 text-primary shrink-0" />}
                         <span className={`flex-1 text-sm truncate ${isUnread ? 'font-bold' : 'font-medium'}`}>{item.title}</span>
-                        <Badge variant="outline" className={`gap-1 text-[10px] px-1.5 py-0 h-4 shrink-0 ${meta.className}`}>
-                          <Icon className="w-2.5 h-2.5" />
-                          {meta.label}
-                        </Badge>
                         <span className="text-[11px] text-muted-foreground whitespace-nowrap ml-1 shrink-0">
                           {new Date(item.created_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                         </span>
@@ -146,16 +133,6 @@ export function NoticesList({ items, unreadIds = [], studentId }: Props) {
             </DialogHeader>
             <div className="space-y-3 py-1">
               <div className="flex flex-wrap items-center gap-2">
-                {(() => {
-                  const meta = AUDIENCE_META[selected.target_audience] ?? AUDIENCE_META.all
-                  const Icon = meta.icon
-                  return (
-                    <Badge variant="outline" className={`gap-1 text-xs ${meta.className}`}>
-                      <Icon className="w-3 h-3" />
-                      {meta.label}
-                    </Badge>
-                  )
-                })()}
                 {selected.chapter && (
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <FolderOpen className="w-3 h-3" />
