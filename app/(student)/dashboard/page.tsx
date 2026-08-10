@@ -215,7 +215,7 @@ export default async function StudentDashboardPage({ searchParams }: { searchPar
             </div>
           )}
           {hasVideo && (
-            <Link href="/dashboard/my-videos" className="p-5 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors flex flex-col">
+            <Link href={`/dashboard/my-videos${grade ? `?grade=${grade.id}` : ''}`} className="p-5 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors flex flex-col">
               <div className="flex items-center gap-2 mb-1">
                 <PlayCircle className="w-4 h-4 text-primary" />
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your videos</span>

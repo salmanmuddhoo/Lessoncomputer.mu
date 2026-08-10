@@ -67,13 +67,8 @@ export function LiveMonthsList({
   const price = usePrice()
   const router = useRouter()
   const subscribedSet = new Set(subscribedPackageIds)
-  const [openMonths, setOpenMonths] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(
-      packages
-        .filter(p => subscribedSet.has(p.id))
-        .map(p => [p.id, true])
-    )
-  )
+  // All month folders start collapsed; the student expands the ones they want.
+  const [openMonths, setOpenMonths] = useState<Record<string, boolean>>({})
   const [paying, setPaying] = useState(false)
   const [pastDialog, setPastDialog] = useState<{ selectedIds: Set<string> } | null>(null)
   const [confirmCurrent, setConfirmCurrent] = useState<MonthPackage | null>(null)
