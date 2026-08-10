@@ -75,17 +75,35 @@ export default async function StudentSubscriptionsPage() {
 
   const liveSubs = activeSubs.filter((s: any) => s.subscription_type === 'live' && s.package?.month != null && s.package?.year != null)
 
-  // Only the latest live recurring subscription shows the Cancel button.
-  const latestLiveRecurringId = liveSubs.filter((s: any) => s.is_recurring).sort(byLatestMonth)[0]?.id ?? null
-  // The latest live subscription overall — the only one that can show Restore.
-  const latestLiveSubId = [...liveSubs].sort(byLatestMonth)[0]?.id ?? null
+  // A student can hold an independent live recurring subscription in more than one grade.
+  // Group live subscriptions by grade so the Cancel/Restore controls are computed PER GRADE
+  // (each grade manages its own latest month), rather than collapsed into a single one.
+  const gradeKey = (s: any) => s.package?.grade?.slug ?? s.package_id
+  const liveByGrade = new Map<string, any[]>()
+  for (const s of liveSubs) {
+    const k = gradeKey(s)
+    const arr = liveByGrade.get(k)
+    if (arr) arr.push(s)
+    else liveByGrade.set(k, [s])
+  }
+
+  // Within each grade: only the latest live recurring subscription shows Cancel, and only the
+  // latest live subscription overall can show Restore.
+  const latestLiveRecurringIds = new Set<string>()
+  const latestLiveSubIds = new Set<string>()
+  for (const group of liveByGrade.values()) {
+    const rec = group.filter((s: any) => s.is_recurring).sort(byLatestMonth)[0]
+    if (rec) latestLiveRecurringIds.add(rec.id)
+    const latest = [...group].sort(byLatestMonth)[0]
+    if (latest) latestLiveSubIds.add(latest.id)
+  }
 
   const today = new Date().toISOString().split('T')[0]
 
-  // Restore only on the LATEST month, and only when it's the one that was cancelled
-  // (past months keep no recurring control — cancelling/restoring them is meaningless).
+  // Restore only on the LATEST month within its grade, and only when it's the one that was
+  // cancelled (past months keep no recurring control — cancelling/restoring them is meaningless).
   function canResubscribeLive(sub: any): boolean {
-    if (sub.id !== latestLiveSubId) return false
+    if (!latestLiveSubIds.has(sub.id)) return false
     if (sub.is_recurring) return false
     if (sub.valid_until && sub.valid_until < today) return false
     return true
@@ -163,7 +181,7 @@ export default async function StudentSubscriptionsPage() {
               packageId={sub.package_id}
               subscriptionType={sub.subscription_type ?? 'video'}
               isRecurring={sub.is_recurring ?? false}
-              canCancelRecurring={sub.id === latestLiveRecurringId}
+              canCancelRecurring={latestLiveRecurringIds.has(sub.id)}
               canResubscribe={canResubscribeLive(sub)}
               gradeSlug={sub.package?.grade?.slug ?? null}
               gradeName={sub.package?.grade?.name ?? null}
