@@ -10,6 +10,7 @@ import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { LiveMonthsList } from '@/components/lc/live-months-list'
 import { JoinLiveClassButton } from '@/components/lc/join-live-class-button'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
+import { DashboardGradeFilter } from '@/components/lc/dashboard-grade-filter'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Live Classes' }
@@ -19,23 +20,54 @@ const MONTHS = [
   'July','August','September','October','November','December',
 ]
 
-export default async function StudentLiveClassesPage() {
+type LiveGrade = {
+  id: string; name: string; color: string; slug: string
+  live_subscription_enabled: boolean; live_subscription_price: number
+}
+
+export default async function StudentLiveClassesPage({ searchParams }: { searchParams: Promise<{ grade?: string }> }) {
+  const { grade: gradeParam } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('grade_id, parent_phone, grade:grades(id, name, color, slug, live_subscription_enabled, live_subscription_price)')
-    .eq('id', user.id)
-    .single()
+  const [{ data: profile }, { data: allSubsRaw }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('grade_id, parent_phone, grade:grades(id, name, color, slug, live_subscription_enabled, live_subscription_price)')
+      .eq('id', user.id)
+      .single(),
+    (supabase as any)
+      .from('student_subscriptions')
+      .select('package_id, purchased_at, is_recurring, subscription_type, valid_from, valid_until, package:subscription_packages(package_type, grade:grades(id, name, color, slug, live_subscription_enabled, live_subscription_price))')
+      .eq('student_id', user.id)
+      .eq('status', 'active'),
+  ])
 
   const hasParentPhone = !!((profile as any)?.parent_phone)
+  const profileGrade = (profile?.grade as LiveGrade | null) ?? null
+  const allSubs = (allSubsRaw ?? []) as any[]
 
-  const grade = profile?.grade as {
-    id: string; name: string; color: string; slug: string
-    live_subscription_enabled: boolean; live_subscription_price: number
-  } | null
+  // Grades the student is actively enrolled in for live classes. A student can hold live
+  // subscriptions in more than one grade; the page shows one grade at a time via ?grade=<id>
+  // and offers a switcher when there's more than one. Falls back to the profile grade for
+  // browsing when the student isn't subscribed to any live grade yet.
+  const enrolledLiveGrades: LiveGrade[] = []
+  const seenGrade = new Set<string>()
+  for (const s of allSubs) {
+    const isLive = s.subscription_type === 'live' || s.package?.package_type === 'live_month'
+    const g = s.package?.grade as LiveGrade | undefined
+    if (isLive && g?.id && g.live_subscription_enabled && !seenGrade.has(g.id)) {
+      seenGrade.add(g.id); enrolledLiveGrades.push(g)
+    }
+  }
+  if (enrolledLiveGrades.length === 0 && profileGrade) enrolledLiveGrades.push(profileGrade)
+
+  const grade =
+    enrolledLiveGrades.find((g) => g.id === gradeParam) ??
+    enrolledLiveGrades.find((g) => g.id === profile?.grade_id) ??
+    enrolledLiveGrades[0] ??
+    profileGrade
 
   if (!grade) {
     return (
@@ -69,7 +101,8 @@ export default async function StudentLiveClassesPage() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
 
-  const [{ data: livePackages }, { data: videoPackagesRaw }, { data: subs }, { data: currentLiveClass }] = await Promise.all([
+  const subs = allSubs
+  const [{ data: livePackages }, { data: videoPackagesRaw }, { data: currentLiveClass }] = await Promise.all([
     supabase
       .from('subscription_packages')
       .select('id, name, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index))')
@@ -86,11 +119,6 @@ export default async function StudentLiveClassesPage() {
       .neq('package_type', 'live_month')
       .eq('is_active', true)
       .order('name', { ascending: true }),
-    supabase
-      .from('student_subscriptions')
-      .select('package_id, purchased_at, is_recurring, subscription_type, valid_from, valid_until')
-      .eq('student_id', user.id)
-      .eq('status', 'active'),
     supabase
       .from('live_classes')
       .select('id, title, meet_url, scheduled_at, is_recurring, recurrence_day_of_week, end_time')
@@ -135,11 +163,16 @@ export default async function StudentLiveClassesPage() {
     const subscribedLivePackageIds = [...subscribedPackageIds].filter((id) => livePackageIds.has(id as string)) as string[]
     return (
       <div>
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">Live Classes</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            Monthly live sessions for <span className="font-medium" style={{ color: grade.color }}>{grade.name}</span>
-          </p>
+        <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold">Live Classes</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              Monthly live sessions for <span className="font-medium" style={{ color: grade.color }}>{grade.name}</span>
+            </p>
+          </div>
+          {enrolledLiveGrades.length > 1 && (
+            <DashboardGradeFilter grades={enrolledLiveGrades} selectedId={grade.id} basePath="/dashboard/live-classes" />
+          )}
         </div>
         <div className="py-16 px-6 text-center rounded-xl border border-primary/20 bg-primary/5">
           <Radio className="w-12 h-12 text-primary/40 mx-auto mb-4" />
@@ -220,11 +253,16 @@ export default async function StudentLiveClassesPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Live Classes</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
-          Monthly live sessions for <span className="font-medium" style={{ color: grade.color }}>{grade.name}</span>
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">Live Classes</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            Monthly live sessions for <span className="font-medium" style={{ color: grade.color }}>{grade.name}</span>
+          </p>
+        </div>
+        {enrolledLiveGrades.length > 1 && (
+          <DashboardGradeFilter grades={enrolledLiveGrades} selectedId={grade.id} basePath="/dashboard/live-classes" />
+        )}
       </div>
 
       {/* Join banner — always visible when there's a current live class or current month package */}
