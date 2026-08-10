@@ -27,6 +27,7 @@ interface Student {
   created_at: string
   parent_phone: string | null
   grade: { id: string; name: string; color: string } | null
+  enrolledGrades?: { id: string; name: string; color: string }[]
 }
 
 interface Grade {
@@ -107,15 +108,40 @@ export default function AdminStudentsPage() {
 
   async function load() {
     const supabase = createClient()
-    const [{ data: studentData }, { data: gradeData }] = await Promise.all([
+    const [{ data: studentData }, { data: gradeData }, { data: subGrades }] = await Promise.all([
       (supabase as any)
         .from('profiles')
         .select('id, full_name, is_active, created_at, parent_phone, grade:grades(id, name, color)')
         .eq('role', 'student')
         .order('created_at', { ascending: false }),
       supabase.from('grades').select('id, name, color').eq('is_active', true).order('order_index'),
+      // Every grade a student is actively enrolled in via a subscription (a student can hold
+      // live subscriptions for more than one grade at the same time).
+      (supabase as any)
+        .from('student_subscriptions')
+        .select('student_id, package:subscription_packages(grade:grades(id, name, color))')
+        .eq('status', 'active'),
     ])
-    setStudents((studentData ?? []) as Student[])
+
+    // student_id -> distinct grades from their subscriptions
+    const enrolledByStudent = new Map<string, Map<string, { id: string; name: string; color: string }>>()
+    for (const r of (subGrades ?? []) as any[]) {
+      const g = r.package?.grade
+      if (!g?.id) continue
+      if (!enrolledByStudent.has(r.student_id)) enrolledByStudent.set(r.student_id, new Map())
+      enrolledByStudent.get(r.student_id)!.set(g.id, g)
+    }
+
+    const withGrades = ((studentData ?? []) as any[]).map((s) => {
+      // Union of the profile grade and every subscribed grade, de-duplicated by id.
+      const m = new Map<string, { id: string; name: string; color: string }>()
+      if (s.grade?.id) m.set(s.grade.id, s.grade)
+      const subs = enrolledByStudent.get(s.id)
+      if (subs) for (const [id, g] of subs) m.set(id, g)
+      return { ...s, enrolledGrades: Array.from(m.values()) }
+    })
+
+    setStudents(withGrades as Student[])
     setGrades(gradeData ?? [])
     setLoading(false)
   }
@@ -142,12 +168,22 @@ export default function AdminStudentsPage() {
   }
 
   async function deleteStudent(id: string, name: string | null) {
-    if (!confirm(`Permanently delete ${name ?? 'this student'}? This cannot be undone.`)) return
-    const supabase = createClient()
-    const { error } = await supabase.from('profiles').delete().eq('id', id)
-    if (error) { toast.error(error.message); return }
-    toast.success('Student deleted')
-    load()
+    if (!confirm(`Permanently delete ${name ?? 'this student'}? This removes their account, subscriptions and payment history and cannot be undone. (To keep records, use Deactivate instead.)`)) return
+    // Admins have no RLS policy to delete a profile, so a direct client delete silently
+    // no-ops — go through a service-role admin route.
+    try {
+      const res = await fetch('/api/admin/delete-student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: id }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string }
+      if (!res.ok || !data.ok) { toast.error(data.error ?? 'Could not delete the student.'); return }
+      toast.success('Student deleted')
+      load()
+    } catch {
+      toast.error('Network error. Please try again.')
+    }
   }
 
   async function saveParentPhone() {
@@ -248,7 +284,7 @@ export default function AdminStudentsPage() {
   }
 
   const filtered = students
-    .filter((s) => gradeFilter === 'all' || s.grade?.id === gradeFilter)
+    .filter((s) => gradeFilter === 'all' || s.grade?.id === gradeFilter || (s.enrolledGrades ?? []).some((g) => g.id === gradeFilter))
     .filter((s) => !search || (s.full_name ?? '').toLowerCase().includes(search.toLowerCase()))
 
   const countByGrade: Record<string, number> = {}
@@ -360,7 +396,15 @@ export default function AdminStudentsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        {s.grade ? (
+                        {(s.enrolledGrades && s.enrolledGrades.length > 0) ? (
+                          <div className="flex flex-wrap gap-1">
+                            {s.enrolledGrades.map((g) => (
+                              <Badge key={g.id} variant="outline" className="text-xs" style={{ borderColor: `${g.color}40`, color: g.color }}>
+                                {g.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : s.grade ? (
                           <Badge variant="outline" className="text-xs" style={{ borderColor: `${s.grade.color}40`, color: s.grade.color }}>
                             {s.grade.name}
                           </Badge>
