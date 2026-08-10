@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { formatWhatsAppDisplay, normalizeWhatsAppDigits } from '@/lib/phone'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
@@ -195,7 +196,7 @@ export default function AdminStudentsPage() {
       const res = await fetch('/api/admin/update-student-phone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: subStudent.id, parentPhone: editParentPhone.trim() || null }),
+        body: JSON.stringify({ studentId: subStudent.id, parentPhone: normalizeWhatsAppDigits(editParentPhone) || null }),
       })
       const data = await res.json() as { ok?: boolean; error?: string; parentPhone?: string | null }
       if (!res.ok || !data.ok) {
@@ -214,7 +215,7 @@ export default function AdminStudentsPage() {
 
   async function openDialog(student: Student) {
     setSubStudent(student)
-    setEditParentPhone(student.parent_phone ?? '')
+    setEditParentPhone(normalizeWhatsAppDigits(student.parent_phone))
     setDialogTab('details')
     setSubLoading(true)
     setAddingVideoPkg('')
@@ -414,7 +415,7 @@ export default function AdminStudentsPage() {
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         {s.parent_phone
-                          ? <span className="text-sm font-mono">{s.parent_phone}</span>
+                          ? <span className="text-sm font-mono">{formatWhatsAppDisplay(s.parent_phone)}</span>
                           : <span className="text-xs text-muted-foreground italic">Not provided</span>}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
@@ -530,16 +531,16 @@ export default function AdminStudentsPage() {
                     <Phone className="w-3.5 h-3.5" /> Parent Contact
                   </p>
                   <div className="flex gap-2">
-                    <div className="flex gap-1.5 flex-1">
-                      <span className="inline-flex items-center px-3 rounded-lg border border-border/60 bg-muted text-sm text-muted-foreground shrink-0">+230</span>
+                    <div className="flex items-center gap-1.5 flex-1 rounded-lg border border-border/60 bg-muted pl-2.5 focus-within:ring-2 focus-within:ring-ring">
+                      <span className="text-sm text-muted-foreground">+</span>
                       <Input
                         type="tel"
                         inputMode="numeric"
-                        placeholder="5XXXXXXX"
+                        placeholder="23057123456"
                         value={editParentPhone}
-                        onChange={(e) => setEditParentPhone(e.target.value)}
+                        onChange={(e) => setEditParentPhone(e.target.value.replace(/[^\d]/g, ''))}
                         disabled={savingParentPhone}
-                        className="font-mono"
+                        className="font-mono border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
                       />
                     </div>
                     <Button size="sm" onClick={saveParentPhone} disabled={savingParentPhone} className="bg-primary text-primary-foreground hover:bg-accent shrink-0">

@@ -14,10 +14,11 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { phone } = await req.json() as { phone?: string }
-  if (!phone || phone.trim().length < 7) {
-    return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 })
+  // Full international number, digits only (country code + local number).
+  const trimmedPhone = (phone ?? '').replace(/[^\d]/g, '')
+  if (trimmedPhone.length < 8) {
+    return NextResponse.json({ error: 'A valid phone number with country code is required' }, { status: 400 })
   }
-  const trimmedPhone = phone.trim()
 
   // The student may only set their OWN parent phone (RLS also enforces this).
   const { error: profileError } = await (supabase as any)

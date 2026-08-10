@@ -5,6 +5,7 @@ import { ProfileSettingsForm, PasswordSettingsForm } from './account-settings-fo
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Phone } from 'lucide-react'
+import { formatWhatsAppDisplay } from '@/lib/phone'
 
 export const metadata: Metadata = { title: 'My Account' }
 
@@ -117,7 +118,7 @@ export default async function AccountPage() {
             <CardContent className="space-y-1">
               {parentPhone ? (
                 <>
-                  <p className="text-sm font-mono font-medium">+230 {parentPhone}</p>
+                  <p className="text-sm font-mono font-medium">{formatWhatsAppDisplay(parentPhone)}</p>
                   <p className="text-xs text-muted-foreground">
                     This number receives WhatsApp updates about your live classes. Contact support to change it.
                   </p>

@@ -7,6 +7,8 @@
 // sends to "cold" numbers, WhatsApp requires a pre-approved message TEMPLATE — configure
 // those in Meta and switch `type` to `template` once approved.
 
+import { normalizeWhatsAppDigits } from '@/lib/phone'
+
 export type WhatsAppResult = { ok: boolean; error?: string }
 
 export function isWhatsAppConfigured(): boolean {
@@ -20,7 +22,7 @@ export async function sendWhatsAppText(to: string, body: string): Promise<WhatsA
     return { ok: false, error: 'WhatsApp is not configured' }
   }
 
-  const digits = (to ?? '').replace(/[^\d]/g, '') // E.164 digits only
+  const digits = normalizeWhatsAppDigits(to) // full international E.164 digits
   if (digits.length < 7) return { ok: false, error: 'Invalid phone number' }
 
   try {
