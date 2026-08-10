@@ -69,6 +69,9 @@ export function BuySubscribeDialog({
   const subscribedLiveSet = new Set(subscribedLivePackageIds)
   const isCurrentMonthSubscribed = !!(liveMonthPackageId && subscribedLiveSet.has(liveMonthPackageId))
   const canIncludeLive = liveSubscriptionEnabled && !!liveMonthPackageId && !isCurrentMonthSubscribed
+  // Live is enabled/priced for this grade, but no live package has been set up for the
+  // current month yet (done in Admin → Monthly Content) — so there is nothing to charge.
+  const liveNotSetUp = defaultMode === 'live' && liveSubscriptionEnabled && !liveMonthPackageId
 
   const [open, setOpen] = useState(false)
   const [includeLive, setIncludeLive] = useState(false)
@@ -185,6 +188,20 @@ export function BuySubscribeDialog({
           </DialogHeader>
 
           <div className="space-y-4 py-1 overflow-y-auto flex-1 min-h-0">
+            {/* Live enabled for this grade, but this month's live classes aren't open yet. */}
+            {liveNotSetUp && (
+              <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <Radio className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-sm">Live classes aren&apos;t open for this month yet</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {gradeName} live classes for the current month haven&apos;t been set up yet. Please check
+                    back soon — you&apos;ll be able to subscribe once they&apos;re available.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Live subscription section — only when the dialog was opened from a live
                 "Subscribe" entry point (defaultMode='live'). Video entry points show
                 only video packages, and vice versa. */}
@@ -399,6 +416,7 @@ export function BuySubscribeDialog({
           )}
 
           {/* Terms agreement — required before paying */}
+          {!liveNotSetUp && (
           <label className="flex items-start gap-2 pt-3 border-t border-border/40 cursor-pointer">
             <Checkbox
               checked={agreed}
@@ -413,25 +431,28 @@ export function BuySubscribeDialog({
               of LessonComputer.mu.
             </span>
           </label>
+          )}
 
           <DialogFooter className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button
-              onClick={initiatePayment}
-              disabled={!mounted || paying || combinedTotal === 0 || !agreed}
-              className="bg-primary text-primary-foreground hover:bg-accent"
-            >
-              {paying
-                ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                : <CheckCircle2 className="w-4 h-4 mr-2" />
-              }
-              {!mounted
-                ? 'Loading…'
-                : paying
-                  ? 'Redirecting…'
-                  : `Pay ${price(combinedTotal)}`
-              }
-            </Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>{liveNotSetUp ? 'Close' : 'Cancel'}</Button>
+            {!liveNotSetUp && (
+              <Button
+                onClick={initiatePayment}
+                disabled={!mounted || paying || combinedTotal === 0 || !agreed}
+                className="bg-primary text-primary-foreground hover:bg-accent"
+              >
+                {paying
+                  ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  : <CheckCircle2 className="w-4 h-4 mr-2" />
+                }
+                {!mounted
+                  ? 'Loading…'
+                  : paying
+                    ? 'Redirecting…'
+                    : `Pay ${price(combinedTotal)}`
+                }
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
