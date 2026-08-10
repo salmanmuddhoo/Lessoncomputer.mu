@@ -130,6 +130,9 @@ export default function AdminVideosPage() {
     setNotes((noteData ?? []) as NoteRow[])
     setGrades(gradeData ?? [])
     setChapters(chapterData ?? [])
+    // Start with every folder collapsed so the page opens tidy; the admin expands what they need.
+    setCollapsedGrades(new Set(((gradeData ?? []) as any[]).map((g) => g.id)))
+    setCollapsedChapters(new Set(((chapterData ?? []) as any[]).map((c) => c.id)))
     setPkgInfos((pkgData ?? []).map((p: any) => ({
       id: p.id,
       grade_id: p.grade_id,

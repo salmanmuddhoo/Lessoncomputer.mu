@@ -166,6 +166,8 @@ export default async function StudentSubscriptionsPage() {
               canCancelRecurring={sub.id === latestLiveRecurringId}
               canResubscribe={canResubscribeLive(sub)}
               gradeSlug={sub.package?.grade?.slug ?? null}
+              gradeName={sub.package?.grade?.name ?? null}
+              gradeColor={sub.package?.grade?.color ?? null}
               purchasedAt={sub.purchased_at}
               pkg={sub.package}
               orderId={receiptForSub.get(sub.id) ?? null}

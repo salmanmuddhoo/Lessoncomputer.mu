@@ -24,6 +24,8 @@ interface SubscriptionCardProps {
   canCancelRecurring?: boolean
   canResubscribe?: boolean
   gradeSlug?: string | null
+  gradeName?: string | null
+  gradeColor?: string | null
   purchasedAt: string
   orderId: string | null
   pkg: {
@@ -34,7 +36,7 @@ interface SubscriptionCardProps {
   } | null
 }
 
-export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelRecurring = isRecurring, canResubscribe = false, gradeSlug, purchasedAt, pkg, orderId }: SubscriptionCardProps) {
+export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelRecurring = isRecurring, canResubscribe = false, gradeSlug, gradeName, gradeColor, purchasedAt, pkg, orderId }: SubscriptionCardProps) {
   const router = useRouter()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -131,6 +133,11 @@ export function SubscriptionCard({ id, subscriptionType, isRecurring, canCancelR
             )}
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+            {gradeName && (
+              <Badge variant="outline" className="text-xs" style={{ borderColor: `${gradeColor ?? '#888'}55`, color: gradeColor ?? undefined }}>
+                {gradeName}
+              </Badge>
+            )}
             {monthLabel && <span>{monthLabel}</span>}
             <span>Paid {new Date(purchasedAt).toLocaleDateString('en-MU', { dateStyle: 'medium' })}</span>
             {isUpcoming && (
