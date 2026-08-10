@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { JoinLiveClassButton } from '@/components/lc/join-live-class-button'
+import { DashboardGradeFilter } from '@/components/lc/dashboard-grade-filter'
 import {
   ArrowRight, BookOpen, Radio, Bell, PlayCircle, GraduationCap, TrendingUp,
 } from 'lucide-react'
@@ -11,7 +12,8 @@ export const metadata = { title: 'Dashboard' }
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
-export default async function StudentDashboardPage() {
+export default async function StudentDashboardPage({ searchParams }: { searchParams: Promise<{ grade?: string }> }) {
+  const { grade: gradeParam } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -23,7 +25,7 @@ export default async function StudentDashboardPage() {
       .single(),
     (supabase as any)
       .from('student_subscriptions')
-      .select('package_id, is_recurring, subscription_type, valid_from, valid_until, package:subscription_packages(id, name, package_type, month, year, subscription_package_chapters(chapter_id))')
+      .select('package_id, is_recurring, subscription_type, valid_from, valid_until, package:subscription_packages(id, name, package_type, month, year, grade:grades(id, name, slug, color, live_subscription_enabled), subscription_package_chapters(chapter_id))')
       .eq('student_id', user!.id)
       .eq('status', 'active'),
     (supabase as any)
@@ -33,11 +35,30 @@ export default async function StudentDashboardPage() {
   ])
 
   const profile = profileRaw as { full_name: string | null; grade_id: string | null; parent_phone: string | null; grade: { id: string; name: string; slug: string; color: string; live_subscription_enabled: boolean } | null } | null
-  const grade = profile?.grade ?? null
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there'
   const hasParentPhone = !!profile?.parent_phone
 
-  const subs = (subsRaw ?? []) as any[]
+  const allSubs = (subsRaw ?? []) as any[]
+
+  // Every grade the student is actively subscribed in. A student can hold live subscriptions
+  // for more than one grade; the dashboard shows one grade at a time via ?grade=<id>.
+  const enrolledGrades: { id: string; name: string; slug: string; color: string; live_subscription_enabled: boolean }[] = []
+  const seenGrade = new Set<string>()
+  for (const s of allSubs) {
+    const g = s.package?.grade
+    if (g?.id && !seenGrade.has(g.id)) { seenGrade.add(g.id); enrolledGrades.push(g) }
+  }
+  // Fall back to the profile grade when there are no subscriptions yet.
+  if (enrolledGrades.length === 0 && profile?.grade) enrolledGrades.push(profile.grade)
+
+  const grade =
+    enrolledGrades.find((g) => g.id === gradeParam) ??
+    enrolledGrades.find((g) => g.id === profile?.grade_id) ??
+    enrolledGrades[0] ??
+    profile?.grade ?? null
+
+  // Scope the dashboard to the selected grade's subscriptions only.
+  const subs = grade ? allSubs.filter((s) => s.package?.grade?.id === grade.id) : allSubs
   const watchedSet = new Set((watchedRaw ?? []).map((w: any) => w.video_id))
 
   // Live access lasts for the paid month (valid_until), not only while recurring is on.
@@ -89,9 +110,9 @@ export default async function StudentDashboardPage() {
   const audienceFilter = ['all', ...(hasAnyLivePkg ? ['live'] : []), ...(hasVideo ? ['video'] : [])]
   let unreadCount = 0
   let latestUnread: string | null = null
-  if (profile?.grade_id) {
+  if (grade?.id) {
     const [{ data: broadcasts }, { data: reads }] = await Promise.all([
-      (supabase as any).from('broadcasts').select('id, title, created_at').eq('grade_id', profile.grade_id).in('target_audience', audienceFilter).order('created_at', { ascending: false }),
+      (supabase as any).from('broadcasts').select('id, title, created_at').eq('grade_id', grade.id).in('target_audience', audienceFilter).gte('created_at', user!.created_at).order('created_at', { ascending: false }),
       (supabase as any).from('broadcast_reads').select('broadcast_id').eq('student_id', user!.id),
     ])
     const readSet = new Set((reads ?? []).map((r: any) => r.broadcast_id))
@@ -132,7 +153,7 @@ export default async function StudentDashboardPage() {
     }
   }
 
-  const noSubs = subs.length === 0
+  const noSubs = allSubs.length === 0
 
   return (
     <div className="space-y-8">
@@ -141,10 +162,12 @@ export default async function StudentDashboardPage() {
         <div>
           <h1 className="text-2xl font-bold">Welcome back, {firstName}!</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            {grade ? <>You&rsquo;re enrolled in <span className="font-medium text-foreground">{grade.name}</span></> : 'Set your grade to get started.'}
+            {grade ? <>You&rsquo;re viewing <span className="font-medium text-foreground">{grade.name}</span></> : 'Set your grade to get started.'}
           </p>
         </div>
-        {!grade && (
+        {enrolledGrades.length > 1 ? (
+          <DashboardGradeFilter grades={enrolledGrades} selectedId={grade!.id} />
+        ) : !grade && (
           <Button size="sm" variant="outline" asChild><Link href="/dashboard/account">Set your grade →</Link></Button>
         )}
       </div>
