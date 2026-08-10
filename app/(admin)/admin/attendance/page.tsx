@@ -145,12 +145,26 @@ export default function AdminAttendancePage() {
     if (expandedId === classId) { setExpandedId(null); return }
     setExpandedId(classId)
     setExpandLoading(true)
+    // live_attendance.student_id references auth.users, not profiles, so PostgREST can't embed
+    // profiles directly — fetch the rows, then resolve student names in a second query.
     const { data } = await (supabase as any)
       .from('live_attendance')
-      .select('id, student_id, entry_time, scheduled_end_time, profile:profiles(full_name)')
+      .select('id, student_id, entry_time, scheduled_end_time')
       .eq('live_class_id', classId)
       .order('entry_time', { ascending: true })
-    setExpandedRows((data ?? []) as AttendeeRow[])
+    const rows = (data ?? []) as any[]
+    const studentIds = [...new Set(rows.map((r) => r.student_id))]
+    const nameById = new Map<string, string | null>()
+    if (studentIds.length > 0) {
+      const { data: profiles } = await (supabase as any)
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', studentIds)
+      for (const p of (profiles ?? []) as Array<{ id: string; full_name: string | null }>) {
+        nameById.set(p.id, p.full_name)
+      }
+    }
+    setExpandedRows(rows.map((r) => ({ ...r, profile: { full_name: nameById.get(r.student_id) ?? null } })) as AttendeeRow[])
     setExpandLoading(false)
   }
 
