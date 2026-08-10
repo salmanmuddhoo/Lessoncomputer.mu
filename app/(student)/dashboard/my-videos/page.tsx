@@ -3,6 +3,7 @@ import { getCurrencyInfo } from '@/lib/currency'
 import { formatMoney } from '@/lib/currency-format'
 import { VideoPackagesAccordion } from '@/components/lc/video-packages-accordion'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
+import { DashboardGradeFilter } from '@/components/lc/dashboard-grade-filter'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -12,17 +13,52 @@ import {
 
 export const metadata = { title: 'My Video Packages' }
 
-export default async function MyVideoPackagesPage() {
+type VideoGrade = { id: string; name: string; color: string; slug: string }
+
+export default async function MyVideoPackagesPage({ searchParams }: { searchParams: Promise<{ grade?: string }> }) {
+  const { grade: gradeParam } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('grade_id, grade:grades(id, name, color, slug)')
-    .eq('id', user!.id)
-    .single()
+  const [{ data: profile }, { data: subsRaw }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('grade_id, grade:grades(id, name, color, slug)')
+      .eq('id', user!.id)
+      .single(),
+    (supabase as any)
+      .from('student_subscriptions')
+      .select('package_id, purchased_at, valid_from, valid_until, package:subscription_packages(package_type, grade:grades(id, name, color, slug))')
+      .eq('student_id', user!.id)
+      .eq('status', 'active'),
+  ])
 
-  const grade = profile?.grade as { id: string; name: string; color: string; slug: string } | null
+  const profileGrade = (profile?.grade as VideoGrade | null) ?? null
+
+  // A video subscription grants access only within its validity window; NULL dates =
+  // unlimited. Expired video packages drop out of "subscribed" and become re-purchasable.
+  const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
+  const validSubs = ((subsRaw ?? []) as any[]).filter((s) =>
+    (!s.valid_from || s.valid_from <= muToday) && (!s.valid_until || s.valid_until >= muToday)
+  )
+
+  // Grades the student has bought video packages in. A student can own video packages in
+  // more than one grade; the page shows one grade at a time via ?grade=<id> and offers a
+  // switcher when there's more than one. Falls back to the profile grade for browsing.
+  const enrolledVideoGrades: VideoGrade[] = []
+  const seenGrade = new Set<string>()
+  for (const s of validSubs) {
+    const isVideo = s.package?.package_type !== 'live_month'
+    const g = s.package?.grade as VideoGrade | undefined
+    if (isVideo && g?.id && !seenGrade.has(g.id)) { seenGrade.add(g.id); enrolledVideoGrades.push(g) }
+  }
+  if (enrolledVideoGrades.length === 0 && profileGrade) enrolledVideoGrades.push(profileGrade)
+
+  const grade =
+    enrolledVideoGrades.find((g) => g.id === gradeParam) ??
+    enrolledVideoGrades.find((g) => g.id === profile?.grade_id) ??
+    enrolledVideoGrades[0] ??
+    profileGrade
 
   if (!grade) {
     return (
@@ -60,20 +96,7 @@ export default async function MyVideoPackagesPage() {
       ).data ?? [])
     : (typedPackages ?? [])
 
-  // All active subscriptions — no subscription_type filter
-  const { data: subs } = await supabase
-    .from('student_subscriptions')
-    .select('package_id, purchased_at, valid_from, valid_until')
-    .eq('student_id', user!.id)
-    .eq('status', 'active')
-
-  // A video subscription grants access only within its validity window; NULL dates =
-  // unlimited. Expired video packages drop out of "subscribed" and become re-purchasable.
   const currency = await getCurrencyInfo()
-  const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
-  const validSubs = (subs ?? []).filter((s: any) =>
-    (!s.valid_from || s.valid_from <= muToday) && (!s.valid_until || s.valid_until >= muToday)
-  )
   const subsByPackage = new Map(validSubs.filter((s: any) => s.package_id).map((s: any) => [s.package_id, s]))
   const subscribedPackageIds = new Set(subsByPackage.keys())
 
@@ -131,16 +154,21 @@ export default async function MyVideoPackagesPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">My Video Packages</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
-          {subscribedPackages.length > 0
-            ? `${totalVideos} video${totalVideos !== 1 ? 's' : ''}${totalDocs > 0 ? ` · ${totalDocs} doc${totalDocs !== 1 ? 's' : ''}` : ''}${totalNotes > 0 ? ` · ${totalNotes} note${totalNotes !== 1 ? 's' : ''}` : ''} across ${subscribedPackages.length} package${subscribedPackages.length !== 1 ? 's' : ''}`
-            : `Video packages for `}
-          {subscribedPackages.length === 0 && (
-            <span className="font-medium" style={{ color: grade.color }}>{grade.name}</span>
-          )}
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">My Video Packages</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {subscribedPackages.length > 0
+              ? `${totalVideos} video${totalVideos !== 1 ? 's' : ''}${totalDocs > 0 ? ` · ${totalDocs} doc${totalDocs !== 1 ? 's' : ''}` : ''}${totalNotes > 0 ? ` · ${totalNotes} note${totalNotes !== 1 ? 's' : ''}` : ''} across ${subscribedPackages.length} package${subscribedPackages.length !== 1 ? 's' : ''}`
+              : `Video packages for `}
+            {subscribedPackages.length === 0 && (
+              <span className="font-medium" style={{ color: grade.color }}>{grade.name}</span>
+            )}
+          </p>
+        </div>
+        {enrolledVideoGrades.length > 1 && (
+          <DashboardGradeFilter grades={enrolledVideoGrades} selectedId={grade.id} basePath="/dashboard/my-videos" />
+        )}
       </div>
 
       {/* Subscribed packages with collapsible content */}
