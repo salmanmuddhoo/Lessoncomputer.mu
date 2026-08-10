@@ -230,7 +230,7 @@ export default async function StudentLiveClassesPage() {
       {/* Join banner — always visible when there's a current live class or current month package */}
       {(currentLiveClass || currentMonthPkg) && (
         <div className={`mb-8 p-5 rounded-xl border flex flex-col sm:flex-row sm:items-center gap-4 ${
-          isSubscribedCurrentMonth ? 'border-primary/30 bg-primary/5' : 'border-border/60 bg-card'
+          isSubscribedCurrentMonth ? 'border-primary/60 ring-1 ring-primary/25 bg-primary/15' : 'border-border/60 bg-card'
         }`}>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">

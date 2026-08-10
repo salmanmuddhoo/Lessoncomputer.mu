@@ -149,12 +149,12 @@ export function LiveMonthsList({
             <div
               key={pkg.id}
               className={`rounded-2xl border overflow-hidden ${
-                isSubscribed ? 'border-primary/30' : 'border-border/60'
+                isSubscribed ? 'border-primary/60 ring-1 ring-primary/25' : 'border-border/60'
               }`}
             >
               {/* Month header */}
               <div className={`px-5 py-4 flex items-center justify-between gap-4 ${
-                isSubscribed ? 'bg-primary/5' : 'bg-card'
+                isSubscribed ? 'bg-primary/15' : 'bg-card'
               }`}>
                 <button
                   onClick={() => isSubscribed && toggleMonth(pkg.id)}
