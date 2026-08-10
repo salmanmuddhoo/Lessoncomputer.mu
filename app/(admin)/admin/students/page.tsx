@@ -498,8 +498,16 @@ export default function AdminStudentsPage() {
                     <p className="font-medium">{subStudent?.full_name ?? '—'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Grade</p>
-                    {subStudent?.grade ? (
+                    <p className="text-xs text-muted-foreground mb-0.5">Grades</p>
+                    {(subStudent?.enrolledGrades && subStudent.enrolledGrades.length > 0) ? (
+                      <div className="flex flex-wrap gap-1">
+                        {subStudent.enrolledGrades.map((g) => (
+                          <Badge key={g.id} variant="outline" className="text-xs" style={{ borderColor: `${g.color}40`, color: g.color }}>
+                            {g.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : subStudent?.grade ? (
                       <Badge variant="outline" className="text-xs" style={{ borderColor: `${subStudent.grade.color}40`, color: subStudent.grade.color }}>
                         {subStudent.grade.name}
                       </Badge>

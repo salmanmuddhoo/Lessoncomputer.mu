@@ -109,6 +109,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
     if ((subs ?? []).some((s: any) => s.package?.package_type !== 'live_month')) audienceFilter.push('video')
     const { data: bIds } = await (supabase as any)
       .from('broadcasts').select('id').eq('grade_id', gradeId).in('target_audience', audienceFilter)
+      .gte('created_at', user.created_at) // only messages since this student signed up
     const ids = ((bIds ?? []) as any[]).map((b) => b.id)
     if (ids.length > 0) {
       const { data: reads } = await (supabase as any)

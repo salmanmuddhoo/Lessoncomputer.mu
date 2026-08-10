@@ -46,6 +46,8 @@ export default async function StudentNoticesPage() {
     .select('id, title, body, target_audience, created_at, chapter_id, chapter:chapters(title)')
     .eq('grade_id', profile.grade_id)
     .in('target_audience', audienceFilter)
+    // Only messages sent AFTER this student signed up — no back-history on a new account.
+    .gte('created_at', user.created_at)
     .order('created_at', { ascending: false })
 
   const items = (notices ?? []) as Array<{
