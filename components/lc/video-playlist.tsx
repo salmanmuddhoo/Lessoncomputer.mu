@@ -37,6 +37,8 @@ export interface PlaylistPackage {
   package_type: string
   month: number | null
   year: number | null
+  grade_id?: string | null
+  grade_name?: string | null
   chapters: PlaylistChapter[]
 }
 
@@ -45,6 +47,7 @@ interface Props {
   currentVideoId: string
   isLiveContext: boolean
   gradeColor?: string
+  currentGradeId?: string | null
 }
 
 function totalItems(pkg: PlaylistPackage) {
@@ -62,8 +65,26 @@ function findLocation(playlist: PlaylistPackage[], videoId: string) {
   return null
 }
 
-export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeColor }: Props) {
+export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeColor, currentGradeId }: Props) {
   const location = findLocation(playlist, currentVideoId)
+
+  // Distinct grades represented in this playlist. When a student is subscribed across more
+  // than one grade, the sidebar offers a grade filter so each grade's content is separate.
+  const grades = (() => {
+    const seen = new Map<string, string>()
+    for (const p of playlist) {
+      if (p.grade_id && !seen.has(p.grade_id)) seen.set(p.grade_id, p.grade_name ?? 'Grade')
+    }
+    return Array.from(seen, ([id, name]) => ({ id, name }))
+  })()
+  const multiGrade = grades.length > 1
+  const [gradeFilter, setGradeFilter] = useState<string>(() =>
+    currentGradeId && grades.some(g => g.id === currentGradeId) ? currentGradeId : (grades[0]?.id ?? '')
+  )
+
+  const visiblePlaylist = multiGrade && gradeFilter
+    ? playlist.filter(p => p.grade_id === gradeFilter)
+    : playlist
 
   // Track which packages and chapters are open
   const [openPkgs, setOpenPkgs] = useState<Set<string>>(
@@ -76,7 +97,27 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
   // Mobile: whether the full panel is visible
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const totalCount = playlist.reduce((n, p) => n + totalItems(p), 0)
+  const totalCount = visiblePlaylist.reduce((n, p) => n + totalItems(p), 0)
+
+  // Grade filter pills, shown only when the playlist spans more than one grade.
+  const gradeFilterBar = multiGrade && (
+    <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+      {grades.map(g => (
+        <button
+          key={g.id}
+          onClick={() => setGradeFilter(g.id)}
+          className={cn(
+            'px-2.5 py-1 rounded-full text-xs font-medium border-2 transition-colors',
+            gradeFilter === g.id
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'border-border/60 text-muted-foreground hover:bg-muted/40'
+          )}
+        >
+          {g.name}
+        </button>
+      ))}
+    </div>
+  )
 
   function togglePkg(id: string) {
     setOpenPkgs(prev => {
@@ -96,7 +137,7 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
 
   const panelContent = (
     <div className="space-y-1">
-      {playlist.map(pkg => {
+      {visiblePlaylist.map(pkg => {
         const isPkgOpen = openPkgs.has(pkg.id)
         const count = totalItems(pkg)
         const isLive = pkg.package_type === 'live_month'
@@ -239,6 +280,7 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
             <h2 className="text-sm font-semibold">Playlist</h2>
             <span className="ml-auto text-xs text-muted-foreground">{totalCount} videos</span>
           </div>
+          {gradeFilterBar}
           <div className="overflow-y-auto flex-1 space-y-1 pr-0.5 scrollbar-thin">
             {panelContent}
           </div>
@@ -262,6 +304,7 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
 
         {mobileOpen && (
           <div className="mt-2 max-h-[60vh] overflow-y-auto rounded-xl border border-border/60 p-2 bg-background">
+            {gradeFilterBar}
             {panelContent}
           </div>
         )}
