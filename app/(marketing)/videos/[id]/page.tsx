@@ -170,9 +170,10 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
         const [{ data: vids }, { data: docs }, { data: notes }] = await Promise.all([
           supabase
             .from('videos')
-            .select('id, title, duration_minutes, chapter_id')
+            .select('id, title, duration_minutes, chapter_id, order_index')
             .in('chapter_id', chapterIds)
             .eq(publishedField as any, true)
+            .order('order_index', { ascending: true })
             .order('created_at', { ascending: true }),
           (supabase as any)
             .from('documents')
