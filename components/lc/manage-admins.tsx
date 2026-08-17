@@ -2,12 +2,16 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, ShieldPlus, ShieldCheck } from 'lucide-react'
+import { Loader2, ShieldPlus, ShieldCheck, ShieldMinus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 
 interface AdminRow { id: string; name: string | null }
@@ -19,6 +23,32 @@ export function ManageAdmins({ admins, currentUserId }: { admins: AdminRow[]; cu
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [removeTarget, setRemoveTarget] = useState<AdminRow | null>(null)
+  const [removing, setRemoving] = useState(false)
+
+  async function handleRemove() {
+    if (!removeTarget || removing) return
+    setRemoving(true)
+    try {
+      const res = await fetch('/api/admin/remove-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: removeTarget.id }),
+      })
+      const data = await res.json() as { ok?: boolean; error?: string }
+      if (!res.ok || !data.ok) {
+        toast.error(data.error ?? 'Could not remove the admin.')
+        return
+      }
+      toast.success('Admin access revoked.')
+      setRemoveTarget(null)
+      router.refresh()
+    } catch {
+      toast.error('Network error. Please try again.')
+    } finally {
+      setRemoving(false)
+    }
+  }
 
   async function handleCreate() {
     if (saving) return
@@ -65,7 +95,18 @@ export function ManageAdmins({ admins, currentUserId }: { admins: AdminRow[]; cu
               <div key={a.id} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-border/40 bg-muted/20">
                 <ShieldCheck className="w-3.5 h-3.5 text-primary shrink-0" />
                 <span className="truncate">{a.name ?? 'Unnamed admin'}</span>
-                {a.id === currentUserId && <span className="ml-auto text-xs text-muted-foreground">You</span>}
+                {a.id === currentUserId ? (
+                  <span className="ml-auto text-xs text-muted-foreground">You</span>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto h-7 px-2 text-destructive hover:bg-destructive/10"
+                    onClick={() => setRemoveTarget(a)}
+                  >
+                    <ShieldMinus className="w-3.5 h-3.5 mr-1" /> Remove
+                  </Button>
+                )}
               </div>
             ))
           )}
@@ -108,6 +149,30 @@ export function ManageAdmins({ admins, currentUserId }: { admins: AdminRow[]; cu
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Remove-admin confirmation */}
+      <AlertDialog open={!!removeTarget} onOpenChange={(o) => { if (!o) setRemoveTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove admin access?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removeTarget?.name ?? 'This administrator'} will be demoted to a regular account and
+              lose all admin access. Their login and any content they created are kept.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => { e.preventDefault(); handleRemove() }}
+              disabled={removing}
+            >
+              {removing && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />}
+              Remove admin
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
