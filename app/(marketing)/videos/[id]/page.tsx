@@ -144,7 +144,7 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
 
     const { data: packages } = await supabase
       .from('subscription_packages')
-      .select('id, name, package_type, month, year')
+      .select('id, name, package_type, month, year, grade_id, grade:grades(id, name)')
       .in('id', pkgIds)
       .eq('package_type', pkgType)
       .order('year', { ascending: true })
@@ -239,6 +239,8 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
             package_type: pkg.package_type,
             month: pkg.month ?? null,
             year: pkg.year ?? null,
+            grade_id: pkg.grade_id ?? null,
+            grade_name: (pkg.grade as any)?.name ?? null,
             chapters,
           }
         })
@@ -370,6 +372,7 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
                   currentVideoId={id}
                   isLiveContext={isLiveContext}
                   gradeColor={grade?.color}
+                  currentGradeId={meta.grade_id}
                 />
               </div>
             )}
@@ -383,6 +386,7 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
                 currentVideoId={id}
                 isLiveContext={isLiveContext}
                 gradeColor={grade?.color}
+                currentGradeId={meta.grade_id}
               />
             </div>
           )}
