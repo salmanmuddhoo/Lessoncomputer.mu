@@ -192,7 +192,7 @@ export function AdminSidebar() {
   return (
     <>
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col h-full bg-sidebar border-r border-sidebar-border">
+      <aside className="hidden md:flex md:fixed md:top-0 md:bottom-0 md:left-0 z-30 w-64 flex-col bg-sidebar border-r border-sidebar-border">
         <div className="p-5 border-b border-sidebar-border">
           <Logo size="sm" onDark />
           <span className="text-xs text-muted-foreground mt-1 block">Admin Panel</span>

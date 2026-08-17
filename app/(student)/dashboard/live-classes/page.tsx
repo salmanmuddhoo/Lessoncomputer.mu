@@ -105,7 +105,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
   const [{ data: livePackages }, { data: videoPackagesRaw }, { data: currentLiveClass }] = await Promise.all([
     supabase
       .from('subscription_packages')
-      .select('id, name, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index))')
+      .select('id, name, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index, is_visible_to_subscribers))')
       .eq('grade_id', grade.id)
       .eq('package_type', 'live_month')
       .eq('is_active', true)
@@ -208,10 +208,13 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
     )
   }
 
-  // Fetch content for subscribed packages only
+  // Fetch content for subscribed packages only, skipping chapters an admin has hidden from
+  // live subscribers (is_visible_to_subscribers = false).
   const subscribedChapterIds = (livePackages ?? [])
     .filter((p: any) => subscribedPackageIds.has(p.id))
-    .flatMap((p: any) => (p.subscription_package_chapters ?? []).map((c: any) => c.chapter_id))
+    .flatMap((p: any) => (p.subscription_package_chapters ?? [])
+      .filter((c: any) => c.chapter?.is_visible_to_subscribers !== false)
+      .map((c: any) => c.chapter_id))
 
   const videosByChapter: Record<string, any[]> = {}
   const documentsByChapter: Record<string, any[]> = {}
@@ -219,7 +222,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
 
   if (subscribedChapterIds.length > 0) {
     const [{ data: videos }, { data: docs }, { data: notes }] = await Promise.all([
-      supabase.from('videos').select('*').in('chapter_id', subscribedChapterIds).eq('is_published_for_live' as any, true),
+      supabase.from('videos').select('*').in('chapter_id', subscribedChapterIds).eq('is_published_for_live' as any, true).order('order_index', { ascending: true }).order('created_at', { ascending: true }),
       supabase.from('documents').select('*').in('chapter_id', subscribedChapterIds).eq('is_published_for_live' as any, true),
       (supabase as any).from('revision_notes').select('id, title, content, content_live, chapter_id').in('chapter_id', subscribedChapterIds).eq('is_published_for_live', true),
     ])
@@ -245,6 +248,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
     year: pkg.year,
     chapters: (pkg.subscription_package_chapters ?? [])
       .map((c: any) => c.chapter)
+      .filter((ch: any) => ch && ch.is_visible_to_subscribers !== false)
       .filter(Boolean)
       .sort((a: any, b: any) => a.order_index - b.order_index),
   }))

@@ -45,6 +45,7 @@ interface VideoRow {
   is_demo: boolean
   is_published: boolean
   duration_minutes: number | null
+  order_index: number
   grade: Grade | null
   chapter: Chapter | null
 }
@@ -107,7 +108,7 @@ export default function AdminVideosPage() {
     ] = await Promise.all([
       supabase
         .from('videos')
-        .select('id, title, grade_id, chapter_id, is_free, is_demo, is_published, duration_minutes, grade:grades(id,name,color), chapter:chapters(id,grade_id,title,order_index)')
+        .select('id, title, grade_id, chapter_id, is_free, is_demo, is_published, duration_minutes, order_index, grade:grades(id,name,color), chapter:chapters(id,grade_id,title,order_index)')
         .order('created_at', { ascending: false }),
       supabase
         .from('documents')
@@ -179,6 +180,31 @@ export default function AdminVideosPage() {
     load()
   }
 
+  const [reordering, setReordering] = useState(false)
+
+  // Move a video up/down within its chapter. Rewrites the whole chapter's order_index
+  // sequentially (robust even if existing values are duplicated) and persists.
+  async function handleMoveVideo(video: VideoRow, dir: -1 | 1) {
+    const sibs = videos
+      .filter((v) => v.grade_id === video.grade_id && v.chapter_id === video.chapter_id)
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    const idx = sibs.findIndex((v) => v.id === video.id)
+    const target = idx + dir
+    if (target < 0 || target >= sibs.length) return
+    const reordered = [...sibs]
+    ;[reordered[idx], reordered[target]] = [reordered[target], reordered[idx]]
+    // Optimistic local update
+    const orderById = new Map(reordered.map((v, i) => [v.id, i]))
+    setVideos((prev) => prev.map((v) => orderById.has(v.id) ? { ...v, order_index: orderById.get(v.id)! } : v))
+    setReordering(true)
+    const supabase = createClient()
+    const { error } = await Promise.all(
+      reordered.map((v, i) => supabase.from('videos').update({ order_index: i } as any).eq('id', v.id))
+    ).then(() => ({ error: null })).catch((e) => ({ error: e }))
+    setReordering(false)
+    if (error) { toast.error('Could not save order'); load() }
+  }
+
   const filteredVideos = gradeFilter === 'all' ? videos : videos.filter((v) => v.grade_id === gradeFilter)
   const filteredDocuments = gradeFilter === 'all' ? documents : documents.filter((d) => d.grade_id === gradeFilter)
   const filteredNotes = gradeFilter === 'all' ? notes : notes.filter((n) => n.grade_id === gradeFilter)
@@ -200,6 +226,7 @@ export default function AdminVideosPage() {
   function getContentForChapter(gradeId: string, chapterId: string | null): ContentItem[] {
     const vids = filteredVideos
       .filter((v) => v.grade_id === gradeId && v.chapter_id === chapterId)
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
       .map((v): ContentItem => ({ type: 'video', data: v }))
     const docs = filteredDocuments
       .filter((d) => d.grade_id === gradeId && d.chapter_id === chapterId)
@@ -359,6 +386,8 @@ export default function AdminVideosPage() {
                               onDeleteVideo={handleDeleteVideo}
                               onDeleteDocument={handleDeleteDocument}
                               onDeleteNote={handleDeleteNote}
+                              onMoveVideo={handleMoveVideo}
+                              reordering={reordering}
                               deleting={deleting}
                               pkgInfos={pkgInfos}
                             />
@@ -382,6 +411,8 @@ export default function AdminVideosPage() {
                             onDeleteVideo={handleDeleteVideo}
                             onDeleteDocument={handleDeleteDocument}
                             onDeleteNote={handleDeleteNote}
+                            onMoveVideo={handleMoveVideo}
+                            reordering={reordering}
                             deleting={deleting}
                             pkgInfos={pkgInfos}
                           />
@@ -413,6 +444,8 @@ function ContentTable({
   onDeleteVideo,
   onDeleteDocument,
   onDeleteNote,
+  onMoveVideo,
+  reordering,
   deleting,
   pkgInfos,
 }: {
@@ -420,9 +453,13 @@ function ContentTable({
   onDeleteVideo: (v: VideoRow) => void
   onDeleteDocument: (d: DocumentRow) => void
   onDeleteNote: (n: NoteRow) => void
+  onMoveVideo: (v: VideoRow, dir: -1 | 1) => void
+  reordering: boolean
   deleting: string | null
   pkgInfos: PkgInfo[]
 }) {
+  // Ordered list of the videos in this chapter, so the reorder arrows know first/last.
+  const videoOrder = items.filter((i) => i.type === 'video').map((i) => i.data.id)
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm min-w-[480px]">
@@ -472,6 +509,26 @@ function ContentTable({
                   </td>
                   <td className="px-4 py-2.5 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
+                      <div className="flex flex-col mr-1">
+                        <button
+                          type="button"
+                          aria-label="Move up"
+                          className="text-muted-foreground hover:text-primary disabled:opacity-30 disabled:hover:text-muted-foreground"
+                          onClick={() => onMoveVideo(v, -1)}
+                          disabled={reordering || videoOrder.indexOf(v.id) === 0}
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Move down"
+                          className="text-muted-foreground hover:text-primary disabled:opacity-30 disabled:hover:text-muted-foreground"
+                          onClick={() => onMoveVideo(v, 1)}
+                          disabled={reordering || videoOrder.indexOf(v.id) === videoOrder.length - 1}
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                       <Button variant="ghost" size="sm" asChild>
                         <Link href={`/admin/videos/${v.id}/edit`}><Pencil className="w-3.5 h-3.5" /></Link>
                       </Button>

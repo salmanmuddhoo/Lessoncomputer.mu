@@ -270,8 +270,15 @@ export default function AdminLiveMonthsPage() {
     )
   }
 
-  function toggleVisibility(id: string, val: boolean) {
+  async function toggleVisibility(id: string, val: boolean) {
+    // Persist immediately (like the per-item "Published for Live" toggles) so the change
+    // takes effect without needing to click "Save Chapters".
     setVisibilityMap((prev) => ({ ...prev, [id]: val }))
+    const { error } = await supabase.from('chapters').update({ is_visible_to_subscribers: val }).eq('id', id)
+    if (error) {
+      toast.error(`Save failed: ${error.message}`)
+      setVisibilityMap((prev) => ({ ...prev, [id]: !val })) // revert on failure
+    }
   }
 
   async function handleSaveChapters() {

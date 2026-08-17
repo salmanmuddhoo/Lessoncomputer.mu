@@ -121,7 +121,7 @@ export default async function MyVideoPackagesPage({ searchParams }: { searchPara
 
   if (subscribedChapterIds.length > 0) {
     const [{ data: videos }, { data: docs }, { data: notes }] = await Promise.all([
-      supabase.from('videos').select('*, grade:grades(name, color, slug)').in('chapter_id', subscribedChapterIds).eq('is_published', true),
+      supabase.from('videos').select('*, grade:grades(name, color, slug)').in('chapter_id', subscribedChapterIds).eq('is_published', true).order('order_index', { ascending: true }).order('created_at', { ascending: true }),
       supabase.from('documents').select('*').in('chapter_id', subscribedChapterIds).eq('is_published', true),
       (supabase as any).from('revision_notes').select('id, title, content, chapter_id').in('chapter_id', subscribedChapterIds).eq('is_published', true),
     ])
