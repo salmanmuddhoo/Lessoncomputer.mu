@@ -46,6 +46,12 @@ export async function sendWhatsAppText(to: string, body: string): Promise<WhatsA
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
       console.error('[whatsapp] API error', res.status, detail)
+      // 401/403 almost always means the WhatsApp access token is invalid, expired, or
+      // revoked (Meta "temporary" tokens expire after 24h — use a permanent System User
+      // token). Surface an actionable message instead of a bare status code.
+      if (res.status === 401 || res.status === 403) {
+        return { ok: false, error: 'WhatsApp access token is invalid or expired — update WHATSAPP_ACCESS_TOKEN.' }
+      }
       return { ok: false, error: `WhatsApp API returned ${res.status}` }
     }
     return { ok: true }
