@@ -52,7 +52,15 @@ export async function sendWhatsAppText(to: string, body: string): Promise<WhatsA
       if (res.status === 401 || res.status === 403) {
         return { ok: false, error: 'WhatsApp access token is invalid or expired — update WHATSAPP_ACCESS_TOKEN.' }
       }
-      return { ok: false, error: `WhatsApp API returned ${res.status}` }
+      // Otherwise surface Meta's own error message/code (e.g. "(#131030) Recipient phone
+      // number not in allowed list", or the 24-hour window / template requirement) so the
+      // admin sees the real reason rather than a bare status code.
+      let metaMsg = ''
+      try {
+        const e = (JSON.parse(detail) as any)?.error
+        if (e?.message) metaMsg = e.code ? `(#${e.code}) ${e.message}` : e.message
+      } catch { /* body was not JSON */ }
+      return { ok: false, error: metaMsg ? `WhatsApp: ${metaMsg}` : `WhatsApp API returned ${res.status}` }
     }
     return { ok: true }
   } catch (err) {
