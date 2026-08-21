@@ -12,9 +12,8 @@ export function Logo({ className, size = 'md', onDark = false }: LogoProps) {
 
   return (
     <Link href="/" className={`flex items-center gap-2.5 ${textSize} ${className}`}>
-      <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg text-primary-foreground font-black text-sm shrink-0">
-        LC
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/icon.svg" alt="LessonComputer.mu logo" className="w-8 h-8 shrink-0" />
       <span className={`font-semibold tracking-tight ${onDark ? 'text-sidebar-foreground' : 'text-foreground'}`}>
         Lesson<span className="text-primary font-bold">Computer</span>
         <span className={`font-normal text-sm ${onDark ? 'text-sidebar-foreground/60' : 'text-muted-foreground'}`}>.mu</span>
