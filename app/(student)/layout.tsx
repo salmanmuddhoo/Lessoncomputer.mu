@@ -90,11 +90,13 @@ export default async function StudentLayout({ children }: { children: React.Reac
   // but must NOT revoke access to the current, already-paid month. (is_recurring only
   // controls renewal; the paid period is valid_from..valid_until.)
   const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
-  const isCurrentLive = (s: any) =>
+  // Show the Live Classes menu for a live subscription that is current OR upcoming (a student
+  // who bought a future month should see the menu). We only require it hasn't lapsed yet
+  // (valid_until in the future / unset); a future valid_from still counts.
+  const isLiveActiveOrUpcoming = (s: any) =>
     (s.subscription_type === 'live' || s.package?.package_type === 'live_month') &&
-    (!s.valid_from || s.valid_from <= muToday) &&
     (!s.valid_until || s.valid_until >= muToday)
-  const hasLiveSubscription = (subs ?? []).some(isCurrentLive)
+  const hasLiveSubscription = (subs ?? []).some(isLiveActiveOrUpcoming)
   const hasVideoSubscription = (subs ?? []).some(
     (s: any) => s.package?.package_type !== 'live_month'
   )

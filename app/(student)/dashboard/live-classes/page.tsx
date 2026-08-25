@@ -99,17 +99,15 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
   const currentMonth = now.getMonth() + 1
   const currentYear = now.getFullYear()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
 
   const subs = allSubs
-  const [{ data: livePackages }, { data: videoPackagesRaw }, { data: currentLiveClass }] = await Promise.all([
+  const [{ data: livePackages }, { data: videoPackagesRaw }, { data: upcomingClassesRaw }] = await Promise.all([
     supabase
       .from('subscription_packages')
       .select('id, name, month, year, is_archived, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index, is_visible_to_subscribers))')
       .eq('grade_id', grade.id)
       .eq('package_type', 'live_month')
       .eq('is_active', true)
-      .or(`year.lt.${currentYear},and(year.eq.${currentYear},month.lte.${currentMonth})`)
       .order('year', { ascending: false })
       .order('month', { ascending: false }),
     supabase
@@ -119,6 +117,8 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
       .neq('package_type', 'live_month')
       .eq('is_active', true)
       .order('name', { ascending: true }),
+    // Upcoming published classes from the start of the current month onward — used to show
+    // the next class (current month, or a future month the student already subscribed to).
     supabase
       .from('live_classes')
       .select('id, title, meet_url, scheduled_at, is_recurring, recurrence_day_of_week, end_time')
@@ -126,13 +126,21 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
       .eq('is_published', true)
       .eq('is_archived', false)
       .gte('scheduled_at', monthStart)
-      .lt('scheduled_at', monthEnd)
       .order('scheduled_at', { ascending: true })
-      .limit(1)
-      .maybeSingle(),
+      .limit(12),
   ])
 
   const subscribedPackageIds = new Set((subs ?? []).map((s: any) => s.package_id).filter(Boolean))
+
+  // Load all published live_month packages for the grade (query above), but only DISPLAY past
+  // and current months, plus any FUTURE month the student already subscribed to — so an
+  // upcoming subscription (e.g. next month) shows up while unsubscribed future months don't.
+  const allLive = (livePackages ?? []) as any[]
+  const displayPackages = allLive.filter((p: any) =>
+    p.year < currentYear ||
+    (p.year === currentYear && p.month <= currentMonth) ||
+    subscribedPackageIds.has(p.id)
+  )
 
   const videoPackages = (videoPackagesRaw ?? []).map((p: any) => ({
     id: p.id,
@@ -143,24 +151,41 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
   const videoPackageIds = new Set(videoPackages.map((p) => p.id))
   const subscribedVideoPackageIds = [...subscribedPackageIds].filter((id) => videoPackageIds.has(id as string)) as string[]
 
-  const currentMonthPkg = (livePackages ?? []).find(
+  const currentMonthPkg = allLive.find(
     (p: any) => p.month === currentMonth && p.year === currentYear
   )
-  const isSubscribedCurrentMonth = currentMonthPkg ? subscribedPackageIds.has(currentMonthPkg.id) : false
+  // The class to feature in the banner: the next upcoming class in a month the student is
+  // subscribed to (this handles a future/upcoming subscription); otherwise the current
+  // month's class (so non-subscribers still see this month and a prompt to subscribe).
+  const upcomingClasses = (upcomingClassesRaw ?? []) as any[]
+  const classMonthKey = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth() + 1}` }
+  const subscribedMonthKeys = new Set(
+    displayPackages.filter((p: any) => subscribedPackageIds.has(p.id)).map((p: any) => `${p.year}-${p.month}`)
+  )
+  const bannerClass =
+    upcomingClasses.find((c: any) => subscribedMonthKeys.has(classMonthKey(c.scheduled_at))) ??
+    upcomingClasses.find((c: any) => { const d = new Date(c.scheduled_at); return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear }) ??
+    null
+  let bannerMonth = currentMonth, bannerYear = currentYear, bannerPkg = currentMonthPkg
+  if (bannerClass) {
+    const d = new Date(bannerClass.scheduled_at)
+    bannerMonth = d.getMonth() + 1; bannerYear = d.getFullYear()
+    bannerPkg = allLive.find((p: any) => p.month === bannerMonth && p.year === bannerYear) ?? currentMonthPkg
+  }
+  const isSubscribedBannerMonth = bannerPkg ? subscribedPackageIds.has(bannerPkg.id) : false
+  const bannerIsCurrent = bannerMonth === currentMonth && bannerYear === currentYear
 
-  // Access to live-class resources lasts for the paid month (valid_until), not only
-  // while recurring is on. A student who cancelled recurring keeps access to the
-  // month they already paid for; access ends when that month lapses.
+  // Live access covers any active live subscription that hasn't lapsed yet — current OR
+  // upcoming (a future valid_from still counts). Only a fully-expired subscription is "inactive".
   const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
-  const hasRecurringLive = (subs ?? []).some(
+  const hasLiveAccess = (subs ?? []).some(
     (s: any) =>
       s.subscription_type === 'live' &&
-      (!s.valid_from || s.valid_from <= muToday) &&
       (!s.valid_until || s.valid_until >= muToday)
   )
 
-  if (!hasRecurringLive) {
-    const livePackageIds = new Set((livePackages ?? []).map((p: any) => p.id))
+  if (!hasLiveAccess) {
+    const livePackageIds = new Set(displayPackages.map((p: any) => p.id))
     const subscribedLivePackageIds = [...subscribedPackageIds].filter((id) => livePackageIds.has(id as string)) as string[]
     return (
       <div>
@@ -193,7 +218,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
                 liveSubscriptionEnabled={grade.live_subscription_enabled}
                 liveMonthPackageId={currentMonthPkg.id}
                 liveMonthLabel={`${MONTHS[currentMonth - 1]} ${currentYear}`}
-                pastLivePackages={(livePackages ?? [])
+                pastLivePackages={displayPackages
                   .filter((p: any) => !p.is_archived && (p.year < currentYear || (p.year === currentYear && p.month < currentMonth)))
                   .map((p: any) => ({ id: p.id, name: p.name, month: p.month, year: p.year }))}
                 defaultMode="live"
@@ -211,7 +236,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
 
   // Fetch content for subscribed packages only, skipping chapters an admin has hidden from
   // live subscribers (is_visible_to_subscribers = false).
-  const subscribedChapterIds = (livePackages ?? [])
+  const subscribedChapterIds = displayPackages
     .filter((p: any) => subscribedPackageIds.has(p.id))
     .flatMap((p: any) => (p.subscription_package_chapters ?? [])
       .filter((c: any) => c.chapter?.is_visible_to_subscribers !== false)
@@ -242,7 +267,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
   }
 
   // Shape packages for the client component
-  const monthPackages = (livePackages ?? []).map((pkg: any) => ({
+  const monthPackages = displayPackages.map((pkg: any) => ({
     id: pkg.id,
     name: pkg.name,
     month: pkg.month,
@@ -271,28 +296,28 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
         )}
       </div>
 
-      {/* Join banner — always visible when there's a current live class or current month package */}
-      {(currentLiveClass || currentMonthPkg) && (
+      {/* Join banner — the next class (current month, or an upcoming month you subscribed to) */}
+      {(bannerClass || currentMonthPkg) && (
         <div className={`mb-8 p-5 rounded-xl border flex flex-col sm:flex-row sm:items-center gap-4 ${
-          isSubscribedCurrentMonth ? 'border-primary/60 ring-1 ring-primary/25 bg-primary/15' : 'border-border/60 bg-card'
+          isSubscribedBannerMonth ? 'border-primary/60 ring-1 ring-primary/25 bg-primary/15' : 'border-border/60 bg-card'
         }`}>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <Radio className="w-4 h-4 text-primary shrink-0" />
               <span className="text-xs font-semibold text-primary uppercase tracking-wide">
-                {MONTHS[currentMonth - 1]} {currentYear}
-                {isSubscribedCurrentMonth ? ' — Active' : ' — Current Month'}
+                {MONTHS[bannerMonth - 1]} {bannerYear}
+                {isSubscribedBannerMonth ? (bannerIsCurrent ? ' — Active' : ' — Upcoming (subscribed)') : (bannerIsCurrent ? ' — Current Month' : ' — Upcoming')}
               </span>
             </div>
-            {currentLiveClass ? (
+            {bannerClass ? (
               <>
-                <h3 className="font-semibold text-sm mb-1">{currentLiveClass.title}</h3>
+                <h3 className="font-semibold text-sm mb-1">{bannerClass.title}</h3>
                 <div className="text-sm text-muted-foreground">
                   <LiveClassSchedule
-                    scheduledAt={currentLiveClass.scheduled_at}
-                    isRecurring={currentLiveClass.is_recurring ?? false}
-                    recurrenceDayOfWeek={currentLiveClass.recurrence_day_of_week ?? null}
-                    endTime={currentLiveClass.end_time ?? null}
+                    scheduledAt={bannerClass.scheduled_at}
+                    isRecurring={bannerClass.is_recurring ?? false}
+                    recurrenceDayOfWeek={bannerClass.recurrence_day_of_week ?? null}
+                    endTime={bannerClass.end_time ?? null}
                   />
                 </div>
               </>
@@ -300,16 +325,16 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
               <p className="text-sm text-muted-foreground">Live class schedule not published yet.</p>
             )}
           </div>
-          {isSubscribedCurrentMonth ? (
-            currentLiveClass?.meet_url ? (
+          {isSubscribedBannerMonth ? (
+            bannerClass?.meet_url ? (
               <JoinLiveClassButton
-                liveClassId={currentLiveClass.id}
-                meetUrl={currentLiveClass.meet_url}
+                liveClassId={bannerClass.id}
+                meetUrl={bannerClass.meet_url}
                 gradeId={grade.id}
-                scheduledAt={currentLiveClass.scheduled_at}
-                endTime={currentLiveClass.end_time ?? null}
-                isRecurring={currentLiveClass.is_recurring ?? false}
-                recurrenceDayOfWeek={currentLiveClass.recurrence_day_of_week ?? null}
+                scheduledAt={bannerClass.scheduled_at}
+                endTime={bannerClass.end_time ?? null}
+                isRecurring={bannerClass.is_recurring ?? false}
+                recurrenceDayOfWeek={bannerClass.recurrence_day_of_week ?? null}
                 hasParentPhone={hasParentPhone}
               />
             ) : (
@@ -361,7 +386,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
             liveSubscriptionEnabled={grade.live_subscription_enabled}
             liveMonthPackageId={currentMonthPkg.id}
             liveMonthLabel={`${MONTHS[currentMonth - 1]} ${currentYear}`}
-            pastLivePackages={(livePackages ?? [])
+            pastLivePackages={displayPackages
               .filter((p: any) => !p.is_archived && (p.year < currentYear || (p.year === currentYear && p.month < currentMonth)))
               .map((p: any) => ({ id: p.id, name: p.name, month: p.month, year: p.year }))}
             defaultMode="live"
