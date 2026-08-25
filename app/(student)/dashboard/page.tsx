@@ -133,6 +133,7 @@ export default async function StudentDashboardPage({ searchParams }: { searchPar
         .select('id, title, meet_url, scheduled_at, is_recurring, recurrence_day_of_week, end_time')
         .eq('grade_id', grade.id)
         .eq('is_published', true)
+        .eq('is_archived', false)
         .gte('scheduled_at', monthStart)
         .lt('scheduled_at', monthEnd)
         .order('scheduled_at', { ascending: true })

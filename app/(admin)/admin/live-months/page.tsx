@@ -301,9 +301,23 @@ export default function AdminLiveMonthsPage() {
     if (error) {
       toast.error(`Failed: ${error.message}`)
       setMonthPackages((prev) => prev.map((p) => (p.month === pkg.month ? { ...p, isArchived: !next } : p)))
-    } else {
-      toast.success(next ? `${MONTHS[pkg.month - 1]} archived — no longer purchasable` : `${MONTHS[pkg.month - 1]} unarchived`)
+      return
     }
+    // Cascade to that month's live class(es). Live classes have no package_id, so match by
+    // grade + the month/year of scheduled_at (same convention every live-class query uses).
+    const monthStart = new Date(pkg.year, pkg.month - 1, 1).toISOString()
+    const monthEnd = new Date(pkg.year, pkg.month, 1).toISOString()
+    const { error: lcError } = await supabase
+      .from('live_classes')
+      .update({ is_archived: next } as any)
+      .eq('grade_id', selectedGradeId)
+      .gte('scheduled_at', monthStart)
+      .lt('scheduled_at', monthEnd)
+    if (lcError) {
+      toast.error(`Package ${next ? 'archived' : 'unarchived'}, but its live classes could not be updated: ${lcError.message}`)
+      return
+    }
+    toast.success(next ? `${MONTHS[pkg.month - 1]} archived — no longer purchasable` : `${MONTHS[pkg.month - 1]} unarchived`)
   }
 
   async function handleSaveChapters() {
