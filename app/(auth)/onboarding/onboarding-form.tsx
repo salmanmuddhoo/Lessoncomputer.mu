@@ -15,18 +15,25 @@ export function OnboardingForm({ grades, initialName }: { grades: { id: string; 
   const [fullName, setFullName] = useState(initialName)
   const [gradeId, setGradeId] = useState('')
   const [referralSource, setReferralSource] = useState('')
+  const [referralOther, setReferralOther] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function save() {
     if (saving) return
     if (!gradeId) { toast.error('Please select your grade'); return }
     if (!referralSource) { toast.error('Please tell us how you heard about us'); return }
+    if (referralSource === 'other' && !referralOther.trim()) { toast.error('Please tell us where you heard about us'); return }
     setSaving(true)
     try {
       const res = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gradeId, fullName: fullName.trim() || undefined, referralSource }),
+        body: JSON.stringify({
+          gradeId,
+          fullName: fullName.trim() || undefined,
+          referralSource,
+          referralOther: referralSource === 'other' ? referralOther.trim() : undefined,
+        }),
       })
       const data = await res.json() as { ok?: boolean; error?: string }
       if (!res.ok || !data.ok) { toast.error(data.error ?? 'Could not save. Please try again.'); return }
@@ -62,6 +69,14 @@ export function OnboardingForm({ grades, initialName }: { grades: { id: string; 
             {REFERRAL_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        {referralSource === 'other' && (
+          <Input
+            value={referralOther}
+            onChange={(e) => setReferralOther(e.target.value)}
+            placeholder="Please tell us where"
+            className="mt-2"
+          />
+        )}
       </div>
       <Button
         onClick={save}

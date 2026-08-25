@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { LiveClassCalendar } from '@/components/lc/live-class-calendar'
-import { Plus, Pencil, Calendar, Package, Filter, Video, List, CalendarDays } from 'lucide-react'
+import { Plus, Pencil, Calendar, Package, Filter, Video, List, CalendarDays, Archive, Folder, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { nextOccurrence } from '@/lib/live-class-occurrences'
@@ -35,6 +35,15 @@ export default function AdminLiveClassesPage() {
   const [loading, setLoading] = useState(true)
   const [gradeFilter, setGradeFilter] = useState<string>('all')
   const [view, setView] = useState<'list' | 'calendar'>('list')
+  const [openArchive, setOpenArchive] = useState<Set<string>>(new Set())
+
+  function toggleArchive(gradeId: string) {
+    setOpenArchive((prev) => {
+      const next = new Set(prev)
+      next.has(gradeId) ? next.delete(gradeId) : next.add(gradeId)
+      return next
+    })
+  }
 
   const now = new Date()
   const currentMonth = now.getMonth() + 1
@@ -78,12 +87,27 @@ export default function AdminLiveClassesPage() {
     ? classes
     : classes.filter((c) => c.grade?.id === gradeFilter)
 
+  // Split into active classes (shown normally) and archived classes, which live in a
+  // per-grade "Archived" folder so the main list stays short as months accumulate.
+  const activeClasses = filtered.filter((c) => !c.is_archived)
+  const archivedClasses = filtered.filter((c) => c.is_archived)
+  const archivedByGrade = Array.from(
+    archivedClasses.reduce((map, c) => {
+      const g = c.grade ?? { id: '__none__', name: 'Unknown', color: '#888888' }
+      if (!map.has(g.id)) map.set(g.id, { grade: g, items: [] as LiveClass[] })
+      map.get(g.id)!.items.push(c)
+      return map
+    }, new Map<string, { grade: { id: string; name: string; color: string }; items: LiveClass[] }>()).values()
+  ).sort((a, b) => a.grade.name.localeCompare(b.grade.name))
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold">Live Classes</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{filtered.length} of {classes.length} classes</p>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {activeClasses.length} active{archivedClasses.length > 0 ? ` · ${archivedClasses.length} archived` : ''}
+          </p>
         </div>
         <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
           <Link href="/admin/live-classes/new">
@@ -152,13 +176,14 @@ export default function AdminLiveClassesPage() {
         loading ? (
           <div className="py-16 text-center text-muted-foreground text-sm rounded-xl border border-border/60">Loading…</div>
         ) : (
-          <LiveClassCalendar classes={filtered as any} />
+          <LiveClassCalendar classes={activeClasses as any} />
         )
       ) : (
+      <div className="space-y-6">
       <div className="rounded-xl border border-border/60 overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-muted-foreground text-sm">Loading…</div>
-        ) : filtered.length > 0 ? (
+        ) : activeClasses.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[600px]">
               <thead className="bg-muted/30 border-b border-border/60">
@@ -172,7 +197,7 @@ export default function AdminLiveClassesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {filtered.map((c) => {
+                {activeClasses.map((c) => {
                   const grade = c.grade
                   const pkg = c.package
                   const d = new Date(c.scheduled_at)
@@ -260,6 +285,61 @@ export default function AdminLiveClassesPage() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Archived — one collapsible folder per grade */}
+      {!loading && archivedClasses.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Archive className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-muted-foreground">Archived</h2>
+            <span className="text-xs text-muted-foreground">({archivedClasses.length})</span>
+          </div>
+          <div className="space-y-2">
+            {archivedByGrade.map(({ grade, items }) => {
+              const open = openArchive.has(grade.id)
+              return (
+                <div key={grade.id} className="rounded-xl border border-border/60 overflow-hidden">
+                  <button
+                    onClick={() => toggleArchive(grade.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left"
+                  >
+                    {open
+                      ? <FolderOpen className="w-4 h-4 shrink-0" style={{ color: grade.color }} />
+                      : <Folder className="w-4 h-4 shrink-0" style={{ color: grade.color }} />}
+                    <Badge variant="outline" style={{ borderColor: `${grade.color}40`, color: grade.color }}>{grade.name}</Badge>
+                    <span className="ml-auto text-xs text-muted-foreground">{items.length} archived class{items.length !== 1 ? 'es' : ''}</span>
+                    {open
+                      ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                      : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+                  </button>
+                  {open && (
+                    <div className="border-t border-border/40 divide-y divide-border/30">
+                      {items.map((c) => (
+                        <div key={c.id} className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="font-medium text-sm flex-1 line-clamp-1 min-w-0">{c.title}</span>
+                          <span className="text-xs text-muted-foreground hidden sm:flex items-center gap-1 shrink-0">
+                            <Calendar className="w-3 h-3" />
+                            <LiveClassSchedule
+                              scheduledAt={c.scheduled_at}
+                              isRecurring={c.is_recurring ?? false}
+                              recurrenceDayOfWeek={c.recurrence_day_of_week ?? null}
+                              endTime={c.end_time ?? null}
+                            />
+                          </span>
+                          <Button variant="ghost" size="sm" asChild className="shrink-0">
+                            <Link href={`/admin/live-classes/${c.id}/edit`}><Pencil className="w-3.5 h-3.5 mr-1" /> Edit</Link>
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
       </div>
       )}
     </div>

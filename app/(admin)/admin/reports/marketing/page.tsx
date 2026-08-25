@@ -38,14 +38,21 @@ export default async function MarketingReportPage() {
 
   const { data: studentsRaw } = await (supabase as any)
     .from('profiles')
-    .select('referral_source, signup_country')
+    .select('referral_source, referral_other, signup_country')
     .eq('role', 'student')
 
-  const students = (studentsRaw ?? []) as Array<{ referral_source: string | null; signup_country: string | null }>
+  const students = (studentsRaw ?? []) as Array<{ referral_source: string | null; referral_other: string | null; signup_country: string | null }>
   const total = students.length
 
   const sourceRows = tally(students.map((s) => s.referral_source), (v) => referralLabel(v), 'Not specified')
   const countryRows = tally(students.map((s) => s.signup_country), (v) => countryName(v), 'Unknown')
+
+  // Free-text answers from students who picked "Other".
+  const otherRows = tally(
+    students.filter((s) => s.referral_source === 'other').map((s) => s.referral_other),
+    (v) => v,
+    'Unspecified',
+  )
 
   const knownSource = students.filter((s) => s.referral_source).length
   const knownCountry = students.filter((s) => s.signup_country).length
@@ -104,6 +111,19 @@ export default async function MarketingReportPage() {
           {total === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-muted-foreground">No students yet.</p>
           ) : <Breakdown rows={sourceRows} />}
+          {otherRows.length > 0 && (
+            <div className="border-t border-border/40">
+              <p className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">&ldquo;Other&rdquo; answers</p>
+              <div className="divide-y divide-border/40">
+                {otherRows.map((r) => (
+                  <div key={r.key} className="px-4 py-2 flex items-center justify-between gap-3">
+                    <span className="text-sm truncate">{r.label}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{r.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="rounded-xl border border-border/60 overflow-hidden">
