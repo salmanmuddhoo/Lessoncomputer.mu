@@ -123,6 +123,7 @@ export default async function GradePage({ params }: PageProps) {
       .eq('month', target.month)
       .eq('year', target.year)
       .eq('is_active', true)
+      .eq('is_archived', false)
       .maybeSingle(),
     supabase
       .from('subscription_packages')
@@ -130,6 +131,7 @@ export default async function GradePage({ params }: PageProps) {
       .eq('grade_id', grade.id)
       .eq('package_type', 'live_month')
       .eq('is_active', true)
+      .eq('is_archived', false)
       .or(`year.lt.${target.year},and(year.eq.${target.year},month.lt.${target.month})`)
       .order('year', { ascending: false })
       .order('month', { ascending: false }),
@@ -141,6 +143,7 @@ export default async function GradePage({ params }: PageProps) {
       .eq('month', nextMonthNum)
       .eq('year', nextMonthYear)
       .eq('is_active', true)
+      .eq('is_archived', false)
       .maybeSingle(),
   ])
 
