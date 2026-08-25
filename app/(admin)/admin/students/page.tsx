@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatWhatsAppDisplay, normalizeWhatsAppDigits } from '@/lib/phone'
+import { referralLabel } from '@/lib/referral-sources'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
@@ -27,6 +28,7 @@ interface Student {
   is_active: boolean
   created_at: string
   parent_phone: string | null
+  referral_source: string | null
   grade: { id: string; name: string; color: string } | null
   enrolledGrades?: { id: string; name: string; color: string }[]
 }
@@ -112,7 +114,7 @@ export default function AdminStudentsPage() {
     const [{ data: studentData }, { data: gradeData }, { data: subGrades }] = await Promise.all([
       (supabase as any)
         .from('profiles')
-        .select('id, full_name, is_active, created_at, parent_phone, grade:grades(id, name, color)')
+        .select('id, full_name, is_active, created_at, parent_phone, referral_source, grade:grades(id, name, color)')
         .eq('role', 'student')
         .order('created_at', { ascending: false }),
       supabase.from('grades').select('id, name, color').eq('is_active', true).order('order_index'),
@@ -523,6 +525,10 @@ export default function AdminStudentsPage() {
                     <span className={`text-xs px-2 py-0.5 rounded-full ${subStudent?.is_active ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
                       {subStudent?.is_active ? 'Active' : 'Inactive'}
                     </span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Heard about us</p>
+                    <p className="font-medium">{referralLabel(subStudent?.referral_source)}</p>
                   </div>
                 </div>
 

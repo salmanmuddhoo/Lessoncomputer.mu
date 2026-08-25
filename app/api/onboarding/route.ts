@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-    const { gradeId, fullName } = await req.json() as { gradeId?: string; fullName?: string }
+    const { gradeId, fullName, referralSource } = await req.json() as { gradeId?: string; fullName?: string; referralSource?: string }
     if (!gradeId) return NextResponse.json({ error: 'Please select your grade.' }, { status: 400 })
 
     const admin = createServiceRoleClient()
@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
 
     const patch: Record<string, unknown> = { id: user.id, grade_id: gradeId }
     if (fullName && fullName.trim()) patch.full_name = fullName.trim()
+    if (referralSource && referralSource.trim()) patch.referral_source = referralSource.trim()
 
     const { error } = await (admin as any)
       .from('profiles')

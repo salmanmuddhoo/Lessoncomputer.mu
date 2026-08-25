@@ -16,11 +16,13 @@ import {
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { GoogleSignInButton } from '@/components/lc/google-signin-button'
+import { REFERRAL_SOURCES } from '@/lib/referral-sources'
 
 const schema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email'),
   grade_id: z.string().min(1, 'Please select your grade'),
+  referral_source: z.string().min(1, 'Please tell us how you heard about us'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
 }).refine((d) => d.password === d.confirmPassword, {
@@ -50,7 +52,7 @@ export function RegisterForm({ grades }: RegisterFormProps) {
       email: data.email,
       password: data.password,
       options: {
-        data: { full_name: data.fullName, grade_id: data.grade_id },
+        data: { full_name: data.fullName, grade_id: data.grade_id, referral_source: data.referral_source },
         emailRedirectTo: `${window.location.origin}/api/auth/callback`,
       },
     })
@@ -65,7 +67,7 @@ export function RegisterForm({ grades }: RegisterFormProps) {
     if (authData.user) {
       await supabase
         .from('profiles')
-        .update({ grade_id: data.grade_id, full_name: data.fullName })
+        .update({ grade_id: data.grade_id, full_name: data.fullName, referral_source: data.referral_source })
         .eq('id', authData.user.id)
     }
 
@@ -155,6 +157,21 @@ export function RegisterForm({ grades }: RegisterFormProps) {
               </SelectContent>
             </Select>
             {errors.grade_id && <p className="text-xs text-destructive">{errors.grade_id.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>How did you hear about us?</Label>
+            <Select onValueChange={(v) => setValue('referral_source', v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select an option" />
+              </SelectTrigger>
+              <SelectContent>
+                {REFERRAL_SOURCES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.referral_source && <p className="text-xs text-destructive">{errors.referral_source.message}</p>}
           </div>
 
           <div className="space-y-2">

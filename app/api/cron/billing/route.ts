@@ -170,16 +170,19 @@ export async function GET(req: NextRequest) {
     const { error: orderError } = await (admin as any)
       .from('mips_orders')
       .insert({
-        id:           claimOrderId,
-        student_id:   token.student_id,
-        order_type:   'live',
-        package_ids:  [nextPkg.id],
-        is_recurring: true,
+        id:                 claimOrderId,
+        student_id:         token.student_id,
+        order_type:         'live',
+        package_ids:        [nextPkg.id],
+        is_recurring:       true,
         amount,
-        currency:     token.currency,
-        description:  `Live classes: ${nextPkg.name} (auto-renewal)`,
-        status:       'pending',
-        metadata:     { env, claim: true, cron: true },
+        currency:           token.currency,
+        description:        `Live classes: ${nextPkg.name} (auto-renewal)`,
+        status:             'pending',
+        // Record the MIPS merchant order reference (same shape as interactive payments) so
+        // the Payments report shows a Transaction ID for recurring charges too.
+        mips_transaction_id: toMipsOrderId(claimOrderId),
+        metadata:           { env, claim: true, cron: true },
       })
 
     if (orderError) {
