@@ -41,11 +41,13 @@ export async function POST(req: NextRequest) {
       if (profileError) console.error('[payment/create] ensure profile failed:', profileError)
     }
 
-    // Video packages are always one-off; only live subscriptions can be recurring
-    const effectiveRecurring = (orderType === 'live' || orderType === 'mixed') ? isRecurring : false
-
-    // A recurring subscriber is auto-charged for CURRENT and FUTURE months, so block
-    // re-purchasing those. PAST-month live videos remain purchasable (missed content).
+    // Determine whether the student already holds a recurring live subscription for the
+    // grade(s) in this order, and block only months that recurring subscription actually
+    // covers. A recurring subscription covers ITS month and every LATER month (auto-charged
+    // by the billing cron) — but NOT earlier months. So a student whose recurring sub is for a
+    // FUTURE month (e.g. bought next month first) can still buy the CURRENT (or a past) month
+    // as a one-off catch-up.
+    let hasExistingGradeRecurring = false
     if (orderType === 'live' || orderType === 'mixed') {
       const { data: orderLivePkgs } = await (supabase as any)
         .from('subscription_packages')
@@ -53,43 +55,43 @@ export async function POST(req: NextRequest) {
         .in('id', packageIds)
         .eq('package_type', 'live_month')
 
-      const now = new Date()
-      const curY = now.getFullYear()
-      const curM = now.getMonth() + 1
-      const currentOrFutureLive = (orderLivePkgs ?? []).filter((p: any) =>
-        p.year > curY || (p.year === curY && p.month >= curM)
+      const orderGradeIds = [...new Set(((orderLivePkgs ?? []) as any[]).map((p) => p.grade_id).filter(Boolean))]
+
+      let recurringCovers: Array<{ grade_id: string; month: number; year: number }> = []
+      if (orderGradeIds.length > 0) {
+        const { data: recSubs } = await (supabase as any)
+          .from('student_subscriptions')
+          .select('package:subscription_packages(grade_id, month, year, package_type)')
+          .eq('student_id', user.id)
+          .eq('status', 'active')
+          .eq('is_recurring', true)
+          .not('package_id', 'is', null)
+        recurringCovers = ((recSubs ?? []) as any[])
+          .map((s) => s.package)
+          .filter((p) => p && p.package_type === 'live_month' && orderGradeIds.includes(p.grade_id))
+      }
+      hasExistingGradeRecurring = recurringCovers.length > 0
+
+      // Block a month only if an existing recurring subscription for the same grade already
+      // covers it (its month or a later, auto-charged month).
+      const monthKey = (y: number, m: number) => y * 12 + m
+      const alreadyCovered = ((orderLivePkgs ?? []) as any[]).some((p) =>
+        recurringCovers.some((r) => r.grade_id === p.grade_id && monthKey(p.year, p.month) >= monthKey(r.year, r.month))
       )
-
-      if (currentOrFutureLive.length > 0) {
-        const gradeId = currentOrFutureLive[0].grade_id
-        if (gradeId) {
-          const { data: recurringSubs } = await supabase
-            .from('student_subscriptions')
-            .select('package_id')
-            .eq('student_id', user.id)
-            .eq('status', 'active')
-            .eq('is_recurring', true)
-            .not('package_id', 'is', null)
-
-          if (recurringSubs && recurringSubs.length > 0) {
-            const recurringPkgIds = recurringSubs.map((s: any) => s.package_id).filter(Boolean)
-            const { count } = await (supabase as any)
-              .from('subscription_packages')
-              .select('id', { count: 'exact', head: true })
-              .in('id', recurringPkgIds)
-              .eq('grade_id', gradeId)
-              .eq('package_type', 'live_month')
-
-            if (count && count > 0) {
-              return NextResponse.json(
-                { error: 'You already have an active recurring subscription for this grade. Upcoming months are charged automatically — you can still buy past-month videos.' },
-                { status: 400 }
-              )
-            }
-          }
-        }
+      if (alreadyCovered) {
+        return NextResponse.json(
+          { error: 'You already have an active recurring subscription that covers this month for this grade — it will be charged automatically. You can still buy earlier (past) months.' },
+          { status: 400 }
+        )
       }
     }
+
+    // Video packages are always one-off; live subscriptions can be recurring — EXCEPT when the
+    // student already holds a recurring subscription for the grade. In that case this purchase
+    // (e.g. the current month bought after subscribing to a future month) is a one-off catch-up;
+    // the existing recurring subscription keeps auto-charging the future months.
+    const effectiveRecurring =
+      (orderType === 'live' || orderType === 'mixed') && !hasExistingGradeRecurring ? isRecurring : false
 
     // ── Authoritative server-side pricing ──────────────────────────────────
     // NEVER trust the client's `amount`/`liveAmount`. Recompute from the real
