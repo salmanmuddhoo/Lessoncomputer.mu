@@ -98,11 +98,17 @@ export async function POST(req: NextRequest) {
     // grade via `grades.live_subscription_price` (their own price column is 0).
     const { data: pricePkgs, error: priceErr } = await (supabase as any)
       .from('subscription_packages')
-      .select('id, price, package_type, grade_id')
+      .select('id, price, package_type, grade_id, is_active, is_archived')
       .in('id', packageIds)
 
     if (priceErr || !pricePkgs || pricePkgs.length !== packageIds.length) {
       return NextResponse.json({ error: 'Invalid packages selected' }, { status: 400 })
+    }
+
+    // Reject archived/inactive packages — an archived past-month live package must not be
+    // purchasable even if a stale client still references it.
+    if (pricePkgs.some((p: any) => p.is_archived || p.is_active === false)) {
+      return NextResponse.json({ error: 'One or more selected packages are no longer available for purchase.' }, { status: 400 })
     }
 
     const liveGradeIds = Array.from(

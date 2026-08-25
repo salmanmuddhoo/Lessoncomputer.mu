@@ -105,7 +105,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
   const [{ data: livePackages }, { data: videoPackagesRaw }, { data: currentLiveClass }] = await Promise.all([
     supabase
       .from('subscription_packages')
-      .select('id, name, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index, is_visible_to_subscribers))')
+      .select('id, name, month, year, is_archived, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index, is_visible_to_subscribers))')
       .eq('grade_id', grade.id)
       .eq('package_type', 'live_month')
       .eq('is_active', true)
@@ -193,7 +193,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
                 liveMonthPackageId={currentMonthPkg.id}
                 liveMonthLabel={`${MONTHS[currentMonth - 1]} ${currentYear}`}
                 pastLivePackages={(livePackages ?? [])
-                  .filter((p: any) => p.year < currentYear || (p.year === currentYear && p.month < currentMonth))
+                  .filter((p: any) => !p.is_archived && (p.year < currentYear || (p.year === currentYear && p.month < currentMonth)))
                   .map((p: any) => ({ id: p.id, name: p.name, month: p.month, year: p.year }))}
                 defaultMode="live"
                 triggerLabel="Subscribe Now"
@@ -246,6 +246,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
     name: pkg.name,
     month: pkg.month,
     year: pkg.year,
+    isArchived: !!pkg.is_archived,
     chapters: (pkg.subscription_package_chapters ?? [])
       .map((c: any) => c.chapter)
       .filter((ch: any) => ch && ch.is_visible_to_subscribers !== false)
@@ -360,7 +361,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
             liveMonthPackageId={currentMonthPkg.id}
             liveMonthLabel={`${MONTHS[currentMonth - 1]} ${currentYear}`}
             pastLivePackages={(livePackages ?? [])
-              .filter((p: any) => p.year < currentYear || (p.year === currentYear && p.month < currentMonth))
+              .filter((p: any) => !p.is_archived && (p.year < currentYear || (p.year === currentYear && p.month < currentMonth)))
               .map((p: any) => ({ id: p.id, name: p.name, month: p.month, year: p.year }))}
             defaultMode="live"
             triggerLabel="Subscribe Now"

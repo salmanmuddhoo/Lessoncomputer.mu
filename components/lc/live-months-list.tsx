@@ -29,6 +29,7 @@ interface MonthPackage {
   name: string
   month: number
   year: number
+  isArchived?: boolean
   chapters: Chapter[]
 }
 
@@ -76,7 +77,8 @@ export function LiveMonthsList({
 
   const unsubscribedPastPackages = packages.filter(pkg => {
     const isPast = pkg.year < currentYear || (pkg.year === currentYear && pkg.month < currentMonth)
-    return isPast && !subscribedSet.has(pkg.id)
+    // Archived past months are no longer purchasable.
+    return isPast && !pkg.isArchived && !subscribedSet.has(pkg.id)
   })
 
   function toggleMonth(id: string) {

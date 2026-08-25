@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   Loader2, CalendarDays, Settings2, Video, FileText,
   Eye, EyeOff, FolderOpen, ChevronDown, ChevronUp, Pencil, Radio, Clock, GitMerge, CheckCheck, BookMarked,
+  Archive, ArchiveRestore,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -28,7 +29,7 @@ const MONTHS = [
 
 interface Grade { id: string; name: string; color: string }
 interface Chapter { id: string; title: string; order_index: number; is_visible_to_subscribers: boolean }
-interface MonthPackage { id: string | null; month: number; year: number; chapterIds: string[] }
+interface MonthPackage { id: string | null; month: number; year: number; chapterIds: string[]; isArchived: boolean }
 
 interface VideoItem {
   id: string
@@ -111,7 +112,7 @@ export default function AdminLiveMonthsPage() {
       supabase.from('chapters').select('id,title,order_index,is_visible_to_subscribers')
         .eq('grade_id', selectedGradeId).order('order_index'),
       supabase.from('subscription_packages')
-        .select('id,month,year,subscription_package_chapters(chapter_id)')
+        .select('id,month,year,is_archived,subscription_package_chapters(chapter_id)')
         .eq('grade_id', selectedGradeId)
         .eq('package_type', 'live_month')
         .eq('year', selectedYear),
@@ -127,12 +128,13 @@ export default function AdminLiveMonthsPage() {
         month: p.month,
         year: p.year,
         chapterIds: ((p as any).subscription_package_chapters ?? []).map((c: any) => c.chapter_id),
+        isArchived: !!(p as any).is_archived,
       }
     }
 
     const allMonths: MonthPackage[] = Array.from({ length: 12 }, (_, i) => {
       const m = i + 1
-      return pkgMap[m] ?? { id: null, month: m, year: selectedYear, chapterIds: [] }
+      return pkgMap[m] ?? { id: null, month: m, year: selectedYear, chapterIds: [], isArchived: false }
     })
     setMonthPackages(allMonths)
 
@@ -278,6 +280,29 @@ export default function AdminLiveMonthsPage() {
     if (error) {
       toast.error(`Save failed: ${error.message}`)
       setVisibilityMap((prev) => ({ ...prev, [id]: !val })) // revert on failure
+    }
+  }
+
+  // A month is "past" (in Mauritius time) once its month/year is before the current one.
+  // Only past months may be archived — current and upcoming months stay purchasable.
+  function isPastMonth(month: number, year: number): boolean {
+    const mu = new Date(Date.now() + 4 * 60 * 60 * 1000)
+    const cy = mu.getUTCFullYear(), cm = mu.getUTCMonth() + 1
+    return year < cy || (year === cy && month < cm)
+  }
+
+  // Archive / unarchive a past month's live package. Archived packages can no longer be
+  // purchased; students who already subscribed keep their access.
+  async function toggleArchive(pkg: MonthPackage) {
+    if (!pkg.id) return
+    const next = !pkg.isArchived
+    setMonthPackages((prev) => prev.map((p) => (p.month === pkg.month ? { ...p, isArchived: next } : p)))
+    const { error } = await supabase.from('subscription_packages').update({ is_archived: next } as any).eq('id', pkg.id)
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+      setMonthPackages((prev) => prev.map((p) => (p.month === pkg.month ? { ...p, isArchived: !next } : p)))
+    } else {
+      toast.success(next ? `${MONTHS[pkg.month - 1]} archived — no longer purchasable` : `${MONTHS[pkg.month - 1]} unarchived`)
     }
   }
 
@@ -538,7 +563,23 @@ export default function AdminLiveMonthsPage() {
                     ) : (
                       <span className="text-xs text-muted-foreground">No chapters assigned</span>
                     )}
+                    {pkg.isArchived && (
+                      <Badge variant="outline" className="text-xs bg-muted text-muted-foreground shrink-0">Archived</Badge>
+                    )}
                   </button>
+
+                  {pkg.id && isPastMonth(pkg.month, pkg.year) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); toggleArchive(pkg) }}
+                      className="shrink-0 h-7 text-xs"
+                    >
+                      {pkg.isArchived
+                        ? <><ArchiveRestore className="w-3 h-3 mr-1" /> Unarchive</>
+                        : <><Archive className="w-3 h-3 mr-1" /> Archive</>}
+                    </Button>
+                  )}
 
                   <Button
                     size="sm"
