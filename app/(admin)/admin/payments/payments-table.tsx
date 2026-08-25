@@ -17,7 +17,7 @@ interface MipsOrder {
   mips_transaction_id: string | null
   is_recurring: boolean
   created_at: string
-  metadata?: { failureReason?: string } | null
+  metadata?: { failureReason?: string; transaction_id?: string } | null
   studentName?: string | null
   gradeId?: string | null
   gradeName?: string | null
@@ -150,7 +150,7 @@ export function PaymentsTable({ initialOrders, grades = [] }: { initialOrders: M
                     )}
                   </td>
                   <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
-                    {order.mips_transaction_id ?? '—'}
+                    {order.mips_transaction_id ?? order.metadata?.transaction_id ?? '—'}
                   </td>
                   <td className="px-4 py-3">
                     {canActivate && (

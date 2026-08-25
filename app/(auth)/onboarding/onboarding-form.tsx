@@ -8,22 +8,25 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
+import { REFERRAL_SOURCES } from '@/lib/referral-sources'
 
 export function OnboardingForm({ grades, initialName }: { grades: { id: string; name: string }[]; initialName: string }) {
   const router = useRouter()
   const [fullName, setFullName] = useState(initialName)
   const [gradeId, setGradeId] = useState('')
+  const [referralSource, setReferralSource] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function save() {
     if (saving) return
     if (!gradeId) { toast.error('Please select your grade'); return }
+    if (!referralSource) { toast.error('Please tell us how you heard about us'); return }
     setSaving(true)
     try {
       const res = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gradeId, fullName: fullName.trim() || undefined }),
+        body: JSON.stringify({ gradeId, fullName: fullName.trim() || undefined, referralSource }),
       })
       const data = await res.json() as { ok?: boolean; error?: string }
       if (!res.ok || !data.ok) { toast.error(data.error ?? 'Could not save. Please try again.'); return }
@@ -48,6 +51,15 @@ export function OnboardingForm({ grades, initialName }: { grades: { id: string; 
           <SelectTrigger><SelectValue placeholder="Select your grade" /></SelectTrigger>
           <SelectContent>
             {grades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>How did you hear about us?</Label>
+        <Select onValueChange={setReferralSource}>
+          <SelectTrigger><SelectValue placeholder="Select an option" /></SelectTrigger>
+          <SelectContent>
+            {REFERRAL_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
