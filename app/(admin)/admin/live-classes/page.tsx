@@ -22,6 +22,7 @@ interface LiveClass {
   scheduled_at: string
   meet_url?: string | null
   is_published: boolean
+  is_archived?: boolean
   is_recurring?: boolean
   recurrence_day_of_week?: number | null
   end_time?: string | null
@@ -216,17 +217,21 @@ export default function AdminLiveClassesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex text-xs px-2 py-0.5 rounded-full ${
-                          !c.is_published
-                            ? 'bg-secondary text-muted-foreground'
-                            : isPastMonth
-                            ? 'bg-muted text-muted-foreground'
-                            : isCurrentMonth
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400'
-                        }`}>
-                          {!c.is_published ? 'Draft' : isPastMonth ? 'Ended' : isCurrentMonth ? 'Active' : 'Upcoming'}
-                        </span>
+                        {c.is_archived ? (
+                          <span className="inline-flex text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Archived</span>
+                        ) : (
+                          <span className={`inline-flex text-xs px-2 py-0.5 rounded-full ${
+                            !c.is_published
+                              ? 'bg-secondary text-muted-foreground'
+                              : isPastMonth
+                              ? 'bg-muted text-muted-foreground'
+                              : isCurrentMonth
+                              ? 'bg-primary/10 text-primary'
+                              : 'bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400'
+                          }`}>
+                            {!c.is_published ? 'Draft' : isPastMonth ? 'Ended' : isCurrentMonth ? 'Active' : 'Upcoming'}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Button variant="ghost" size="sm" asChild>
