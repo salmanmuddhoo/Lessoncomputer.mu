@@ -23,11 +23,15 @@ const schema = z.object({
   email: z.string().email('Please enter a valid email'),
   grade_id: z.string().min(1, 'Please select your grade'),
   referral_source: z.string().min(1, 'Please tell us how you heard about us'),
+  referral_other: z.string().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
 }).refine((d) => d.password === d.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
+}).refine((d) => d.referral_source !== 'other' || !!d.referral_other?.trim(), {
+  message: 'Please tell us where you heard about us',
+  path: ['referral_other'],
 })
 
 type FormData = z.infer<typeof schema>
@@ -52,7 +56,12 @@ export function RegisterForm({ grades }: RegisterFormProps) {
       email: data.email,
       password: data.password,
       options: {
-        data: { full_name: data.fullName, grade_id: data.grade_id, referral_source: data.referral_source },
+        data: {
+          full_name: data.fullName,
+          grade_id: data.grade_id,
+          referral_source: data.referral_source,
+          referral_other: data.referral_source === 'other' ? (data.referral_other?.trim() || null) : null,
+        },
         emailRedirectTo: `${window.location.origin}/api/auth/callback`,
       },
     })
@@ -67,7 +76,12 @@ export function RegisterForm({ grades }: RegisterFormProps) {
     if (authData.user) {
       await supabase
         .from('profiles')
-        .update({ grade_id: data.grade_id, full_name: data.fullName, referral_source: data.referral_source })
+        .update({
+          grade_id: data.grade_id,
+          full_name: data.fullName,
+          referral_source: data.referral_source,
+          referral_other: data.referral_source === 'other' ? (data.referral_other?.trim() || null) : null,
+        })
         .eq('id', authData.user.id)
     }
 
@@ -172,6 +186,12 @@ export function RegisterForm({ grades }: RegisterFormProps) {
               </SelectContent>
             </Select>
             {errors.referral_source && <p className="text-xs text-destructive">{errors.referral_source.message}</p>}
+            {watch('referral_source') === 'other' && (
+              <div className="pt-1">
+                <Input placeholder="Please tell us where" {...register('referral_other')} />
+                {errors.referral_other && <p className="text-xs text-destructive mt-1">{errors.referral_other.message}</p>}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
