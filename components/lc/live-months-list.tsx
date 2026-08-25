@@ -137,6 +137,9 @@ export function LiveMonthsList({
       <div className="space-y-4">
         {packages.map(pkg => {
           const isSubscribed = subscribedSet.has(pkg.id)
+          // Archived past months are no longer purchasable. Hide them entirely unless the
+          // student already subscribed — in which case they keep access to that month.
+          if (pkg.isArchived && !isSubscribed) return null
           const isCurrentMonth = pkg.month === currentMonth && pkg.year === currentYear
           const isPast = pkg.year < currentYear || (pkg.year === currentYear && pkg.month < currentMonth)
           const monthLabel = `${MONTHS[pkg.month - 1]} ${pkg.year}`
