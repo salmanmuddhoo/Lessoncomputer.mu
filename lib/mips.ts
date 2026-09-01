@@ -46,6 +46,9 @@ export interface CreatePaymentParams {
   description: string
   returnUrl: string
   notificationUrl: string   // IMN webhook — MIPS POSTs here when payment completes
+  // The paying student's name/email — shown in the MIPS "Client details" tab.
+  clientName?: string
+  clientEmail?: string
   // For recurring live subscriptions: use ODRP mode to tokenize the card.
   odrp?: {
     maxAmountTotal:    number
@@ -61,7 +64,7 @@ export interface CreatePaymentResult {
 }
 
 export async function createMipsPayment(params: CreatePaymentParams): Promise<CreatePaymentResult> {
-  const { env, orderId, amount, currency = 'MUR', description, returnUrl, notificationUrl, odrp } = params
+  const { env, orderId, amount, currency = 'MUR', description, returnUrl, notificationUrl, clientName, clientEmail, odrp } = params
   const creds = getCredentials()
   const baseUrl = getBaseUrl(env)
   const mipsOrderId = toMipsOrderId(orderId)
@@ -77,6 +80,9 @@ export async function createMipsPayment(params: CreatePaymentParams): Promise<Cr
       request_mode:  odrp ? 'odrp' : 'simple',
       sending_mode:  'link',
       request_title: description.slice(0, 200),
+      // Populates the "Client details" tab on the MIPS payment/back-office page.
+      ...(clientName && { request_name: clientName.slice(0, 200) }),
+      ...(clientEmail && { request_email: clientEmail.slice(0, 200) }),
       ...(odrp && {
         max_amount_total:    odrp.maxAmountTotal,
         max_amount_per_claim: odrp.maxAmountPerClaim,

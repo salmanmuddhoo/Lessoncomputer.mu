@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrencyInfo } from '@/lib/currency'
 import { formatMoney } from '@/lib/currency-format'
 import { GradePageContent } from '@/components/lc/grade-page-content'
+import { DemoVideosButton } from '@/components/lc/demo-videos-button'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { Badge } from '@/components/ui/badge'
@@ -216,6 +217,12 @@ export default async function GradePage({ params }: PageProps) {
     for (const d of (demoRows ?? []) as any[]) if (d.streamable_url) demoUrlById.set(d.id, d.streamable_url)
   }
 
+  // All playable demo videos for this grade — surfaced up top so any student (live or
+  // video-package) can preview lessons before subscribing to anything.
+  const demoVideosForButton = (videos ?? [])
+    .filter((v: any) => v.is_demo && demoUrlById.has(v.id))
+    .map((v: any) => ({ id: v.id, title: v.title, streamable_url: demoUrlById.get(v.id)! }))
+
   const gradeRef = { name: (grade as any).name, color: (grade as any).color, slug: (grade as any).slug }
   const videosByChapter: Record<string, any[]> = {}
   const unchapteredVideos: any[] = []
@@ -314,6 +321,8 @@ export default async function GradePage({ params }: PageProps) {
           )}
         </div>
       </header>
+
+      <DemoVideosButton videos={demoVideosForButton} />
 
       {/* Live class subscription banner */}
       {liveSubscriptionEnabled && (

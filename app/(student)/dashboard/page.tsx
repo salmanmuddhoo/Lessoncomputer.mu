@@ -192,28 +192,40 @@ export default async function StudentDashboardPage({ searchParams }: { searchPar
       )}
 
       {/* Access widgets: live join + video access */}
-      {(liveJoin || hasVideo) && (
+      {(hasLive || hasVideo) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {liveJoin && (
-            <div className="p-5 rounded-xl border border-primary/30 bg-card flex flex-col">
-              <div className="flex items-center gap-2 mb-1">
-                <Radio className="w-4 h-4 text-primary" />
-                <span className="text-xs font-semibold text-primary uppercase tracking-wide">Your live class</span>
+          {hasLive && (
+            liveJoin ? (
+              <div className="p-5 rounded-xl border border-primary/30 bg-card flex flex-col">
+                <div className="flex items-center gap-2 mb-1">
+                  <Radio className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-semibold text-primary uppercase tracking-wide">Your live class</span>
+                </div>
+                <h3 className="font-semibold text-sm mb-3">{liveJoin.cls.title}</h3>
+                <div className="mt-auto">
+                  <JoinLiveClassButton
+                    liveClassId={liveJoin.cls.id}
+                    meetUrl={liveJoin.cls.meet_url}
+                    gradeId={liveJoin.gradeId}
+                    scheduledAt={liveJoin.cls.scheduled_at}
+                    endTime={liveJoin.cls.end_time ?? null}
+                    isRecurring={liveJoin.cls.is_recurring ?? false}
+                    recurrenceDayOfWeek={liveJoin.cls.recurrence_day_of_week ?? null}
+                    hasParentPhone={hasParentPhone}
+                  />
+                </div>
               </div>
-              <h3 className="font-semibold text-sm mb-3">{liveJoin.cls.title}</h3>
-              <div className="mt-auto">
-                <JoinLiveClassButton
-                  liveClassId={liveJoin.cls.id}
-                  meetUrl={liveJoin.cls.meet_url}
-                  gradeId={liveJoin.gradeId}
-                  scheduledAt={liveJoin.cls.scheduled_at}
-                  endTime={liveJoin.cls.end_time ?? null}
-                  isRecurring={liveJoin.cls.is_recurring ?? false}
-                  recurrenceDayOfWeek={liveJoin.cls.recurrence_day_of_week ?? null}
-                  hasParentPhone={hasParentPhone}
-                />
-              </div>
-            </div>
+            ) : (
+              <Link href={`/dashboard/live-classes${grade ? `?grade=${grade.id}` : ''}`} className="p-5 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors flex flex-col">
+                <div className="flex items-center gap-2 mb-1">
+                  <Radio className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your live class</span>
+                </div>
+                <h3 className="font-semibold text-sm mb-1">See your live class schedule</h3>
+                <p className="text-xs text-muted-foreground mb-3">Check when the next session is and catch up on past content.</p>
+                <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-primary">Open Live Classes <ArrowRight className="w-4 h-4" /></span>
+              </Link>
+            )
           )}
           {hasVideo && (
             <Link href={`/dashboard/my-videos${grade ? `?grade=${grade.id}` : ''}`} className="p-5 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors flex flex-col">

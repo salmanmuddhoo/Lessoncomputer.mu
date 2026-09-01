@@ -38,7 +38,7 @@ export function Hero() {
         {/* CTAs */}
         <div className="animate-blur-in-delay-3 flex flex-col sm:flex-row gap-3 justify-center">
           <Button size="lg" asChild className="bg-foreground text-background hover:bg-foreground/90 font-semibold rounded-full px-9 h-12 text-[15px]">
-            <Link href="/register">
+            <Link href="/grades">
               Browse Grades <ArrowRight className="ml-2 w-4 h-4" />
             </Link>
           </Button>
