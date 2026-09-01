@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { usePrice } from '@/components/lc/currency-provider'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Radio, CheckCircle2, Lock, Calendar, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { Radio, CheckCircle2, Lock, Calendar, ChevronDown, ChevronUp, Loader2, Search, X } from 'lucide-react'
 import { LiveMonthChapters } from '@/components/lc/live-month-chapters'
 import { toast } from 'sonner'
 
@@ -74,6 +74,25 @@ export function LiveMonthsList({
   const [pastDialog, setPastDialog] = useState<{ selectedIds: Set<string> } | null>(null)
   const [confirmCurrent, setConfirmCurrent] = useState<MonthPackage | null>(null)
   const [agreed, setAgreed] = useState(false)
+  const [search, setSearch] = useState('')
+
+  // Search by chapter title or lesson (video/document/note) title — helps a student revising
+  // for an exam find "binary" or "arrays" instantly instead of opening every month.
+  const query = search.trim().toLowerCase()
+  const matchingChapterIds = useMemo(() => {
+    if (!query) return null
+    const ids = new Set<string>()
+    for (const pkg of packages) {
+      for (const ch of pkg.chapters) {
+        const chMatch = ch.title.toLowerCase().includes(query)
+        const videoMatch = (videosByChapter[ch.id] ?? []).some((v: any) => v.title?.toLowerCase().includes(query))
+        const docMatch = (documentsByChapter[ch.id] ?? []).some((d: any) => d.title?.toLowerCase().includes(query))
+        const noteMatch = (notesByChapter[ch.id] ?? []).some((n: any) => n.title?.toLowerCase().includes(query))
+        if (chMatch || videoMatch || docMatch || noteMatch) ids.add(ch.id)
+      }
+    }
+    return ids
+  }, [query, packages, videosByChapter, documentsByChapter, notesByChapter])
 
   const unsubscribedPastPackages = packages.filter(pkg => {
     const isPast = pkg.year < currentYear || (pkg.year === currentYear && pkg.month < currentMonth)
@@ -134,16 +153,43 @@ export function LiveMonthsList({
 
   return (
     <>
+      {/* Search bar */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by chapter or lesson title (e.g. &ldquo;binary&rdquo;, &ldquo;arrays&rdquo;)…"
+          className="w-full rounded-lg border border-input bg-background pl-9 pr-9 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {matchingChapterIds && matchingChapterIds.size === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-6">No chapters or lessons match &ldquo;{search.trim()}&rdquo;.</p>
+      )}
+
       <div className="space-y-4">
         {packages.map(pkg => {
           const isSubscribed = subscribedSet.has(pkg.id)
           // Archived past months are no longer purchasable. Hide them entirely unless the
           // student already subscribed — in which case they keep access to that month.
           if (pkg.isArchived && !isSubscribed) return null
+          const pkgChapterMatch = matchingChapterIds ? pkg.chapters.some(ch => matchingChapterIds.has(ch.id)) : true
+          if (matchingChapterIds && !pkgChapterMatch) return null
           const isCurrentMonth = pkg.month === currentMonth && pkg.year === currentYear
           const isPast = pkg.year < currentYear || (pkg.year === currentYear && pkg.month < currentMonth)
           const monthLabel = `${MONTHS[pkg.month - 1]} ${pkg.year}`
-          const isOpen = openMonths[pkg.id] ?? false
+          const isOpen = matchingChapterIds ? true : (openMonths[pkg.id] ?? false)
 
           return (
             <div
@@ -241,6 +287,7 @@ export function LiveMonthsList({
                     videosByChapter={videosByChapter}
                     documentsByChapter={documentsByChapter}
                     notesByChapter={notesByChapter}
+                    filterChapterIds={matchingChapterIds}
                   />
                 </div>
               )}
@@ -249,7 +296,7 @@ export function LiveMonthsList({
               {!isSubscribed && isPast && pkg.chapters.length > 0 && (
                 <div className="px-5 py-3 border-t border-border/40">
                   <p className="text-xs text-muted-foreground">
-                    Includes: {pkg.chapters.map(ch => ch.title).join(' · ')}
+                    Includes: {(matchingChapterIds ? pkg.chapters.filter(ch => matchingChapterIds.has(ch.id)) : pkg.chapters).map(ch => ch.title).join(' · ')}
                   </p>
                 </div>
               )}

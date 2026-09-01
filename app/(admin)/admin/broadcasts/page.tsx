@@ -17,7 +17,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Loader2, Plus, Pencil, Trash2, Megaphone, Users, Radio, Video, Folder, FolderOpen, ChevronRight, ChevronDown, Bell } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Megaphone, Users, Radio, Video, Folder, FolderOpen, ChevronRight, ChevronDown, Bell, Inbox, Mail, GraduationCap } from 'lucide-react'
 import { toast } from 'sonner'
 
 const AUDIENCE_LABELS: Record<string, { label: string; icon: React.ElementType; className: string }> = {
@@ -41,15 +41,30 @@ interface Broadcast {
 }
 
 interface AdminNotification { id: string; message: string; created_at: string; type: string }
+interface ContactMessage {
+  id: string
+  name: string
+  email: string
+  subject: string
+  body: string
+  is_read: boolean
+  created_at: string
+  student: { full_name: string | null } | null
+  grade: { name: string; color: string } | null
+}
 
 export default function AdminBroadcastsPage() {
+  const [tab, setTab] = useState<'sent' | 'inbox'>('sent')
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
+  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([])
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
   const [grades, setGrades] = useState<Grade[]>([])
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleteContactId, setDeleteContactId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [openGrades, setOpenGrades] = useState<Record<string, boolean>>({})
@@ -66,7 +81,7 @@ export default function AdminBroadcastsPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: bData }, { data: gData }, { data: nData }] = await Promise.all([
+    const [{ data: bData }, { data: gData }, { data: nData }, { data: cData }] = await Promise.all([
       (supabase as any)
         .from('broadcasts')
         .select('id, title, body, grade_id, chapter_id, target_audience, created_at, grade:grades(name, color), chapter:chapters(title)')
@@ -78,9 +93,14 @@ export default function AdminBroadcastsPage() {
         .is('read_at', null)
         .order('created_at', { ascending: false })
         .limit(50),
+      (supabase as any)
+        .from('contact_messages')
+        .select('id, name, email, subject, body, is_read, created_at, student:profiles(full_name), grade:grades(name, color)')
+        .order('created_at', { ascending: false }),
     ])
     setBroadcasts((bData ?? []) as Broadcast[])
     setNotifications((nData ?? []) as AdminNotification[])
+    setContactMessages((cData ?? []) as ContactMessage[])
     const gs = (gData ?? []) as Grade[]
     setGrades(gs)
     if (gs.length > 0 && !gradeId) setGradeId(gs[0].id)
@@ -123,6 +143,28 @@ export default function AdminBroadcastsPage() {
     setNotifications((prev) => prev.filter((n) => n.id !== id))
     await (supabase as any).from('admin_notifications').update({ read_at: new Date().toISOString() }).eq('id', id)
   }
+
+  async function toggleContactRead(id: string, isRead: boolean) {
+    setContactMessages((prev) => prev.map((m) => (m.id === id ? { ...m, is_read: isRead } : m)))
+    await (supabase as any).from('contact_messages').update({ is_read: isRead }).eq('id', id)
+  }
+
+  function openContactMessage(m: ContactMessage) {
+    setExpandedId((prev) => (prev === m.id ? null : m.id))
+    if (!m.is_read) toggleContactRead(m.id, true)
+  }
+
+  async function deleteContactMessage(id: string) {
+    const { error } = await (supabase as any).from('contact_messages').delete().eq('id', id)
+    if (error) toast.error(error.message)
+    else {
+      toast.success('Message deleted')
+      setContactMessages((prev) => prev.filter((m) => m.id !== id))
+    }
+    setDeleteContactId(null)
+  }
+
+  const unreadContactCount = contactMessages.filter((m) => !m.is_read).length
 
   function openNew() {
     setEditingId(null)
@@ -229,20 +271,47 @@ export default function AdminBroadcastsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Messages</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Send homework, reminders, or announcements to students by grade
+            {tab === 'sent' ? 'Send homework, reminders, or announcements to students by grade' : 'Messages from the public contact form and students'}
           </p>
         </div>
-        <Button size="sm" className="bg-primary text-primary-foreground hover:bg-accent" onClick={openNew}>
-          <Plus className="w-4 h-4 mr-1" /> New Message
-        </Button>
+        {tab === 'sent' && (
+          <Button size="sm" className="bg-primary text-primary-foreground hover:bg-accent" onClick={openNew}>
+            <Plus className="w-4 h-4 mr-1" /> New Message
+          </Button>
+        )}
+      </div>
+
+      {/* Tabs: outbound (Sent) vs inbound (Inbox) */}
+      <div className="flex items-center gap-1 mb-8 border-b border-border/60">
+        <button
+          onClick={() => setTab('sent')}
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            tab === 'sent' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <span className="inline-flex items-center gap-1.5"><Megaphone className="w-3.5 h-3.5" /> Sent</span>
+        </button>
+        <button
+          onClick={() => setTab('inbox')}
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            tab === 'inbox' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Inbox className="w-3.5 h-3.5" /> Inbox
+            {unreadContactCount > 0 && (
+              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadContactCount}</span>
+            )}
+          </span>
+        </button>
       </div>
 
       {/* System notifications (e.g. subscription cancellations) */}
-      {!loading && notifications.length > 0 && (
+      {tab === 'sent' && !loading && notifications.length > 0 && (
         <div className="mb-8 rounded-xl border border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 p-4">
           <div className="flex items-center gap-2 mb-3">
             <Bell className="w-4 h-4 text-amber-500 shrink-0" />
@@ -270,7 +339,7 @@ export default function AdminBroadcastsPage() {
         </div>
       )}
 
-      {loading ? (
+      {tab === 'sent' && (loading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
@@ -390,7 +459,73 @@ export default function AdminBroadcastsPage() {
             )
           })}
         </div>
-      )}
+      ))}
+
+      {tab === 'inbox' && (loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : contactMessages.length === 0 ? (
+        <div className="py-20 text-center rounded-xl border border-border/60">
+          <Inbox className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground">No messages received yet.</p>
+          <p className="text-xs text-muted-foreground mt-1">Messages sent through the public contact form will appear here.</p>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border/60 divide-y divide-border/60 overflow-hidden">
+          {contactMessages.map((m) => {
+            const isOpen = expandedId === m.id
+            return (
+              <div key={m.id} className={!m.is_read ? 'bg-primary/5' : ''}>
+                <button
+                  onClick={() => openContactMessage(m)}
+                  className="w-full flex items-start gap-3 px-4 py-3.5 text-left hover:bg-muted/30 transition-colors"
+                >
+                  <Mail className={`w-4 h-4 mt-0.5 shrink-0 ${!m.is_read ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-sm ${!m.is_read ? 'font-semibold' : 'font-medium'}`}>{m.subject}</span>
+                      {!m.is_read && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      From <span className="font-medium text-foreground">{m.student?.full_name ?? m.name}</span>
+                      {' '}&lt;{m.email}&gt;
+                      {m.grade && (
+                        <span className="inline-flex items-center gap-1 ml-2">
+                          <GraduationCap className="w-3 h-3" style={{ color: m.grade.color }} />
+                          <span style={{ color: m.grade.color }}>{m.grade.name}</span>
+                        </span>
+                      )}
+                    </p>
+                    {!isOpen && <p className="text-xs text-muted-foreground line-clamp-1 mt-1">{m.body}</p>}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">
+                    {new Date(m.created_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="px-4 pb-4 pl-11">
+                    <p className="text-sm text-foreground/90 whitespace-pre-wrap mb-3">{m.body}</p>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+                        <a href={`mailto:${m.email}?subject=${encodeURIComponent(`Re: ${m.subject}`)}`}>Reply by Email</a>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteContactId(m.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ))}
 
       {/* Create dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -485,6 +620,27 @@ export default function AdminBroadcastsPage() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteId && handleDelete(deleteId)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation — inbox message */}
+      <AlertDialog open={!!deleteContactId} onOpenChange={(open) => { if (!open) setDeleteContactId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this message from the inbox.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteContactId && deleteContactMessage(deleteContactId)}
             >
               Delete
             </AlertDialogAction>
