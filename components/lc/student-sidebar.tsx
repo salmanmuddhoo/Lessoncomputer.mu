@@ -43,7 +43,7 @@ function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscrip
     { label: 'My Video Packages', href: '/dashboard/my-videos',   icon: BookOpen,         show: hasVideoSubscription },
     { label: 'Live Classes',      href: '/dashboard/live-classes', icon: Users,            show: hasLiveSubscription },
     { label: 'Attendance',        href: '/dashboard/attendance',  icon: ClipboardList,    show: hasLiveSubscription },
-    { label: 'Subscriptions',     href: '/dashboard/subscriptions',icon: Package,          show: true },
+    { label: 'Orders and Subscriptions', href: '/dashboard/subscriptions', icon: Package, show: true },
     { label: 'My Account',        href: '/dashboard/account',      icon: User,             show: true },
   ]
 

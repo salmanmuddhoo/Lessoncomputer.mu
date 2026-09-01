@@ -15,7 +15,13 @@ export default async function StudentSubscriptionsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [subsResult, ordersResult, failedResult] = await Promise.all([
+  const [profileResult, subsResult, ordersResult, failedResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('grade_id, grade:grades(slug, name)')
+      .eq('id', user.id)
+      .single(),
+
     supabase
       .from('student_subscriptions')
       .select(`
@@ -52,6 +58,8 @@ export default async function StudentSubscriptionsPage() {
       .order('created_at', { ascending: false })
       .limit(5),
   ])
+
+  const profileGrade = (profileResult.data?.grade as { slug: string; name: string } | null) ?? null
 
   const activeSubs = ((subsResult.data ?? []) as any[]).filter((s) => s.package_id && s.package)
   const paidOrders = (ordersResult.data ?? []) as { id: string; package_ids: string[] }[]
@@ -170,7 +178,9 @@ export default async function StudentSubscriptionsPage() {
             Browse grades to subscribe to live classes or buy video packages.
           </p>
           <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
-            <Link href="/grades">Browse Grades <ArrowRight className="ml-2 w-4 h-4" /></Link>
+            <Link href={profileGrade ? `/grades/${profileGrade.slug}` : '/grades'}>
+              Browse {profileGrade ? profileGrade.name : 'Grades'} <ArrowRight className="ml-2 w-4 h-4" />
+            </Link>
           </Button>
         </div>
       ) : (

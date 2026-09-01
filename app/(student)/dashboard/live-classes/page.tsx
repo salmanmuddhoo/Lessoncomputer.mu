@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   Radio, Calendar, ArrowRight, BookOpen,
 } from 'lucide-react'
-import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
+import { LiveClassCountdown } from '@/components/lc/live-class-countdown'
 import { LiveMonthsList } from '@/components/lc/live-months-list'
 import { JoinLiveClassButton } from '@/components/lc/join-live-class-button'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
@@ -313,7 +313,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
               <>
                 <h3 className="font-semibold text-sm mb-1">{bannerClass.title}</h3>
                 <div className="text-sm text-muted-foreground">
-                  <LiveClassSchedule
+                  <LiveClassCountdown
                     scheduledAt={bannerClass.scheduled_at}
                     isRecurring={bannerClass.is_recurring ?? false}
                     recurrenceDayOfWeek={bannerClass.recurrence_day_of_week ?? null}
