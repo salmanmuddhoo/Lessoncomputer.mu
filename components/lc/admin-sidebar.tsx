@@ -42,8 +42,9 @@ const NAV: NavEntry[] = [
   { type: 'link', label: 'Testimonials', href: '/admin/testimonials', icon: MessageSquareQuote },
 ]
 
-// Unread admin notifications (e.g. subscription cancellations) shown as a badge on
-// the Messages menu. Refetches on navigation, window focus, and every 60s.
+// Unread admin notifications (e.g. subscription cancellations) PLUS unread inbound
+// contact-form messages, shown together as a badge on the Messages menu. Refetches on
+// navigation, window focus, and every 60s.
 function useUnreadNotificationCount() {
   const [count, setCount] = useState(0)
   const pathname = usePathname()
@@ -53,13 +54,14 @@ function useUnreadNotificationCount() {
     async function fetchCount() {
       // Fetch the unread rows and count them — more reliable than the exact/head count,
       // which can come back null under some PostgREST/RLS configurations.
-      const { data, error } = await (supabase as any)
-        .from('admin_notifications')
-        .select('id')
-        .is('read_at', null)
-        .limit(1000)
-      if (error) { console.error('[admin-sidebar] unread count failed:', error.message); return }
-      if (active) setCount(Array.isArray(data) ? data.length : 0)
+      const [{ data: notifData, error: notifError }, { data: contactData, error: contactError }] = await Promise.all([
+        (supabase as any).from('admin_notifications').select('id').is('read_at', null).limit(1000),
+        (supabase as any).from('contact_messages').select('id').eq('is_read', false).limit(1000),
+      ])
+      if (notifError) console.error('[admin-sidebar] unread notification count failed:', notifError.message)
+      if (contactError) console.error('[admin-sidebar] unread contact count failed:', contactError.message)
+      const total = (Array.isArray(notifData) ? notifData.length : 0) + (Array.isArray(contactData) ? contactData.length : 0)
+      if (active) setCount(total)
     }
     fetchCount()
     const interval = setInterval(fetchCount, 60_000)

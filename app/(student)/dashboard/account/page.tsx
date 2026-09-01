@@ -31,13 +31,14 @@ export default async function AccountPage() {
   const currentGrade = profile?.grade as { id: string; name: string } | null
   const parentPhone = (profile as any)?.parent_phone as string | null
 
-  // Count every active package the student owns — video packages AND live-class months —
-  // within their validity window. A student can hold several of either kind.
+  // Video packages and live-class subscriptions are shown as separate stats — count each
+  // kind of active package the student owns, within its validity window.
   const muToday = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().split('T')[0] // Mauritius (UTC+4)
   const validSubs = ((subsRaw ?? []) as any[]).filter((s) =>
     (!s.valid_from || s.valid_from <= muToday) && (!s.valid_until || s.valid_until >= muToday)
   )
-  const packagesOwned = validSubs.filter((s) => s.package).length
+  const packagesOwned = validSubs.filter((s) => s.package && s.package.package_type !== 'live_month').length
+  const liveSubscriptions = validSubs.filter((s) => s.package?.package_type === 'live_month').length
 
   // Every grade the student is actively subscribed in (a student can hold live/video
   // subscriptions in more than one grade), falling back to the profile grade.
@@ -73,10 +74,14 @@ export default async function AccountPage() {
                 ))}
               </div>
             </div>
-            <div className="ml-auto hidden sm:grid grid-cols-2 gap-x-8 gap-y-1 text-sm shrink-0">
+            <div className="ml-auto hidden sm:grid grid-cols-3 gap-x-8 gap-y-1 text-sm shrink-0">
               <div>
                 <p className="text-muted-foreground text-xs">Packages owned</p>
                 <p className="font-semibold">{packagesOwned}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Live Class Subscription</p>
+                <p className="font-semibold">{liveSubscriptions}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Member since</p>
@@ -87,10 +92,14 @@ export default async function AccountPage() {
             </div>
           </div>
           {/* Stats row on mobile */}
-          <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-2 gap-3 text-sm sm:hidden">
+          <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-3 gap-3 text-sm sm:hidden">
             <div>
               <p className="text-muted-foreground text-xs">Packages owned</p>
               <p className="font-semibold">{packagesOwned}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Live Class Subscription</p>
+              <p className="font-semibold">{liveSubscriptions}</p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Member since</p>
