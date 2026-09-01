@@ -51,6 +51,11 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Payments is finance-restricted — only admins granted finance access may view it.
+  const { data: me } = await supabase.from('profiles').select('role, can_access_finance').eq('id', user.id).single()
+  if ((me as any)?.role !== 'admin') redirect('/dashboard')
+  if ((me as any)?.can_access_finance !== true) redirect('/admin')
+
   // Selected reporting month (defaults to the current Mauritius month).
   const muNow = new Date(Date.now() + 4 * 60 * 60 * 1000)
   const selYear = Number(yParam) || muNow.getUTCFullYear()

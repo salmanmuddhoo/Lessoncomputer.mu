@@ -9,10 +9,13 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-    const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    const { data: me } = await supabase.from('profiles').select('role, can_access_finance').eq('id', user.id).single()
     if ((me as any)?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { email, password, fullName } = await req.json() as { email?: string; password?: string; fullName?: string }
+    const { email, password, fullName, canAccessFinance } = await req.json() as { email?: string; password?: string; fullName?: string; canAccessFinance?: boolean }
+    // Only an admin who already has finance access may grant it to a new admin — you can't
+    // hand out an access level you don't hold.
+    const grantFinance = !!canAccessFinance && (me as any)?.can_access_finance === true
     const cleanEmail = (email ?? '').trim().toLowerCase()
     if (!cleanEmail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
       return NextResponse.json({ error: 'A valid email is required.' }, { status: 400 })
@@ -42,7 +45,7 @@ export async function POST(req: NextRequest) {
     // Service-role writes bypass the privilege-escalation guard (043).
     const { error: roleErr } = await (admin as any)
       .from('profiles')
-      .upsert({ id: created.user.id, full_name: (fullName ?? '').trim() || null, role: 'admin' }, { onConflict: 'id' })
+      .upsert({ id: created.user.id, full_name: (fullName ?? '').trim() || null, role: 'admin', can_access_finance: grantFinance }, { onConflict: 'id' })
 
     if (roleErr) {
       console.error('[admin/create-admin] promote failed:', roleErr)

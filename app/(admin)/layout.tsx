@@ -10,15 +10,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, can_access_finance')
     .eq('id', user.id)
     .single()
 
   if (profile?.role !== 'admin') redirect('/dashboard')
 
+  const canAccessFinance = (profile as any)?.can_access_finance === true
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <AdminSidebar />
+      <AdminSidebar canAccessFinance={canAccessFinance} />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0 md:pl-64">
         <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
           {children}
