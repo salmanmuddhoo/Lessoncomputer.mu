@@ -247,7 +247,7 @@ export default async function MyVideoPackagesPage({ searchParams }: { searchPara
           <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-muted-foreground mb-4">No video packages available for {grade.name} yet.</p>
           <Button asChild className="bg-primary text-primary-foreground hover:bg-accent">
-            <Link href="/grades">Browse Grades <ArrowRight className="ml-2 w-4 h-4" /></Link>
+            <Link href={`/grades/${grade.slug}`}>Browse {grade.name} <ArrowRight className="ml-2 w-4 h-4" /></Link>
           </Button>
         </div>
       )}

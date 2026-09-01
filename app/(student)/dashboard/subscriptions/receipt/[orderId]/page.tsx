@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { PrintButton, BackButton } from './print-button'
+import { ReceiptDate } from './receipt-date'
 import { formatMoney } from '@/lib/currency-format'
 
 export const metadata: Metadata = { title: 'Payment Receipt' }
@@ -57,9 +58,6 @@ export default async function ReceiptPage({ params }: PageProps) {
     .single()
 
   const receiptNo = order.id.replace(/-/g, '').slice(0, 10).toUpperCase()
-  const date = new Date(order.created_at)
-  const formattedDate = date.toLocaleDateString('en-MU', { dateStyle: 'long' })
-  const formattedTime = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
   return (
     <>
@@ -97,8 +95,7 @@ export default async function ReceiptPage({ params }: PageProps) {
             </div>
             <div className="sm:text-right min-w-0">
               <p className="text-xs text-muted-foreground mb-0.5">Date</p>
-              <p className="font-medium">{formattedDate}</p>
-              <p className="text-xs text-muted-foreground">{formattedTime}</p>
+              <ReceiptDate iso={order.created_at} />
             </div>
           </div>
 
