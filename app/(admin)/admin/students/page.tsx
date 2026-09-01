@@ -290,7 +290,15 @@ export default function AdminStudentsPage() {
 
   const filtered = students
     .filter((s) => gradeFilter === 'all' || s.grade?.id === gradeFilter || (s.enrolledGrades ?? []).some((g) => g.id === gradeFilter))
-    .filter((s) => !search || (s.full_name ?? '').toLowerCase().includes(search.toLowerCase()))
+    .filter((s) => {
+      if (!search) return true
+      const q = search.trim().toLowerCase()
+      const nameMatch = (s.full_name ?? '').toLowerCase().includes(q)
+      // Phone search: compare on digits only, so "+230 5..." / spaces / the leading 230 all match.
+      const qDigits = q.replace(/\D/g, '')
+      const phoneMatch = qDigits.length > 0 && (s.parent_phone ?? '').replace(/\D/g, '').includes(qDigits)
+      return nameMatch || phoneMatch
+    })
 
   // Count a student toward EVERY grade they're enrolled in (profile grade ∪ subscription
   // grades), matching the list filter below — otherwise a student enrolled via subscription
@@ -378,7 +386,7 @@ export default function AdminStudentsPage() {
       {/* Search */}
       <div className="relative mb-4 max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Search by name…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        <Input placeholder="Search by name or phone…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
       </div>
 
       {loading ? (

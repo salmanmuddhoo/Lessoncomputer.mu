@@ -50,6 +50,7 @@ export default function AdminAttendancePage() {
   const [gradeFilter, setGradeFilter] = useState('')
   const [month, setMonth] = useState(nowD.getMonth() + 1) // 1–12
   const [year, setYear] = useState(nowD.getFullYear())
+  const [dateFilter, setDateFilter] = useState('') // yyyy-mm-dd; empty = whole month
   const [loading, setLoading] = useState(true)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -216,10 +217,21 @@ export default function AdminAttendancePage() {
   const openCount = classes.filter((c) => c.attendance_open).length
   const isPastMonth = year < nowD.getFullYear() || (year === nowD.getFullYear() && month < nowD.getMonth() + 1)
 
+  // Optional single-date filter: show only classes that fall on the chosen date. A weekly
+  // recurring class counts if the chosen date lands on its recurrence weekday.
+  function matchesDate(c: LiveClass): boolean {
+    if (!dateFilter) return true
+    const sel = new Date(`${dateFilter}T00:00:00`)
+    if (c.is_recurring && c.recurrence_day_of_week != null) return sel.getDay() === c.recurrence_day_of_week
+    const d = new Date(c.scheduled_at)
+    return d.getFullYear() === sel.getFullYear() && d.getMonth() === sel.getMonth() && d.getDate() === sel.getDate()
+  }
+  const visibleClasses = classes.filter(matchesDate)
+
   // Group by grade for display when no grade filter
   const grouped: Array<{ key: string; label: string; items: LiveClass[] }> = []
   const seenKeys = new Set<string>()
-  for (const cls of classes) {
+  for (const cls of visibleClasses) {
     if (!seenKeys.has(cls.grade_id)) {
       seenKeys.add(cls.grade_id)
       grouped.push({ key: cls.grade_id, label: cls.grade?.name ?? 'Unknown Grade', items: [] })
@@ -276,17 +288,41 @@ export default function AdminAttendancePage() {
             {yearOptions.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
           </SelectContent>
         </Select>
+        {/* Jump to a specific date — narrows the month's classes to that day. */}
+        <input
+          type="date"
+          value={dateFilter}
+          onChange={(e) => {
+            const v = e.target.value
+            setDateFilter(v)
+            if (v) { const d = new Date(`${v}T00:00:00`); setMonth(d.getMonth() + 1); setYear(d.getFullYear()) }
+          }}
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+          aria-label="Filter by date"
+        />
+        {dateFilter && (
+          <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={() => setDateFilter('')}>Clear date</Button>
+        )}
       </div>
 
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
-      ) : classes.length === 0 ? (
+      ) : visibleClasses.length === 0 ? (
         <div className="py-20 text-center rounded-xl border border-border/60">
           <ClipboardList className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">No live classes scheduled for {monthLabel}.</p>
-          <p className="text-xs text-muted-foreground mt-1">Schedule and publish live classes to manage attendance.</p>
+          {dateFilter ? (
+            <>
+              <p className="text-muted-foreground">No live classes on {new Date(`${dateFilter}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}.</p>
+              <p className="text-xs text-muted-foreground mt-1">Try another date or clear the date filter to see the whole month.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-muted-foreground">No live classes scheduled for {monthLabel}.</p>
+              <p className="text-xs text-muted-foreground mt-1">Schedule and publish live classes to manage attendance.</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-8">
