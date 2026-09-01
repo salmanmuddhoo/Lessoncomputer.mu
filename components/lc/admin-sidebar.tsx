@@ -188,7 +188,7 @@ function NavContent({ onNav, unreadCount = 0, canAccessFinance = false }: { onNa
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          Sign Out
+          Sign out
         </button>
       </div>
     </>

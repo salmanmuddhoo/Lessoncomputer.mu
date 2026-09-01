@@ -98,10 +98,10 @@ export function Testimonials({ items = [] }: { items?: TestimonialItem[] }) {
                   </div>
                 ) : t.type === 'result' ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={t.media_url} alt={`Result — ${t.author_name ?? 'student'}`} className="w-full aspect-[4/3] object-cover" />
+                  <img src={t.media_url} alt={`Result — ${t.author_name ?? 'student'}`} className="w-full aspect-[4/3] object-contain bg-muted/40" />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={t.media_url} alt={t.author_name ?? 'Testimonial'} className="w-full aspect-[4/3] object-cover" />
+                  <img src={t.media_url} alt={t.author_name ?? 'Testimonial'} className="w-full aspect-[4/3] object-contain bg-muted/40" />
                 )}
 
                 <div className="p-6 flex flex-col flex-1">

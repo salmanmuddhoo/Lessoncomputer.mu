@@ -168,9 +168,13 @@ function TestimonialDialog({ item, onDone }: { item?: Testimonial; onDone: () =>
                 </label>
                 {form.media_url && !uploading && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.media_url} alt="preview" className="h-14 w-14 rounded-lg object-cover border border-border/60" />
+                  <img src={form.media_url} alt="preview" className="h-14 w-14 rounded-lg object-contain bg-muted/40 border border-border/60" />
                 )}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Shown uncropped in a 4:3 frame on the homepage. For the sharpest result use a
+                landscape image around 1200×900px (a portrait result sheet is fine too — it&apos;s shown whole).
+              </p>
             </div>
           )}
 
@@ -262,7 +266,7 @@ export default function AdminTestimonialsPage() {
                     </div>
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={t.media_url} alt={t.author_name ?? 'testimonial'} className="w-full h-full object-cover" />
+                    <img src={t.media_url} alt={t.author_name ?? 'testimonial'} className="w-full h-full object-contain" />
                   )}
                   {!t.is_published && (
                     <span className="absolute top-2 left-2 text-[10px] px-1.5 py-0.5 rounded bg-background/90 border border-border/60 text-muted-foreground">Hidden</span>

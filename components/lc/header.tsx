@@ -96,14 +96,12 @@ export function Header({ user, grades }: HeaderProps) {
                   <Link href={user.role === 'admin' ? '/admin' : '/dashboard'}>Dashboard</Link>
                 </Button>
                 <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-foreground">
-                  <LogOut className="w-4 h-4 mr-1" /> Log out
+                  <LogOut className="w-4 h-4 mr-1" /> Sign out
                 </Button>
               </>
             ) : (
               <>
-                <Link href="/login" className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground lc-transition">
-                  Log in
-                </Link>
+                <Link href="/login" className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground lc-transition">Sign in</Link>
                 <Button size="sm" asChild className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-full px-5">
                   <Link href="/register">Get Started</Link>
                 </Button>
@@ -154,7 +152,7 @@ export function Header({ user, grades }: HeaderProps) {
               ) : (
                 <>
                   <Button variant="outline" size="sm" asChild className="flex-1 rounded-full">
-                    <Link href="/login" onClick={() => setMobileOpen(false)}>Log in</Link>
+                    <Link href="/login" onClick={() => setMobileOpen(false)}>Sign in</Link>
                   </Button>
                   <Button size="sm" asChild className="flex-1 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold">
                     <Link href="/register" onClick={() => setMobileOpen(false)}>Get Started</Link>
