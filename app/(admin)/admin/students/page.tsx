@@ -291,10 +291,19 @@ export default function AdminStudentsPage() {
     .filter((s) => gradeFilter === 'all' || s.grade?.id === gradeFilter || (s.enrolledGrades ?? []).some((g) => g.id === gradeFilter))
     .filter((s) => !search || (s.full_name ?? '').toLowerCase().includes(search.toLowerCase()))
 
+  // Count a student toward EVERY grade they're enrolled in (profile grade ∪ subscription
+  // grades), matching the list filter below — otherwise a student enrolled via subscription
+  // in a grade other than their profile grade is missed (e.g. "Grade 8 (1)" for 2 students).
   const countByGrade: Record<string, number> = {}
   for (const s of students) {
-    const key = s.grade?.id ?? 'none'
-    countByGrade[key] = (countByGrade[key] ?? 0) + 1
+    const gs = (s.enrolledGrades && s.enrolledGrades.length > 0)
+      ? s.enrolledGrades
+      : (s.grade ? [s.grade] : [])
+    if (gs.length === 0) {
+      countByGrade['none'] = (countByGrade['none'] ?? 0) + 1
+    } else {
+      for (const g of gs) countByGrade[g.id] = (countByGrade[g.id] ?? 0) + 1
+    }
   }
 
   const videoSubs = studentSubs.filter((sub) => {
@@ -642,7 +651,7 @@ export default function AdminStudentsPage() {
                           <p className="text-sm font-medium truncate">{p.description ?? `${p.order_type} payment`}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {new Date(p.created_at).toLocaleDateString('en-MU', { dateStyle: 'medium' })}
-                            {' · '}{new Date(p.created_at).toLocaleTimeString('en-MU', { timeStyle: 'short' })}
+                            {' · '}{new Date(p.created_at).toLocaleTimeString('en-GB', { timeStyle: 'short' })}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -698,7 +707,7 @@ export default function AdminStudentsPage() {
                           </p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Marked: {new Date(a.marked_at).toLocaleDateString('en-MU', { dateStyle: 'medium' })}
-                            {' · '}{new Date(a.marked_at).toLocaleTimeString('en-MU', { timeStyle: 'short' })}
+                            {' · '}{new Date(a.marked_at).toLocaleTimeString('en-GB', { timeStyle: 'short' })}
                           </p>
                         </div>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium shrink-0">

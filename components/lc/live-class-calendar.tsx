@@ -25,8 +25,8 @@ const WEEK_OPTS = { weekStartsOn: 1 as const } // Monday
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function timeLabel(occ: Occ) {
-  const s = format(occ.start, 'h:mm a')
-  return occ.end ? `${s} – ${format(occ.end, 'h:mm a')}` : s
+  const s = format(occ.start, 'HH:mm')
+  return occ.end ? `${s} – ${format(occ.end, 'HH:mm')}` : s
 }
 
 function openMeet(url?: string | null) {

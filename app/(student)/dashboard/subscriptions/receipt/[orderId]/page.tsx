@@ -58,7 +58,7 @@ export default async function ReceiptPage({ params }: PageProps) {
   const receiptNo = order.id.replace(/-/g, '').slice(0, 10).toUpperCase()
   const date = new Date(order.created_at)
   const formattedDate = date.toLocaleDateString('en-MU', { dateStyle: 'long' })
-  const formattedTime = date.toLocaleTimeString('en-MU', { hour: '2-digit', minute: '2-digit' })
+  const formattedTime = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
   return (
     <>

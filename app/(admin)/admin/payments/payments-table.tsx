@@ -120,7 +120,7 @@ export function PaymentsTable({ initialOrders, grades = [] }: { initialOrders: M
                 <tr key={order.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                     <div>{date.toLocaleDateString()}</div>
-                    <div className="text-[11px]">{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div className="text-[11px]">{date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
                   </td>
                   <td className="px-4 py-3 font-medium">
                     {order.studentName ?? <span className="text-muted-foreground italic">Unknown</span>}

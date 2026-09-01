@@ -17,7 +17,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Loader2, Plus, Trash2, Megaphone, Users, Radio, Video, Folder, FolderOpen, ChevronRight, ChevronDown, Bell } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Megaphone, Users, Radio, Video, Folder, FolderOpen, ChevronRight, ChevronDown, Bell } from 'lucide-react'
 import { toast } from 'sonner'
 
 const AUDIENCE_LABELS: Record<string, { label: string; icon: React.ElementType; className: string }> = {
@@ -50,6 +50,7 @@ export default function AdminBroadcastsPage() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [openGrades, setOpenGrades] = useState<Record<string, boolean>>({})
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
@@ -124,6 +125,7 @@ export default function AdminBroadcastsPage() {
   }
 
   function openNew() {
+    setEditingId(null)
     setTitle('')
     setBody('')
     setAudience('all')
@@ -132,9 +134,36 @@ export default function AdminBroadcastsPage() {
     setDialogOpen(true)
   }
 
+  function openEdit(b: Broadcast) {
+    setEditingId(b.id)
+    setTitle(b.title)
+    setBody(b.body)
+    setAudience(b.target_audience)
+    setGradeId(b.grade_id)
+    setChapterId(b.chapter_id ?? '')
+    setDialogOpen(true)
+  }
+
   async function handleSend() {
     if (!title.trim() || !body.trim() || !gradeId) return
     setSaving(true)
+    if (editingId) {
+      // Edit an already-sent message in place.
+      const { error } = await (supabase as any)
+        .from('broadcasts')
+        .update({
+          title: title.trim(),
+          body: body.trim(),
+          grade_id: gradeId,
+          chapter_id: chapterId || null,
+          target_audience: audience,
+        })
+        .eq('id', editingId)
+      if (error) toast.error(`Failed: ${error.message}`)
+      else { toast.success('Message updated'); setDialogOpen(false); load() }
+      setSaving(false)
+      return
+    }
     const { data: { user } } = await supabase.auth.getUser()
     const { error } = await (supabase as any)
       .from('broadcasts')
@@ -327,14 +356,26 @@ export default function AdminBroadcastsPage() {
                                         </span>
                                       </div>
                                     </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-destructive hover:bg-destructive/10 h-7 w-7 p-0 shrink-0"
-                                      onClick={() => setDeleteId(b.id)}
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => openEdit(b)}
+                                        aria-label="Edit message"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-destructive hover:bg-destructive/10 h-7 w-7 p-0"
+                                        onClick={() => setDeleteId(b.id)}
+                                        aria-label="Delete message"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </div>
                                   </div>
                                 )
                               })}
@@ -355,7 +396,7 @@ export default function AdminBroadcastsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Send Message / Homework</DialogTitle>
+            <DialogTitle>{editingId ? 'Edit Message' : 'Send Message / Homework'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-3">
@@ -424,7 +465,7 @@ export default function AdminBroadcastsPage() {
               className="bg-primary text-primary-foreground hover:bg-accent"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Send Message
+              {editingId ? 'Save changes' : 'Send Message'}
             </Button>
           </DialogFooter>
         </DialogContent>
