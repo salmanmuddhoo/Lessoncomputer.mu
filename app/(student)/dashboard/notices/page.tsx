@@ -45,7 +45,7 @@ export default async function StudentNoticesPage() {
 
   const { data: notices } = await (supabase as any)
     .from('broadcasts')
-    .select('id, title, body, target_audience, created_at, chapter_id, chapter:chapters(title)')
+    .select('id, title, body, target_audience, created_at, chapter_id, chapter:chapters(title), grade_id, grade:grades(id, name)')
     .in('grade_id', [...gradeIds])
     .in('target_audience', audienceFilter)
     // Only messages sent AFTER this student signed up — no back-history on a new account.
@@ -60,6 +60,8 @@ export default async function StudentNoticesPage() {
     created_at: string
     chapter_id: string | null
     chapter: { title: string } | null
+    grade_id: string | null
+    grade: { id: string; name: string } | null
   }>
 
   // Per-student read state: which of THIS student's messages are still unread. Messages

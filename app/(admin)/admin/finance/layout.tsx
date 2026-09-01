@@ -1,5 +1,8 @@
 import { redirect } from 'next/navigation'
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = { title: 'Finance' }
 
 // Finance is a client page, so gate access here (server) — only admins granted finance
 // access may view it. A restricted admin is sent back to the admin dashboard.
