@@ -71,11 +71,13 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
   })
 
   const watchedName = watch('name')
+  // Keep the slug in sync with the name — on create AND on rename — unless the admin has
+  // manually edited the slug this session. Renaming a grade should update its public URL.
   useEffect(() => {
-    if (!grade && !slugTouched && watchedName) {
+    if (!slugTouched && watchedName) {
       setValue('slug', toSlug(watchedName))
     }
-  }, [watchedName, grade, slugTouched, setValue])
+  }, [watchedName, slugTouched, setValue])
 
   async function onSubmit(data: FormData) {
     setLoading(true)

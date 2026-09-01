@@ -11,14 +11,23 @@ export default async function StudentNoticesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profileRaw } = await (supabase as any)
-    .from('profiles')
-    .select('grade_id')
-    .eq('id', user.id)
-    .single()
+  const [{ data: profileRaw }, { data: subs }] = await Promise.all([
+    (supabase as any).from('profiles').select('grade_id').eq('id', user.id).single(),
+    supabase
+      .from('student_subscriptions')
+      .select('package:subscription_packages(package_type, grade_id)')
+      .eq('student_id', user.id)
+      .eq('status', 'active'),
+  ])
   const profile = profileRaw as { grade_id: string | null } | null
 
-  if (!profile?.grade_id) {
+  // Every grade the student belongs to: their profile grade plus every grade they hold an
+  // active subscription in — so a student enrolled in two grades sees messages for both.
+  const gradeIds = new Set<string>()
+  if (profile?.grade_id) gradeIds.add(profile.grade_id)
+  for (const s of (subs ?? []) as any[]) if (s.package?.grade_id) gradeIds.add(s.package.grade_id)
+
+  if (gradeIds.size === 0) {
     return (
       <div className="py-20 text-center">
         <Inbox className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
@@ -26,13 +35,6 @@ export default async function StudentNoticesPage() {
       </div>
     )
   }
-
-  // Determine which subscription types this student has
-  const { data: subs } = await supabase
-    .from('student_subscriptions')
-    .select('package:subscription_packages(package_type)')
-    .eq('student_id', user.id)
-    .eq('status', 'active')
 
   const hasLive = (subs ?? []).some((s: any) => s.package?.package_type === 'live_month')
   const hasVideo = (subs ?? []).some((s: any) => s.package?.package_type !== 'live_month')
@@ -44,7 +46,7 @@ export default async function StudentNoticesPage() {
   const { data: notices } = await (supabase as any)
     .from('broadcasts')
     .select('id, title, body, target_audience, created_at, chapter_id, chapter:chapters(title)')
-    .eq('grade_id', profile.grade_id)
+    .in('grade_id', [...gradeIds])
     .in('target_audience', audienceFilter)
     // Only messages sent AFTER this student signed up — no back-history on a new account.
     .gte('created_at', user.created_at)

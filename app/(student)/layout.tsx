@@ -19,7 +19,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
       .single(),
     supabase
       .from('student_subscriptions')
-      .select('is_recurring, subscription_type, valid_from, valid_until, package:subscription_packages(package_type)')
+      .select('is_recurring, subscription_type, valid_from, valid_until, package:subscription_packages(package_type, grade_id)')
       .eq('student_id', user.id)
       .eq('status', 'active'),
     (supabase as any)
@@ -101,16 +101,19 @@ export default async function StudentLayout({ children }: { children: React.Reac
     (s: any) => s.package?.package_type !== 'live_month'
   )
 
-  // Unread messages (admin broadcasts) badge for the Messages menu — broadcasts for
-  // this student's grade + audience that they haven't opened yet (no broadcast_reads row).
-  const gradeId = (profile as any)?.grade_id ?? null
+  // Unread messages (admin broadcasts) badge for the Messages menu — broadcasts for EVERY
+  // grade the student belongs to (profile grade ∪ subscribed grades) + audience that they
+  // haven't opened yet (no broadcast_reads row).
+  const messageGradeIds = new Set<string>()
+  if ((profile as any)?.grade_id) messageGradeIds.add((profile as any).grade_id)
+  for (const s of (subs ?? []) as any[]) if (s.package?.grade_id) messageGradeIds.add(s.package.grade_id)
   let unreadMessages = 0
-  if (gradeId) {
+  if (messageGradeIds.size > 0) {
     const audienceFilter = ['all']
     if ((subs ?? []).some((s: any) => s.package?.package_type === 'live_month')) audienceFilter.push('live')
     if ((subs ?? []).some((s: any) => s.package?.package_type !== 'live_month')) audienceFilter.push('video')
     const { data: bIds } = await (supabase as any)
-      .from('broadcasts').select('id').eq('grade_id', gradeId).in('target_audience', audienceFilter)
+      .from('broadcasts').select('id').in('grade_id', [...messageGradeIds]).in('target_audience', audienceFilter)
       .gte('created_at', user.created_at) // only messages since this student signed up
     const ids = ((bIds ?? []) as any[]).map((b) => b.id)
     if (ids.length > 0) {

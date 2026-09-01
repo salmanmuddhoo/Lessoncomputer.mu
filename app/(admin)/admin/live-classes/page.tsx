@@ -127,7 +127,7 @@ export default function AdminLiveClassesPage() {
               <p className="text-xs font-medium text-primary uppercase tracking-wide">Next live class</p>
               <p className="font-semibold text-sm truncate">{nextUp.cls.title}</p>
               <p className="text-xs text-muted-foreground">
-                {nextUp.cls.grade ? `${nextUp.cls.grade.name} · ` : ''}{format(nextUp.start, 'EEE d MMM, h:mm a')}
+                {nextUp.cls.grade ? `${nextUp.cls.grade.name} · ` : ''}{format(nextUp.start, 'EEE d MMM, HH:mm')}
               </p>
             </div>
           </div>
