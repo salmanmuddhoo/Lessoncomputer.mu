@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Mail, MapPin, MessageSquare } from 'lucide-react'
+import { ContactForm } from './contact-form'
 
 export const metadata: Metadata = {
   title: 'Contact Us',
@@ -59,67 +60,7 @@ export default function ContactPage() {
       <div className="max-w-xl mx-auto">
         <div className="rounded-xl border border-border/60 bg-card p-6 sm:p-8">
           <h2 className="text-xl font-semibold mb-6">Send us a message</h2>
-          <form
-            action="mailto:support@lessoncomputer.mu"
-            method="GET"
-            className="space-y-4"
-          >
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label htmlFor="name" className="text-sm font-medium">Name</label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  placeholder="Your name"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="email" className="text-sm font-medium">Email</label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  placeholder="you@example.com"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="subject" className="text-sm font-medium">Subject</label>
-              <input
-                id="subject"
-                name="subject"
-                type="text"
-                required
-                placeholder="How can we help?"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="body" className="text-sm font-medium">Message</label>
-              <textarea
-                id="body"
-                name="body"
-                rows={5}
-                required
-                placeholder="Tell us more about your question…"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-primary text-primary-foreground hover:bg-accent font-semibold py-2.5 rounded-md text-sm transition-colors"
-            >
-              Send Message
-            </button>
-          </form>
+          <ContactForm />
         </div>
       </div>
     </div>

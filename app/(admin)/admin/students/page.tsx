@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import {
   Loader2, Users, Trash2, UserX, UserCheck, Search, Package,
   RefreshCw, X, Radio, Phone, User, CreditCard, ClipboardList,
+  ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -94,6 +95,10 @@ export default function AdminStudentsPage() {
   const [gradeFilter, setGradeFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [sortBy, setSortBy] = useState<'name' | 'joined' | 'status'>('joined')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 25
 
   // Dialog state
   const [subStudent, setSubStudent] = useState<Student | null>(null)
@@ -152,6 +157,7 @@ export default function AdminStudentsPage() {
   }
 
   useEffect(() => { load() }, [])
+  useEffect(() => { setPage(1) }, [gradeFilter, search])
 
   async function toggleActive(student: Student) {
     const newValue = !student.is_active
@@ -300,6 +306,33 @@ export default function AdminStudentsPage() {
       return nameMatch || phoneMatch
     })
 
+  const sorted = [...filtered].sort((a, b) => {
+    let cmp = 0
+    if (sortBy === 'name') cmp = (a.full_name ?? '').localeCompare(b.full_name ?? '')
+    else if (sortBy === 'joined') cmp = a.created_at.localeCompare(b.created_at)
+    else if (sortBy === 'status') cmp = Number(a.is_active) - Number(b.is_active)
+    return sortDir === 'asc' ? cmp : -cmp
+  })
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  function toggleSort(col: 'name' | 'joined' | 'status') {
+    if (sortBy === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortBy(col)
+      setSortDir(col === 'joined' ? 'desc' : 'asc')
+    }
+    setPage(1)
+  }
+
+  function sortIcon(col: 'name' | 'joined' | 'status') {
+    if (sortBy !== col) return <ArrowUpDown className="w-3 h-3 text-muted-foreground/50" />
+    return sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+  }
+
   // Count a student toward EVERY grade they're enrolled in (profile grade ∪ subscription
   // grades), matching the list filter below — otherwise a student enrolled via subscription
   // in a grade other than their profile grade is missed (e.g. "Grade 8 (1)" for 2 students).
@@ -394,20 +427,33 @@ export default function AdminStudentsPage() {
       ) : (
         <div className="rounded-xl border border-border/60 overflow-hidden">
           {filtered.length > 0 ? (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[500px]">
                 <thead className="bg-muted/30 border-b border-border/60">
                   <tr>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Student</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                      <button onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                        Student {sortIcon('name')}
+                      </button>
+                    </th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grade</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Parent Phone</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Joined</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">
+                      <button onClick={() => toggleSort('joined')} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                        Joined {sortIcon('joined')}
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                      <button onClick={() => toggleSort('status')} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                        Status {sortIcon('status')}
+                      </button>
+                    </th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
-                  {filtered.map((s) => (
+                  {paginated.map((s) => (
                     <tr key={s.id} className={`hover:bg-muted/20 transition-colors ${!s.is_active ? 'opacity-60' : ''}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -465,6 +511,37 @@ export default function AdminStudentsPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-border/60 text-sm">
+                <span className="text-xs text-muted-foreground">
+                  Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, sorted.length)} of {sorted.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </Button>
+                  <span className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
           ) : (
             <div className="py-16 text-center">
               <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />

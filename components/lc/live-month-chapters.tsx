@@ -16,13 +16,25 @@ interface Props {
   videosByChapter: Record<string, any[]>
   documentsByChapter: Record<string, any[]>
   notesByChapter?: Record<string, any[]>
+  // When set, only these chapters render (forced open) — used by the search bar above.
+  filterChapterIds?: Set<string> | null
 }
 
-export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapter, notesByChapter = {} }: Props) {
+export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapter, notesByChapter = {}, filterChapterIds = null }: Props) {
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
 
   function toggle(id: string) {
     setOpenChapters((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  const visibleChapters = filterChapterIds ? chapters.filter((ch) => filterChapterIds.has(ch.id)) : chapters
+
+  if (visibleChapters.length === 0 && filterChapterIds) {
+    return (
+      <p className="text-sm text-muted-foreground py-4 text-center">
+        No chapters or lessons in this month match your search.
+      </p>
+    )
   }
 
   if (chapters.length === 0) {
@@ -35,8 +47,8 @@ export function LiveMonthChapters({ chapters, videosByChapter, documentsByChapte
 
   return (
     <div className="space-y-2 mt-4">
-      {chapters.map((ch) => {
-        const isOpen = openChapters[ch.id] ?? false
+      {visibleChapters.map((ch) => {
+        const isOpen = filterChapterIds ? true : (openChapters[ch.id] ?? false)
         const chVideos = videosByChapter[ch.id] ?? []
         const chDocs = documentsByChapter[ch.id] ?? []
         const chNotes = notesByChapter[ch.id] ?? []

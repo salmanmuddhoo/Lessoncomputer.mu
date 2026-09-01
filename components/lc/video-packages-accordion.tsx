@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import {
   Package, FolderOpen, FileText, Download,
-  ChevronDown, ChevronUp, BookMarked, ExternalLink, Play,
+  ChevronDown, ChevronUp, BookMarked, ExternalLink, Play, Search, X,
 } from 'lucide-react'
 
 interface Chapter {
@@ -37,6 +37,7 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
     Object.fromEntries(packages.map(p => [p.id, true]))
   )
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
+  const [search, setSearch] = useState('')
 
   function togglePackage(id: string) {
     setOpenPackages(prev => ({ ...prev, [id]: !prev[id] }))
@@ -46,10 +47,55 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
     setOpenChapters(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
+  // Search by chapter title or lesson (video/document/note) title — helps a student revising
+  // for an exam find "binary" or "arrays" instantly instead of scrolling every chapter.
+  const query = search.trim().toLowerCase()
+  const matchingChapterIds = useMemo(() => {
+    if (!query) return null
+    const ids = new Set<string>()
+    for (const pkg of packages) {
+      for (const ch of pkg.chapters) {
+        const chMatch = ch.title.toLowerCase().includes(query)
+        const videoMatch = (videosByChapter[ch.id] ?? []).some((v: any) => v.title?.toLowerCase().includes(query))
+        const docMatch = (documentsByChapter[ch.id] ?? []).some((d: any) => d.title?.toLowerCase().includes(query))
+        const noteMatch = (notesByChapter[ch.id] ?? []).some((n: any) => n.title?.toLowerCase().includes(query))
+        if (chMatch || videoMatch || docMatch || noteMatch) ids.add(ch.id)
+      }
+    }
+    return ids
+  }, [query, packages, videosByChapter, documentsByChapter, notesByChapter])
+
   return (
     <div className="space-y-4">
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by chapter or lesson title (e.g. &ldquo;binary&rdquo;, &ldquo;arrays&rdquo;)…"
+          className="w-full rounded-lg border border-input bg-background pl-9 pr-9 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {matchingChapterIds && matchingChapterIds.size === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-6">No chapters or lessons match &ldquo;{search.trim()}&rdquo;.</p>
+      )}
+
       {packages.map(pkg => {
-        const isPkgOpen = openPackages[pkg.id] ?? true
+        const pkgChapters = matchingChapterIds ? pkg.chapters.filter(ch => matchingChapterIds.has(ch.id)) : pkg.chapters
+        if (matchingChapterIds && pkgChapters.length === 0) return null
+        const isPkgOpen = matchingChapterIds ? true : (openPackages[pkg.id] ?? true)
         const totalVideos = pkg.chapters.reduce((s, ch) => s + (videosByChapter[ch.id]?.length ?? 0), 0)
         const totalDocs = pkg.chapters.reduce((s, ch) => s + (documentsByChapter[ch.id]?.length ?? 0), 0)
         const totalNotes = pkg.chapters.reduce((s, ch) => s + (notesByChapter[ch.id]?.length ?? 0), 0)
@@ -111,12 +157,12 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
             {/* Package content */}
             {isPkgOpen && (
               <div className="divide-y divide-border/40">
-                {pkg.chapters.map(ch => {
+                {pkgChapters.map(ch => {
                   const chVideos = videosByChapter[ch.id] ?? []
                   const chDocs = documentsByChapter[ch.id] ?? []
                   const chNotes = notesByChapter[ch.id] ?? []
                   if (chVideos.length === 0 && chDocs.length === 0 && chNotes.length === 0) return null
-                  const isChOpen = openChapters[ch.id] ?? false
+                  const isChOpen = matchingChapterIds ? true : (openChapters[ch.id] ?? false)
 
                   return (
                     <div key={ch.id}>
@@ -204,7 +250,7 @@ export function VideoPackagesAccordion({ packages, videosByChapter, documentsByC
                     </div>
                   )
                 })}
-                {pkg.chapters.every(ch =>
+                {!matchingChapterIds && pkg.chapters.every(ch =>
                   (videosByChapter[ch.id]?.length ?? 0) === 0 &&
                   (documentsByChapter[ch.id]?.length ?? 0) === 0 &&
                   (notesByChapter[ch.id]?.length ?? 0) === 0
