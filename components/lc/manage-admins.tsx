@@ -8,21 +8,24 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 
-interface AdminRow { id: string; name: string | null }
+interface AdminRow { id: string; name: string | null; canAccessFinance?: boolean }
 
-export function ManageAdmins({ admins, currentUserId }: { admins: AdminRow[]; currentUserId: string }) {
+export function ManageAdmins({ admins, currentUserId, canManageFinance }: { admins: AdminRow[]; currentUserId: string; canManageFinance: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [grantFinance, setGrantFinance] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<AdminRow | null>(null)
   const [removing, setRemoving] = useState(false)
 
@@ -61,7 +64,7 @@ export function ManageAdmins({ admins, currentUserId }: { admins: AdminRow[]; cu
       const res = await fetch('/api/admin/create-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName: fullName.trim(), email: email.trim(), password }),
+        body: JSON.stringify({ fullName: fullName.trim(), email: email.trim(), password, canAccessFinance: canManageFinance && grantFinance }),
       })
       const data = await res.json() as { ok?: boolean; error?: string }
       if (!res.ok || !data.ok) {
@@ -69,7 +72,7 @@ export function ManageAdmins({ admins, currentUserId }: { admins: AdminRow[]; cu
         return
       }
       toast.success('Admin created. They can now sign in.')
-      setFullName(''); setEmail(''); setPassword(''); setOpen(false)
+      setFullName(''); setEmail(''); setPassword(''); setGrantFinance(false); setOpen(false)
       router.refresh()
     } catch {
       toast.error('Network error. Please try again.')
@@ -95,6 +98,9 @@ export function ManageAdmins({ admins, currentUserId }: { admins: AdminRow[]; cu
               <div key={a.id} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-border/40 bg-muted/20">
                 <ShieldCheck className="w-3.5 h-3.5 text-primary shrink-0" />
                 <span className="truncate">{a.name ?? 'Unnamed admin'}</span>
+                {a.canAccessFinance && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 shrink-0">Finance</Badge>
+                )}
                 {a.id === currentUserId ? (
                   <span className="ml-auto text-xs text-muted-foreground">You</span>
                 ) : (
@@ -139,6 +145,15 @@ export function ManageAdmins({ admins, currentUserId }: { admins: AdminRow[]; cu
               <Input id="admin-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" />
               <p className="text-xs text-muted-foreground">Share it with the new admin; they can change it later from Settings.</p>
             </div>
+            {canManageFinance && (
+              <label className="flex items-start gap-2 pt-1 cursor-pointer">
+                <Checkbox checked={grantFinance} onCheckedChange={(v) => setGrantFinance(!!v)} className="mt-0.5 shrink-0" />
+                <span className="text-sm">
+                  Can access <span className="font-medium">Finance &amp; Payments</span>
+                  <span className="block text-xs text-muted-foreground">Leave off to hide revenue and payment reports from this admin.</span>
+                </span>
+              </label>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>

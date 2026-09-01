@@ -15,7 +15,7 @@ export default async function AdminSettingsPage() {
   const [{ data: profile }, { data: siteSettings }, { data: adminRows }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('full_name, avatar_url, role')
+      .select('full_name, avatar_url, role, can_access_finance')
       .eq('id', user!.id)
       .single(),
     (supabase as any)
@@ -25,12 +25,13 @@ export default async function AdminSettingsPage() {
       .single(),
     (supabase as any)
       .from('profiles')
-      .select('id, full_name')
+      .select('id, full_name, can_access_finance')
       .eq('role', 'admin')
       .order('full_name', { ascending: true }),
   ])
 
-  const admins = ((adminRows ?? []) as any[]).map((a) => ({ id: a.id as string, name: (a.full_name ?? null) as string | null }))
+  const admins = ((adminRows ?? []) as any[]).map((a) => ({ id: a.id as string, name: (a.full_name ?? null) as string | null, canAccessFinance: !!a.can_access_finance }))
+  const canManageFinance = (profile as any)?.can_access_finance === true
 
   const ss = (siteSettings ?? {}) as {
     facebook_url: string | null
@@ -79,7 +80,7 @@ export default async function AdminSettingsPage() {
 
           <CurrencySettingsForm initialUsdRate={ss.usd_rate ?? null} />
 
-          <ManageAdmins admins={admins} currentUserId={user!.id} />
+          <ManageAdmins admins={admins} currentUserId={user!.id} canManageFinance={canManageFinance} />
         </div>
       </div>
     </div>

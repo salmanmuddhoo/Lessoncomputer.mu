@@ -70,7 +70,7 @@ function useUnreadNotificationCount() {
   return count
 }
 
-function NavContent({ onNav, unreadCount = 0 }: { onNav?: () => void; unreadCount?: number }) {
+function NavContent({ onNav, unreadCount = 0, canAccessFinance = false }: { onNav?: () => void; unreadCount?: number; canAccessFinance?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -80,9 +80,18 @@ function NavContent({ onNav, unreadCount = 0 }: { onNav?: () => void; unreadCoun
   }
   const groupActive = (g: NavGroup) => g.items.some((it) => pathname.startsWith(it.href))
 
+  // Finance and the Payments report are visible only to admins granted finance access.
+  const nav: NavEntry[] = NAV
+    .filter((e) => canAccessFinance || !(e.type === 'link' && e.href === '/admin/finance'))
+    .map((e) =>
+      e.type === 'group'
+        ? { ...e, items: e.items.filter((it) => canAccessFinance || it.href !== '/admin/payments') }
+        : e
+    )
+
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
-    for (const e of NAV) if (e.type === 'group') init[e.label] = groupActive(e)
+    for (const e of nav) if (e.type === 'group') init[e.label] = groupActive(e)
     return init
   })
   const toggleGroup = (label: string) => setOpenGroups((p) => ({ ...p, [label]: !p[label] }))
@@ -97,7 +106,7 @@ function NavContent({ onNav, unreadCount = 0 }: { onNav?: () => void; unreadCoun
   return (
     <>
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {NAV.map((entry) => {
+        {nav.map((entry) => {
           if (entry.type === 'link') {
             return (
               <Link
@@ -186,7 +195,7 @@ function NavContent({ onNav, unreadCount = 0 }: { onNav?: () => void; unreadCoun
   )
 }
 
-export function AdminSidebar() {
+export function AdminSidebar({ canAccessFinance = false }: { canAccessFinance?: boolean }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const unreadCount = useUnreadNotificationCount()
 
@@ -198,7 +207,7 @@ export function AdminSidebar() {
           <Logo size="sm" onDark />
           <span className="text-xs text-muted-foreground mt-1 block">Admin Panel</span>
         </div>
-        <NavContent unreadCount={unreadCount} />
+        <NavContent unreadCount={unreadCount} canAccessFinance={canAccessFinance} />
       </aside>
 
       {/* ── Mobile top bar ── */}
@@ -232,7 +241,7 @@ export function AdminSidebar() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <NavContent onNav={() => setMobileOpen(false)} unreadCount={unreadCount} />
+            <NavContent onNav={() => setMobileOpen(false)} unreadCount={unreadCount} canAccessFinance={canAccessFinance} />
           </aside>
         </div>
       )}
