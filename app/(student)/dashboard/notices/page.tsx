@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { Megaphone, Inbox } from 'lucide-react'
 import { NoticesList } from '@/components/lc/notices-list'
+import { MessagesTabs } from '@/components/lc/messages-tabs'
+import { ContactThreads } from '@/components/lc/contact-threads'
 
 export const metadata: Metadata = { title: 'Messages' }
 
@@ -78,28 +80,52 @@ export default async function StudentNoticesPage() {
     unreadIds = items.filter((i) => !readSet.has(i.id)).map((i) => i.id)
   }
 
+  // Contact Admin: this student's own conversations with admin (started either from the
+  // public /contact form while logged in, or from this page) plus their replies.
+  const { data: contactRows } = await (supabase as any)
+    .from('contact_messages')
+    .select('id, subject, body, created_at, contact_message_replies(id, sender_role, body, is_read, created_at)')
+    .eq('student_id', user.id)
+    .order('created_at', { ascending: false })
+
+  const threads = ((contactRows ?? []) as any[]).map((t) => ({
+    id: t.id,
+    subject: t.subject,
+    body: t.body,
+    created_at: t.created_at,
+    replies: (t.contact_message_replies ?? []).sort(
+      (a: any, b: any) => a.created_at.localeCompare(b.created_at)
+    ),
+  }))
+  const unreadReplies = threads.reduce(
+    (n, t) => n + t.replies.filter((r: any) => r.sender_role === 'admin' && !r.is_read).length,
+    0
+  )
+
   return (
     <div>
-      <div className="mb-6 flex items-center gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Messages</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            Homework, announcements and messages from your teacher
-          </p>
-        </div>
-        {items.length > 0 && (
-          <span className="ml-auto text-xs text-muted-foreground">{items.length} message{items.length !== 1 ? 's' : ''}</span>
-        )}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Messages</h1>
+        <p className="text-muted-foreground text-sm mt-0.5">
+          Homework, announcements and messages from your teacher
+        </p>
       </div>
 
-      {items.length === 0 ? (
-        <div className="py-20 text-center rounded-xl border border-border/60">
-          <Megaphone className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">No messages yet. Check back later!</p>
-        </div>
-      ) : (
-        <NoticesList items={items} unreadIds={unreadIds} studentId={user.id} />
-      )}
+      <MessagesTabs
+        unreadAnnouncements={unreadIds.length}
+        unreadReplies={unreadReplies}
+        announcements={
+          items.length === 0 ? (
+            <div className="py-20 text-center rounded-xl border border-border/60">
+              <Megaphone className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground">No messages yet. Check back later!</p>
+            </div>
+          ) : (
+            <NoticesList items={items} unreadIds={unreadIds} studentId={user.id} />
+          )
+        }
+        contact={<ContactThreads threads={threads} />}
+      />
     </div>
   )
 }

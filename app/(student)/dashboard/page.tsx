@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { JoinLiveClassButton } from '@/components/lc/join-live-class-button'
+import { LiveClassCountdown } from '@/components/lc/live-class-countdown'
 import { DashboardGradeFilter } from '@/components/lc/dashboard-grade-filter'
 import {
   ArrowRight, BookOpen, Radio, Bell, PlayCircle, GraduationCap, TrendingUp,
@@ -123,6 +124,7 @@ export default async function StudentDashboardPage({ searchParams }: { searchPar
 
   // ── Upcoming live class (for live subscribers) ──
   let liveJoin: any = null
+  let upcomingClass: any = null
   if (grade && grade.live_subscription_enabled && hasLive) {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
@@ -149,8 +151,9 @@ export default async function StudentDashboardPage({ searchParams }: { searchPar
     const cm = now.getMonth() + 1, cy = now.getFullYear()
     const currentMonthPkg = ((livePackages ?? []) as any[]).find((p) => p.month === cm && p.year === cy)
     const subscribedCurrentMonth = currentMonthPkg ? subscribedPackageIds.has(currentMonthPkg.id) : false
-    if (subscribedCurrentMonth && currentLiveClass?.meet_url) {
-      liveJoin = { cls: currentLiveClass, gradeId: grade.id }
+    if (subscribedCurrentMonth && currentLiveClass) {
+      upcomingClass = currentLiveClass
+      if (currentLiveClass.meet_url) liveJoin = { cls: currentLiveClass, gradeId: grade.id }
     }
   }
 
@@ -201,7 +204,15 @@ export default async function StudentDashboardPage({ searchParams }: { searchPar
                   <Radio className="w-4 h-4 text-primary" />
                   <span className="text-xs font-semibold text-primary uppercase tracking-wide">Your live class</span>
                 </div>
-                <h3 className="font-semibold text-sm mb-3">{liveJoin.cls.title}</h3>
+                <h3 className="font-semibold text-sm mb-1">{liveJoin.cls.title}</h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                  <LiveClassCountdown
+                    scheduledAt={liveJoin.cls.scheduled_at}
+                    isRecurring={liveJoin.cls.is_recurring ?? false}
+                    recurrenceDayOfWeek={liveJoin.cls.recurrence_day_of_week ?? null}
+                    endTime={liveJoin.cls.end_time ?? null}
+                  />
+                </p>
                 <div className="mt-auto">
                   <JoinLiveClassButton
                     liveClassId={liveJoin.cls.id}
@@ -215,6 +226,23 @@ export default async function StudentDashboardPage({ searchParams }: { searchPar
                   />
                 </div>
               </div>
+            ) : upcomingClass ? (
+              <Link href={`/dashboard/live-classes${grade ? `?grade=${grade.id}` : ''}`} className="p-5 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors flex flex-col">
+                <div className="flex items-center gap-2 mb-1">
+                  <Radio className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your live class</span>
+                </div>
+                <h3 className="font-semibold text-sm mb-1">{upcomingClass.title}</h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                  <LiveClassCountdown
+                    scheduledAt={upcomingClass.scheduled_at}
+                    isRecurring={upcomingClass.is_recurring ?? false}
+                    recurrenceDayOfWeek={upcomingClass.recurrence_day_of_week ?? null}
+                    endTime={upcomingClass.end_time ?? null}
+                  />
+                </p>
+                <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-primary">Open Live Classes <ArrowRight className="w-4 h-4" /></span>
+              </Link>
             ) : (
               <Link href={`/dashboard/live-classes${grade ? `?grade=${grade.id}` : ''}`} className="p-5 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors flex flex-col">
                 <div className="flex items-center gap-2 mb-1">

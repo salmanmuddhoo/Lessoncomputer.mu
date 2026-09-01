@@ -17,7 +17,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Loader2, Plus, Pencil, Trash2, Megaphone, Users, Radio, Video, Folder, FolderOpen, ChevronRight, ChevronDown, Bell, Inbox, Mail, GraduationCap } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Megaphone, Users, Radio, Video, Folder, FolderOpen, ChevronRight, ChevronDown, Bell, Inbox, Mail, GraduationCap, Send } from 'lucide-react'
 import { toast } from 'sonner'
 
 const AUDIENCE_LABELS: Record<string, { label: string; icon: React.ElementType; className: string }> = {
@@ -41,6 +41,14 @@ interface Broadcast {
 }
 
 interface AdminNotification { id: string; message: string; created_at: string; type: string }
+interface ContactReply {
+  id: string
+  sender_role: 'admin' | 'student'
+  body: string
+  is_read: boolean
+  created_at: string
+}
+
 interface ContactMessage {
   id: string
   name: string
@@ -49,8 +57,10 @@ interface ContactMessage {
   body: string
   is_read: boolean
   created_at: string
+  student_id: string | null
   student: { full_name: string | null } | null
   grade: { name: string; color: string } | null
+  contact_message_replies: ContactReply[]
 }
 
 export default function AdminBroadcastsPage() {
@@ -65,6 +75,8 @@ export default function AdminBroadcastsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null)
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({})
+  const [sendingReplyId, setSendingReplyId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [openGrades, setOpenGrades] = useState<Record<string, boolean>>({})
@@ -95,12 +107,15 @@ export default function AdminBroadcastsPage() {
         .limit(50),
       (supabase as any)
         .from('contact_messages')
-        .select('id, name, email, subject, body, is_read, created_at, student:profiles(full_name), grade:grades(name, color)')
+        .select('id, name, email, subject, body, is_read, created_at, student_id, student:profiles(full_name), grade:grades(name, color), contact_message_replies(id, sender_role, body, is_read, created_at)')
         .order('created_at', { ascending: false }),
     ])
     setBroadcasts((bData ?? []) as Broadcast[])
     setNotifications((nData ?? []) as AdminNotification[])
-    setContactMessages((cData ?? []) as ContactMessage[])
+    setContactMessages(((cData ?? []) as ContactMessage[]).map((m) => ({
+      ...m,
+      contact_message_replies: [...(m.contact_message_replies ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    })))
     const gs = (gData ?? []) as Grade[]
     setGrades(gs)
     if (gs.length > 0 && !gradeId) setGradeId(gs[0].id)
@@ -149,9 +164,46 @@ export default function AdminBroadcastsPage() {
     await (supabase as any).from('contact_messages').update({ is_read: isRead }).eq('id', id)
   }
 
-  function openContactMessage(m: ContactMessage) {
+  async function openContactMessage(m: ContactMessage) {
     setExpandedId((prev) => (prev === m.id ? null : m.id))
     if (!m.is_read) toggleContactRead(m.id, true)
+    const unreadStudentReplies = m.contact_message_replies.filter((r) => r.sender_role === 'student' && !r.is_read)
+    if (unreadStudentReplies.length > 0) {
+      await (supabase as any)
+        .from('contact_message_replies')
+        .update({ is_read: true })
+        .in('id', unreadStudentReplies.map((r) => r.id))
+      setContactMessages((prev) => prev.map((cm) => cm.id !== m.id ? cm : {
+        ...cm,
+        contact_message_replies: cm.contact_message_replies.map((r) => r.sender_role === 'student' ? { ...r, is_read: true } : r),
+      }))
+    }
+  }
+
+  async function sendContactReply(threadId: string) {
+    const draft = (replyDrafts[threadId] ?? '').trim()
+    if (!draft) return
+    setSendingReplyId(threadId)
+    try {
+      const res = await fetch('/api/messages/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactMessageId: threadId, body: draft }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(data.error ?? 'Could not send your reply.'); return }
+      setContactMessages((prev) => prev.map((cm) => cm.id !== threadId ? cm : {
+        ...cm,
+        contact_message_replies: [...cm.contact_message_replies, {
+          id: `local-${Date.now()}`, sender_role: 'admin', body: draft, is_read: true, created_at: new Date().toISOString(),
+        }],
+      }))
+      setReplyDrafts((prev) => ({ ...prev, [threadId]: '' }))
+    } catch {
+      toast.error('Network error. Please try again.')
+    } finally {
+      setSendingReplyId(null)
+    }
   }
 
   async function deleteContactMessage(id: string) {
@@ -504,9 +556,36 @@ export default function AdminBroadcastsPage() {
                   </span>
                 </button>
                 {isOpen && (
-                  <div className="px-4 pb-4 pl-11">
-                    <p className="text-sm text-foreground/90 whitespace-pre-wrap mb-3">{m.body}</p>
-                    <div className="flex items-center gap-2">
+                  <div className="px-4 pb-4 pl-11 space-y-2.5">
+                    <p className="text-sm text-foreground/90 whitespace-pre-wrap">{m.body}</p>
+                    {m.contact_message_replies.map((r) => (
+                      <div
+                        key={r.id}
+                        className={`rounded-lg border p-3 ${r.sender_role === 'admin' ? 'border-primary/30 bg-primary/5' : 'border-border/60 bg-muted/20'}`}
+                      >
+                        <p className="text-xs text-muted-foreground mb-1">{r.sender_role === 'admin' ? 'You' : (m.student?.full_name ?? m.name)}</p>
+                        <p className="text-sm whitespace-pre-wrap">{r.body}</p>
+                      </div>
+                    ))}
+                    {m.student_id && (
+                      <div className="flex items-end gap-2 pt-1">
+                        <Textarea
+                          value={replyDrafts[m.id] ?? ''}
+                          onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [m.id]: e.target.value }))}
+                          placeholder="Reply in-app — the student sees this in their Messages page…"
+                          className="text-sm min-h-[60px] resize-y"
+                        />
+                        <Button
+                          size="sm"
+                          className="bg-primary text-primary-foreground hover:bg-accent shrink-0"
+                          disabled={sendingReplyId === m.id || !(replyDrafts[m.id] ?? '').trim()}
+                          onClick={() => sendContactReply(m.id)}
+                        >
+                          {sendingReplyId === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                        </Button>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 pt-1">
                       <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
                         <a href={`mailto:${m.email}?subject=${encodeURIComponent(`Re: ${m.subject}`)}`}>Reply by Email</a>
                       </Button>

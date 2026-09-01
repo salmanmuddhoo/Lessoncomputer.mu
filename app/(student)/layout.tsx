@@ -124,6 +124,16 @@ export default async function StudentLayout({ children }: { children: React.Reac
     }
   }
 
+  // Unread admin replies on this student's contact threads count toward the same
+  // Messages badge. RLS already scopes contact_message_replies to this student's own
+  // threads, so no explicit student_id filter is needed here.
+  const { data: unreadReplyRows } = await (supabase as any)
+    .from('contact_message_replies')
+    .select('id')
+    .eq('sender_role', 'admin')
+    .eq('is_read', false)
+  unreadMessages += (unreadReplyRows ?? []).length
+
   const currency = await getCurrencyInfo()
 
   return (
