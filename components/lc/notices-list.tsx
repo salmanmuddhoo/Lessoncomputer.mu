@@ -14,6 +14,8 @@ interface Broadcast {
   created_at: string
   chapter_id: string | null
   chapter: { title: string } | null
+  grade_id?: string | null
+  grade?: { id: string; name: string } | null
 }
 
 interface Props {
@@ -27,10 +29,18 @@ export function NoticesList({ items, unreadIds = [], studentId }: Props) {
   const [selected, setSelected] = useState<Broadcast | null>(null)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const [unread, setUnread] = useState<Set<string>>(() => new Set(unreadIds))
+  const [gradeFilter, setGradeFilter] = useState<string>('all')
 
   function toggleGroup(key: string) {
     setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }))
   }
+
+  // Distinct grades present across the messages — a student in more than one grade can
+  // filter to a single grade's messages.
+  const gradeOptions = Array.from(
+    new Map(items.filter((i) => i.grade?.id).map((i) => [i.grade!.id, i.grade!])).values()
+  ).sort((a, b) => a.name.localeCompare(b.name))
+  const visibleItems = gradeFilter === 'all' ? items : items.filter((i) => i.grade_id === gradeFilter)
 
   // Open a message and, if it was unread for THIS student, mark it read (per-student
   // via broadcast_reads). Other students keep their own unread state.
@@ -51,7 +61,7 @@ export function NoticesList({ items, unreadIds = [], studentId }: Props) {
 
   // Group by chapter; "General" last
   const chapterMap = new Map<string, { key: string; title: string; items: Broadcast[] }>()
-  for (const item of items) {
+  for (const item of visibleItems) {
     const key = item.chapter_id ?? '__general__'
     if (!chapterMap.has(key)) {
       chapterMap.set(key, { key, title: item.chapter?.title ?? 'General', items: [] })
@@ -67,6 +77,25 @@ export function NoticesList({ items, unreadIds = [], studentId }: Props) {
 
   return (
     <>
+      {gradeOptions.length > 1 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => setGradeFilter('all')}
+            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${gradeFilter === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/40'}`}
+          >
+            All grades
+          </button>
+          {gradeOptions.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => setGradeFilter(g.id)}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${gradeFilter === g.id ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/40'}`}
+            >
+              {g.name}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="space-y-2">
         {groups.map((group) => {
           const isOpen = openGroups[group.key] ?? false

@@ -21,6 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { formatMoney } from '@/lib/currency-format'
 
 interface Student {
   id: string
@@ -656,7 +657,7 @@ export default function AdminStudentsPage() {
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={statusBadge(p.status)}>{p.status}</span>
-                          <span className="text-sm font-semibold">{p.currency} {p.amount.toFixed(2)}</span>
+                          <span className="text-sm font-semibold">{formatMoney(p.amount)}</span>
                           {(p.status === 'pending' || p.status === 'failed') && (
                             <Button
                               size="sm"

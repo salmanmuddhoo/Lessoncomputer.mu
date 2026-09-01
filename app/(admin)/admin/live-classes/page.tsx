@@ -100,20 +100,46 @@ export default function AdminLiveClassesPage() {
     }, new Map<string, { grade: { id: string; name: string; color: string }; items: LiveClass[] }>()).values()
   ).sort((a, b) => a.grade.name.localeCompare(b.grade.name))
 
+  // Status of a class, mirroring the per-row badge logic, so the header counts are accurate
+  // (e.g. only current-month published classes are "Active", not every non-archived one).
+  function statusOf(c: LiveClass): 'archived' | 'draft' | 'ended' | 'active' | 'upcoming' {
+    if (c.is_archived) return 'archived'
+    if (!c.is_published) return 'draft'
+    const d = new Date(c.scheduled_at)
+    const m = d.getMonth() + 1, y = d.getFullYear()
+    if (y < currentYear || (y === currentYear && m < currentMonth)) return 'ended'
+    if (y === currentYear && m === currentMonth) return 'active'
+    return 'upcoming'
+  }
+  const counts = { active: 0, upcoming: 0, ended: 0, archived: 0, draft: 0 }
+  for (const c of filtered) counts[statusOf(c)]++
+
+  const summary: { label: string; value: number; className: string }[] = [
+    { label: 'Active', value: counts.active, className: 'bg-primary/10 text-primary' },
+    { label: 'Upcoming', value: counts.upcoming, className: 'bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400' },
+    { label: 'Ended', value: counts.ended, className: 'bg-muted text-muted-foreground' },
+    { label: 'Archived', value: counts.archived, className: 'bg-muted text-muted-foreground' },
+    ...(counts.draft > 0 ? [{ label: 'Draft', value: counts.draft, className: 'bg-secondary text-muted-foreground' }] : []),
+  ]
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold">Live Classes</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {activeClasses.length} active{archivedClasses.length > 0 ? ` · ${archivedClasses.length} archived` : ''}
-          </p>
-        </div>
+      <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+        <h1 className="text-2xl font-bold">Live Classes</h1>
         <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
           <Link href="/admin/live-classes/new">
             <Plus className="w-4 h-4 mr-1" /> Schedule Class
           </Link>
         </Button>
+      </div>
+
+      {/* Status summary */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {summary.map((s) => (
+          <div key={s.label} className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${s.className}`}>
+            <span className="font-bold">{s.value}</span> {s.label}
+          </div>
+        ))}
       </div>
 
       {/* Join next upcoming class */}

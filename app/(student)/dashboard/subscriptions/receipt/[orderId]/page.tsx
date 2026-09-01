@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { PrintButton, BackButton } from './print-button'
+import { formatMoney } from '@/lib/currency-format'
 
 export const metadata: Metadata = { title: 'Payment Receipt' }
 
@@ -120,7 +121,7 @@ export default async function ReceiptPage({ params }: PageProps) {
                     </p>
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">
-                    {order.currency} {Number(order.amount).toFixed(2)}
+                    {formatMoney(Number(order.amount))}
                   </td>
                 </tr>
               </tbody>
@@ -128,7 +129,7 @@ export default async function ReceiptPage({ params }: PageProps) {
                 <tr className="border-t border-border/60 bg-muted/10">
                   <td className="px-4 py-3 font-semibold text-sm">Total paid</td>
                   <td className="px-4 py-3 text-right font-bold text-primary text-base">
-                    {order.currency} {Number(order.amount).toFixed(2)}
+                    {formatMoney(Number(order.amount))}
                   </td>
                 </tr>
               </tfoot>

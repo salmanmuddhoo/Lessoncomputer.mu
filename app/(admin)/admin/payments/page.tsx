@@ -4,6 +4,7 @@ import { CreditCard, CheckCircle2, XCircle, Clock, CalendarClock, BarChart3, Pla
 import type { Metadata } from 'next'
 import { PaymentsTable } from './payments-table'
 import { PaymentsMonthFilter } from './payments-month-filter'
+import { formatMoney } from '@/lib/currency-format'
 
 export const metadata: Metadata = { title: 'Payments' }
 
@@ -275,7 +276,7 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                     <td className="px-4 py-2.5 font-medium">{u.name}</td>
                     <td className="px-4 py-2.5 text-muted-foreground">{u.gradeName ?? '—'}</td>
                     <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">{nextDate.toLocaleDateString('en-MU', { dateStyle: 'medium' })}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold whitespace-nowrap">{u.currency} {u.amount.toFixed(2)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold whitespace-nowrap">{formatMoney(u.amount)}</td>
                   </tr>
                 ))}
               </tbody>

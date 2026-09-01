@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, Clock, AlertCircle, Zap, Filter } from 'lucide-r
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { formatMoney } from '@/lib/currency-format'
 
 interface MipsOrder {
   id: string
@@ -138,7 +139,7 @@ export function PaymentsTable({ initialOrders, grades = [] }: { initialOrders: M
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
-                    {order.currency} {Number(order.amount).toFixed(2)}
+                    {formatMoney(Number(order.amount))}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${cfg.className}`}>

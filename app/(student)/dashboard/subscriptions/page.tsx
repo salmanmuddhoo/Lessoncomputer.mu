@@ -6,6 +6,7 @@ import { BookOpen, ArrowRight, AlertTriangle } from 'lucide-react'
 import type { Metadata } from 'next'
 import { SubscriptionCard } from '@/components/lc/subscription-card'
 import { RetryPaymentButton } from '@/components/lc/retry-payment-button'
+import { formatMoney } from '@/lib/currency-format'
 
 export const metadata: Metadata = { title: 'My Subscriptions' }
 
@@ -152,7 +153,7 @@ export default async function StudentSubscriptionsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="font-semibold text-red-500">Failed · {o.currency} {Number(o.amount).toFixed(2)}</span>
+                  <span className="font-semibold text-red-500">Failed · {formatMoney(Number(o.amount))}</span>
                   <RetryPaymentButton orderId={o.id} />
                 </div>
               </div>

@@ -18,7 +18,7 @@ import { toast } from 'sonner'
 
 interface AdminRow { id: string; name: string | null; canAccessFinance?: boolean }
 
-export function ManageAdmins({ admins, currentUserId, canManageFinance }: { admins: AdminRow[]; currentUserId: string; canManageFinance: boolean }) {
+export function ManageAdmins({ admins, currentUserId, canManageFinance, canRemoveAdmins }: { admins: AdminRow[]; currentUserId: string; canManageFinance: boolean; canRemoveAdmins: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -103,7 +103,7 @@ export function ManageAdmins({ admins, currentUserId, canManageFinance }: { admi
                 )}
                 {a.id === currentUserId ? (
                   <span className="ml-auto text-xs text-muted-foreground">You</span>
-                ) : (
+                ) : canRemoveAdmins ? (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -112,7 +112,7 @@ export function ManageAdmins({ admins, currentUserId, canManageFinance }: { admi
                   >
                     <ShieldMinus className="w-3.5 h-3.5 mr-1" /> Remove
                   </Button>
-                )}
+                ) : null}
               </div>
             ))
           )}

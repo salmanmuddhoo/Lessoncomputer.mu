@@ -25,13 +25,17 @@ export default async function AdminSettingsPage() {
       .single(),
     (supabase as any)
       .from('profiles')
-      .select('id, full_name, can_access_finance')
+      .select('id, full_name, can_access_finance, created_at')
       .eq('role', 'admin')
       .order('full_name', { ascending: true }),
   ])
 
   const admins = ((adminRows ?? []) as any[]).map((a) => ({ id: a.id as string, name: (a.full_name ?? null) as string | null, canAccessFinance: !!a.can_access_finance }))
   const canManageFinance = (profile as any)?.can_access_finance === true
+  // Only the first (original) admin may remove other admins.
+  const firstAdminId = [...((adminRows ?? []) as any[])]
+    .sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))[0]?.id ?? null
+  const canRemoveAdmins = firstAdminId === user!.id
 
   const ss = (siteSettings ?? {}) as {
     facebook_url: string | null
@@ -80,7 +84,7 @@ export default async function AdminSettingsPage() {
 
           <CurrencySettingsForm initialUsdRate={ss.usd_rate ?? null} />
 
-          <ManageAdmins admins={admins} currentUserId={user!.id} canManageFinance={canManageFinance} />
+          <ManageAdmins admins={admins} currentUserId={user!.id} canManageFinance={canManageFinance} canRemoveAdmins={canRemoveAdmins} />
         </div>
       </div>
     </div>

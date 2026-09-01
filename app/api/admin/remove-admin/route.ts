@@ -15,13 +15,24 @@ export async function POST(req: NextRequest) {
     const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     if ((me as any)?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+    // Only the FIRST (original) admin may remove other admins — admins added afterwards can't.
+    const admin = createServiceRoleClient()
+    const { data: firstAdmin } = await (admin as any)
+      .from('profiles')
+      .select('id')
+      .eq('role', 'admin')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (!firstAdmin || (firstAdmin as any).id !== user.id) {
+      return NextResponse.json({ error: 'Only the primary administrator can remove admins.' }, { status: 403 })
+    }
+
     const { adminId } = await req.json() as { adminId?: string }
     if (!adminId) return NextResponse.json({ error: 'Missing admin id.' }, { status: 400 })
     if (adminId === user.id) {
       return NextResponse.json({ error: 'You cannot remove your own admin access.' }, { status: 400 })
     }
-
-    const admin = createServiceRoleClient()
 
     const { data: target } = await (admin as any)
       .from('profiles')

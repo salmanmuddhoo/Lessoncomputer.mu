@@ -27,6 +27,7 @@ interface AttendeeRow {
   student_id: string
   entry_time: string
   scheduled_end_time: string | null
+  is_absent: boolean
   profile: { full_name: string | null } | null
 }
 
@@ -132,7 +133,7 @@ export default function AdminAttendancePage() {
     // profiles directly — fetch the rows, then resolve student names in a second query.
     const { data } = await (supabase as any)
       .from('live_attendance')
-      .select('id, student_id, entry_time, scheduled_end_time')
+      .select('id, student_id, entry_time, scheduled_end_time, is_absent')
       .eq('live_class_id', cls.id)
       .order('entry_time', { ascending: true })
     const rows = (data ?? []) as any[]
@@ -161,33 +162,43 @@ export default function AdminAttendancePage() {
     setExpandLoading(false)
   }
 
-  // Correct a student's attendance: mark them present (set the present timestamp) or undo it.
-  async function togglePresent(classId: string, row: AttendeeRow) {
-    const makePresent = !row.scheduled_end_time
+  const isPresent = (r: AttendeeRow) => !!r.scheduled_end_time && !r.is_absent
+
+  // Correct a student's attendance: mark them present or absent.
+  async function setStatus(classId: string, row: AttendeeRow, status: 'present' | 'absent') {
     setSavingMark(row.id)
-    const val = makePresent ? new Date().toISOString() : null
+    const patch = status === 'present'
+      ? { scheduled_end_time: new Date().toISOString(), is_absent: false }
+      : { scheduled_end_time: null, is_absent: true }
     const { error } = await (supabase as any)
       .from('live_attendance')
-      .update({ scheduled_end_time: val })
+      .update(patch)
       .eq('id', row.id)
     if (error) {
       toast.error(error.message)
     } else {
-      setExpandedRows((prev) => prev.map((r) => r.id === row.id ? { ...r, scheduled_end_time: val } : r))
-      setMarkCounts((prev) => ({ ...prev, [classId]: Math.max(0, (prev[classId] ?? 0) + (makePresent ? 1 : -1)) }))
-      toast.success(makePresent ? 'Marked present' : 'Marked not present')
+      const wasPresent = isPresent(row)
+      const nowPresent = status === 'present'
+      setExpandedRows((prev) => prev.map((r) => r.id === row.id ? { ...r, ...patch } : r))
+      if (wasPresent !== nowPresent) {
+        setMarkCounts((prev) => ({ ...prev, [classId]: Math.max(0, (prev[classId] ?? 0) + (nowPresent ? 1 : -1)) }))
+      }
+      toast.success(status === 'present' ? 'Marked present' : 'Marked absent')
     }
     setSavingMark(null)
   }
 
-  // Add a student who attended but has no record (e.g. couldn't join to mark themselves).
-  async function addPresent(cls: LiveClass, studentId: string) {
+  // Add a student who has no record yet (e.g. attended but couldn't join, or a no-show).
+  async function addAttendance(cls: LiveClass, studentId: string, status: 'present' | 'absent') {
     setSavingMark(studentId)
     const nowIso = new Date().toISOString()
+    const patch = status === 'present'
+      ? { scheduled_end_time: nowIso, is_absent: false }
+      : { scheduled_end_time: null, is_absent: true }
     const { data, error } = await (supabase as any)
       .from('live_attendance')
-      .insert({ live_class_id: cls.id, student_id: studentId, grade_id: cls.grade_id, entry_time: nowIso, scheduled_end_time: nowIso })
-      .select('id, student_id, entry_time, scheduled_end_time')
+      .insert({ live_class_id: cls.id, student_id: studentId, grade_id: cls.grade_id, entry_time: nowIso, ...patch })
+      .select('id, student_id, entry_time, scheduled_end_time, is_absent')
       .single()
     if (error || !data) {
       toast.error(error?.message ?? 'Could not add the student.')
@@ -195,9 +206,9 @@ export default function AdminAttendancePage() {
       const name = candidates.find((c) => c.id === studentId)?.full_name ?? null
       setExpandedRows((prev) => [...prev, { ...data, profile: { full_name: name } } as AttendeeRow])
       setCandidates((prev) => prev.filter((c) => c.id !== studentId))
-      setMarkCounts((prev) => ({ ...prev, [cls.id]: (prev[cls.id] ?? 0) + 1 }))
+      if (status === 'present') setMarkCounts((prev) => ({ ...prev, [cls.id]: (prev[cls.id] ?? 0) + 1 }))
       setAddSelect('')
-      toast.success('Student added as present')
+      toast.success(status === 'present' ? 'Student added as present' : 'Student added as absent')
     }
     setSavingMark(null)
   }
@@ -394,7 +405,8 @@ export default function AdminAttendancePage() {
                                             </thead>
                                             <tbody className="divide-y divide-border/20">
                                               {expandedRows.map((row) => {
-                                                const present = !!row.scheduled_end_time
+                                                const present = isPresent(row)
+                                                const absent = row.is_absent
                                                 return (
                                                   <tr key={row.id}>
                                                     <td className="py-1.5 font-medium pr-4">{row.profile?.full_name ?? 'Unknown'}</td>
@@ -403,21 +415,29 @@ export default function AdminAttendancePage() {
                                                     <td className="py-1.5">
                                                       {present
                                                         ? <span className="text-green-600 dark:text-green-400 font-semibold">Present</span>
+                                                        : absent
+                                                        ? <span className="text-red-500 font-semibold">Absent</span>
                                                         : <span className="text-orange-500 font-semibold">Joined only</span>}
                                                     </td>
                                                     <td className="py-1.5 text-right">
-                                                      <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className={`h-6 text-[11px] gap-1 ${present ? 'text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20' : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20'}`}
-                                                        disabled={savingMark === row.id}
-                                                        onClick={() => togglePresent(cls.id, row)}
-                                                      >
-                                                        {savingMark === row.id
-                                                          ? <Loader2 className="w-3 h-3 animate-spin" />
-                                                          : present ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-                                                        {present ? 'Unmark' : 'Mark present'}
-                                                      </Button>
+                                                      <div className="inline-flex items-center gap-1">
+                                                        <Button
+                                                          variant="ghost" size="sm"
+                                                          className={`h-6 text-[11px] gap-1 ${present ? 'text-green-600 bg-green-50 dark:bg-green-950/20' : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20'}`}
+                                                          disabled={savingMark === row.id || present}
+                                                          onClick={() => setStatus(cls.id, row, 'present')}
+                                                        >
+                                                          <Check className="w-3 h-3" /> Present
+                                                        </Button>
+                                                        <Button
+                                                          variant="ghost" size="sm"
+                                                          className={`h-6 text-[11px] gap-1 ${absent ? 'text-red-600 bg-red-50 dark:bg-red-950/20' : 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20'}`}
+                                                          disabled={savingMark === row.id || absent}
+                                                          onClick={() => setStatus(cls.id, row, 'absent')}
+                                                        >
+                                                          {savingMark === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />} Absent
+                                                        </Button>
+                                                      </div>
                                                     </td>
                                                   </tr>
                                                 )
@@ -427,10 +447,10 @@ export default function AdminAttendancePage() {
                                         </div>
                                       )}
 
-                                      {/* Add a student who attended but has no record */}
+                                      {/* Add a student who has no record — present or absent */}
                                       {candidates.length > 0 && (
                                         <div className="mt-3 flex items-center gap-2 flex-wrap border-t border-border/30 pt-3">
-                                          <span className="text-[11px] text-muted-foreground">Add a student who attended:</span>
+                                          <span className="text-[11px] text-muted-foreground">Add a student:</span>
                                           <Select value={addSelect} onValueChange={setAddSelect}>
                                             <SelectTrigger className="w-56 h-7 text-xs"><SelectValue placeholder="Select a student" /></SelectTrigger>
                                             <SelectContent>
@@ -439,12 +459,21 @@ export default function AdminAttendancePage() {
                                           </Select>
                                           <Button
                                             size="sm"
-                                            className="h-7 text-xs bg-primary text-primary-foreground hover:bg-accent"
+                                            className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
                                             disabled={!addSelect || savingMark === addSelect}
-                                            onClick={() => addSelect && addPresent(cls, addSelect)}
+                                            onClick={() => addSelect && addAttendance(cls, addSelect, 'present')}
                                           >
                                             {savingMark === addSelect ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <UserPlus className="w-3 h-3 mr-1" />}
-                                            Add present
+                                            Present
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                            disabled={!addSelect || savingMark === addSelect}
+                                            onClick={() => addSelect && addAttendance(cls, addSelect, 'absent')}
+                                          >
+                                            Absent
                                           </Button>
                                         </div>
                                       )}
