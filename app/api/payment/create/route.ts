@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
     // so a user whose signup trigger never created their profile would otherwise fail
     // the order insert with a foreign-key violation. Create it (from signup metadata)
     // if missing; leave an existing profile untouched (ON CONFLICT DO NOTHING).
+    const meta = (user.user_metadata ?? {}) as { full_name?: string; grade_id?: string }
     {
-      const meta = (user.user_metadata ?? {}) as { full_name?: string; grade_id?: string }
       const profileAdmin = createServiceRoleClient()
       const { error: profileError } = await (profileAdmin as any)
         .from('profiles')
@@ -40,6 +40,16 @@ export async function POST(req: NextRequest) {
         )
       if (profileError) console.error('[payment/create] ensure profile failed:', profileError)
     }
+
+    // The paying student's name — for the MIPS "Client details" tab. Prefer the
+    // profile's current full_name (may have been edited since signup) over signup metadata.
+    const { data: paymentProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+    const clientName = (paymentProfile as { full_name: string | null } | null)?.full_name ?? meta.full_name ?? undefined
+    const clientEmail = user.email ?? undefined
 
     // Determine whether the student already holds a recurring live subscription for the
     // grade(s) in this order, and block only months that recurring subscription actually
@@ -215,6 +225,8 @@ export async function POST(req: NextRequest) {
       description,
       returnUrl:       `${origin}/payment/result?orderId=${orderId}`,
       notificationUrl: `${siteUrl}/api/payment/callback`,
+      clientName,
+      clientEmail,
       odrp: odrpParams,
     })
 

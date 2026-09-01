@@ -2,7 +2,12 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-export function CTASection() {
+interface Props {
+  isLoggedIn?: boolean
+  dashboardHref?: string
+}
+
+export function CTASection({ isLoggedIn = false, dashboardHref = '/dashboard' }: Props) {
   return (
     <section className="relative overflow-hidden bg-foreground py-20 md:py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -26,12 +31,14 @@ export function CTASection() {
               asChild
               className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-full px-9 h-12 text-[15px]"
             >
-              <Link href="/register">
-                Create Free Account <ArrowRight className="ml-2 w-4 h-4" />
+              <Link href={isLoggedIn ? dashboardHref : '/register'}>
+                {isLoggedIn ? 'Go to My Dashboard' : 'Create Free Account'} <ArrowRight className="ml-2 w-4 h-4" />
               </Link>
             </Button>
           </div>
-          <p className="relative text-xs text-background/35 mt-6">No credit card required · Free videos available immediately</p>
+          {!isLoggedIn && (
+            <p className="relative text-xs text-background/35 mt-6">No credit card required · Free videos available immediately</p>
+          )}
         </div>
       </div>
     </section>

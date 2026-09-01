@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Hero } from '@/components/lc/hero'
+import { TeacherSection } from '@/components/lc/teacher-section'
 import { TrustBadges } from '@/components/lc/trust-badges'
 import { StatsSection } from '@/components/lc/stats-section'
 import { GradesSection } from '@/components/lc/grades-section'
@@ -11,6 +12,17 @@ import type { Grade } from '@/lib/types/database'
 
 export default async function HomePage() {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  let dashboardHref = '/dashboard'
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile?.role === 'admin') dashboardHref = '/admin'
+  }
 
   const { data: gradesData } = await supabase
     .from('grades')
@@ -36,25 +48,28 @@ export default async function HomePage() {
       {/* 1. Hero — large serif headline, two CTAs */}
       <Hero />
 
-      {/* 2. Trust badges — yellow strip, like Boty */}
+      {/* 2. Meet the teacher — builds trust near the top */}
+      <TeacherSection />
+
+      {/* 3. Trust badges — yellow strip, like Boty */}
       <TrustBadges />
 
-      {/* 3. Stats bar */}
+      {/* 4. Stats bar */}
       <StatsSection />
 
-      {/* 4. Grade grid — "the boxes" like Boty product grid */}
+      {/* 5. Grade grid — "the boxes" like Boty product grid */}
       <GradesSection grades={grades ?? undefined} />
 
-      {/* 5. Feature cards */}
+      {/* 6. Feature cards */}
       <FeaturesSection />
 
-      {/* 6. Testimonials */}
+      {/* 7. Testimonials */}
       <Testimonials items={testimonials ?? []} />
 
-      {/* 7. CTA banner — dark block */}
-      <CTASection />
+      {/* 8. CTA banner — dark block */}
+      <CTASection isLoggedIn={!!user} dashboardHref={dashboardHref} />
 
-      {/* 8. Newsletter */}
+      {/* 9. Newsletter */}
       <Newsletter />
     </>
   )
