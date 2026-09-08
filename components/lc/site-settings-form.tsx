@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Loader2, Facebook, Instagram, MessageCircle } from 'lucide-react'
+import { Loader2, Facebook, Instagram, MessageCircle, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 
 function TikTokIcon({ className }: { className?: string }) {
@@ -22,6 +22,7 @@ interface Props {
     instagram_url: string
     tiktok_url: string
     whatsapp_number: string
+    business_address: string
   }
 }
 
@@ -44,6 +45,7 @@ export function SiteSettingsForm({ initial }: Props) {
         instagram_url: values.instagram_url.trim() || null,
         tiktok_url: values.tiktok_url.trim() || null,
         whatsapp_number: values.whatsapp_number.trim() || null,
+        business_address: values.business_address.trim() || null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' })
 
@@ -107,6 +109,19 @@ export function SiteSettingsForm({ initial }: Props) {
             className="text-sm font-mono"
           />
           <p className="text-[11px] text-muted-foreground">Include country code. E.g. for Mauritius: 23052312345</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-2 text-xs">
+            <MapPin className="w-3.5 h-3.5 text-primary" /> Business Address
+          </Label>
+          <Input
+            value={values.business_address}
+            onChange={(e) => set('business_address', e.target.value)}
+            placeholder="e.g. 12 Royal Road, Curepipe, Mauritius"
+            className="text-sm"
+          />
+          <p className="text-[11px] text-muted-foreground">Shown on the Contact page.</p>
         </div>
       </div>
 

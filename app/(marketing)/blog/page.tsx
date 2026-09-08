@@ -5,8 +5,16 @@ import { ArrowRight, Calendar } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 export const metadata: Metadata = {
-  title: 'Blog | LessonComputer.mu',
-  description: 'Tips, guides and news for Mauritian ICT students.',
+  title: 'Blog',
+  description: 'Tips, guides and news for Cambridge Computer Science students.',
+  alternates: { canonical: '/blog' },
+  openGraph: {
+    title: 'Blog | LessonComputer.mu',
+    description: 'Tips, guides and news for Cambridge Computer Science students.',
+    siteName: 'LessonComputer.mu',
+    url: '/blog',
+    type: 'website',
+  },
 }
 
 export default async function BlogPage() {

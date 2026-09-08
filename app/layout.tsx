@@ -19,14 +19,17 @@ const playfairDisplay = Playfair_Display({
   weight: ['400', '500', '600', '700'],
 })
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://lessoncomputer.mu'
+
 export const metadata: Metadata = {
   title: {
-    default: 'LessonComputer.mu — Learn at Your Own Pace',
+    default: 'LessonComputer.mu | Cambridge Computer Science Tuition',
     template: '%s | LessonComputer.mu',
   },
-  description: 'The leading online learning platform in Mauritius. Watch video lessons and join live classes organised by grade.',
-  keywords: ['online learning', 'Mauritius', 'education', 'live classes', 'video lessons', 'grades'],
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://lessoncomputer.mu'),
+  description: 'Expert-led Cambridge IGCSE, O Level and A Level Computer Science tuition (0478, 2210, 9618) — video lessons and live classes for students in Mauritius and worldwide.',
+  keywords: ['Cambridge Computer Science', 'IGCSE Computer Science 0478', 'O Level Computer Science 2210', 'A Level Computer Science 9618', 'Mauritius', 'online tuition', 'live classes', 'video lessons'],
+  metadataBase: new URL(SITE_URL),
+  alternates: { canonical: '/' },
   icons: {
     icon: [
       { url: '/favicon.ico?v=2', sizes: '32x32' },
@@ -35,9 +38,17 @@ export const metadata: Metadata = {
     apple: '/apple-icon.png?v=2',
   },
   openGraph: {
-    title: 'LessonComputer.mu',
-    description: 'The leading online learning platform in Mauritius.',
+    siteName: 'LessonComputer.mu',
+    title: 'LessonComputer.mu | Cambridge Computer Science Tuition',
+    description: 'Expert-led Cambridge IGCSE, O Level and A Level Computer Science tuition — video lessons and live classes for students in Mauritius and worldwide.',
+    url: SITE_URL,
     type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'LessonComputer.mu | Cambridge Computer Science Tuition',
+    description: 'Expert-led Cambridge IGCSE, O Level and A Level Computer Science tuition — video lessons and live classes for students in Mauritius and worldwide.',
   },
 }
 

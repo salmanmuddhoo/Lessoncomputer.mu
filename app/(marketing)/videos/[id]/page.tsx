@@ -36,7 +36,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    openGraph: { title, description, type: 'video.other', siteName: 'LessonComputer.mu' },
+    alternates: { canonical: `/videos/${id}` },
+    openGraph: { title, description, type: 'video.other', siteName: 'LessonComputer.mu', url: `/videos/${id}` },
     twitter: { card: 'summary_large_image', title, description },
   }
 }

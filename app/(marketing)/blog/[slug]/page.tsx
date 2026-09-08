@@ -13,17 +13,26 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const supabase = await createClient()
   const { data } = await (supabase as any)
     .from('blog_posts')
-    .select('title, excerpt')
+    .select('title, excerpt, cover_image_url')
     .eq('slug', slug)
     .eq('is_published', true)
     .single()
 
-  if (!data) return { title: 'Blog | LessonComputer.mu' }
+  if (!data) return { title: 'Blog' }
 
   return {
-    title: `${data.title} | LessonComputer.mu`,
+    title: data.title,
     description: data.excerpt ?? undefined,
-    openGraph: { title: data.title, description: data.excerpt ?? undefined },
+    alternates: { canonical: `/blog/${slug}` },
+    openGraph: {
+      title: data.title,
+      description: data.excerpt ?? undefined,
+      siteName: 'LessonComputer.mu',
+      url: `/blog/${slug}`,
+      type: 'article',
+      images: data.cover_image_url ? [data.cover_image_url] : undefined,
+    },
+    twitter: { card: 'summary_large_image', title: data.title, description: data.excerpt ?? undefined },
   }
 }
 

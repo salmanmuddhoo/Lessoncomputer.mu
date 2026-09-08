@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Loader2, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -9,11 +10,16 @@ export function ContactForm() {
   const [email, setEmail] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
+  const [consent, setConsent] = useState(false)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!consent) {
+      toast.error('Please confirm you agree to our Privacy Policy before sending.')
+      return
+    }
     setSending(true)
     try {
       const res = await fetch('/api/contact', {
@@ -105,9 +111,23 @@ export function ContactForm() {
         />
       </div>
 
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary"
+        />
+        <span className="text-xs text-muted-foreground leading-relaxed">
+          I agree that LessonComputer.mu may store and use the information above to respond to my
+          enquiry, in line with the{' '}
+          <Link href="/privacy" target="_blank" className="text-primary hover:underline">Privacy Policy</Link>.
+        </span>
+      </label>
+
       <button
         type="submit"
-        disabled={sending}
+        disabled={sending || !consent}
         className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:bg-accent font-semibold py-2.5 rounded-md text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {sending && <Loader2 className="w-4 h-4 animate-spin" />}

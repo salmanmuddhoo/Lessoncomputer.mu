@@ -21,7 +21,7 @@ export default async function AdminSettingsPage() {
       .single(),
     (supabase as any)
       .from('site_settings')
-      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, billing_day, cutoff_day, usd_rate, banner_enabled, banner_text, banner_link')
+      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, business_address, mips_environment, billing_day, cutoff_day, usd_rate, banner_enabled, banner_text, banner_link')
       .eq('id', 1)
       .single(),
     (supabase as any)
@@ -43,6 +43,7 @@ export default async function AdminSettingsPage() {
     instagram_url: string | null
     tiktok_url: string | null
     whatsapp_number: string | null
+    business_address: string | null
     mips_environment: string | null
     billing_day: number | null
     cutoff_day: number | null
@@ -75,6 +76,7 @@ export default async function AdminSettingsPage() {
               instagram_url: ss.instagram_url ?? '',
               tiktok_url: ss.tiktok_url ?? '',
               whatsapp_number: ss.whatsapp_number ?? '',
+              business_address: ss.business_address ?? '',
             }}
           />
 
