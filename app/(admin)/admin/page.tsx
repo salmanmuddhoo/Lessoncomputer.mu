@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, Video, Radio, BookOpen } from 'lucide-react'
+import { formatMoney } from '@/lib/currency-format'
 
 export const metadata = { title: 'Admin Dashboard' }
 
@@ -22,8 +23,28 @@ export default async function AdminDashboardPage() {
     supabase.from('live_classes').select('*', { count: 'exact', head: true }),
     supabase.from('grades').select('*', { count: 'exact', head: true }).eq('is_active', true),
     supabase.from('videos').select('id, title, created_at, is_published').order('created_at', { ascending: false }).limit(5),
-    supabase.from('purchases').select('id, amount, status, created_at').eq('status', 'completed').order('created_at', { ascending: false }).limit(5),
+    // Real payments live in mips_orders (video AND live purchases alike) — the legacy
+    // `purchases` table is never written to, so it always showed empty here.
+    (supabase as any)
+      .from('mips_orders')
+      .select('id, student_id, order_type, amount, currency, description, created_at')
+      .eq('status', 'paid')
+      .order('created_at', { ascending: false })
+      .limit(6),
   ])
+
+  const purchaseRows = (recentPurchases ?? []) as { id: string; student_id: string; order_type: string; amount: number; currency: string; description: string | null; created_at: string }[]
+  const purchaseStudentIds = [...new Set(purchaseRows.map((p) => p.student_id))]
+  const purchaseStudentMap: Record<string, string | null> = {}
+  if (purchaseStudentIds.length > 0) {
+    const { data: purchaseProfiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', purchaseStudentIds)
+    for (const p of (purchaseProfiles ?? []) as { id: string; full_name: string | null }[]) {
+      purchaseStudentMap[p.id] = p.full_name
+    }
+  }
 
   const STATS = [
     { label: 'Total Students', value: studentCount ?? 0, icon: Users,    href: '/admin/students' },
@@ -81,14 +102,21 @@ export default async function AdminDashboardPage() {
         </Card>
 
         <Card className="border-border/60">
-          <CardHeader className="pb-3">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base font-semibold">Recent Purchases</CardTitle>
+            <Button variant="ghost" size="sm" asChild><Link href="/admin/payments">View all</Link></Button>
           </CardHeader>
           <CardContent className="space-y-3">
-            {recentPurchases?.length ? recentPurchases.map((p) => (
-              <div key={p.id} className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground text-xs">{new Date(p.created_at).toLocaleDateString()}</span>
-                <span className="font-semibold text-primary">Rs {p.amount}</span>
+            {purchaseRows.length ? purchaseRows.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{purchaseStudentMap[p.student_id] ?? 'Unknown student'}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {p.description ?? (p.order_type === 'live' ? 'Live classes' : 'Video package')}
+                    {' · '}{new Date(p.created_at).toLocaleDateString('en-MU', { dateStyle: 'medium' })}
+                  </p>
+                </div>
+                <span className="font-semibold text-primary shrink-0">{formatMoney(Number(p.amount))}</span>
               </div>
             )) : <p className="text-sm text-muted-foreground py-4 text-center">No purchases yet.</p>}
           </CardContent>

@@ -112,7 +112,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
       .order('month', { ascending: false }),
     supabase
       .from('subscription_packages')
-      .select('id, name, price, subscription_package_chapters(chapter_id)')
+      .select('id, name, price, expires_days, subscription_package_chapters(chapter_id)')
       .eq('grade_id', grade.id)
       .neq('package_type', 'live_month')
       .eq('is_active', true)
@@ -147,6 +147,7 @@ export default async function StudentLiveClassesPage({ searchParams }: { searchP
     name: p.name,
     price: Number(p.price),
     chapterCount: (p.subscription_package_chapters ?? []).length,
+    expiresDays: p.expires_days ?? null,
   }))
   const videoPackageIds = new Set(videoPackages.map((p) => p.id))
   const subscribedVideoPackageIds = [...subscribedPackageIds].filter((id) => videoPackageIds.has(id as string)) as string[]

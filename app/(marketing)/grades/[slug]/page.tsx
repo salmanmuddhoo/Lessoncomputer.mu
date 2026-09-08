@@ -8,7 +8,7 @@ import { DemoVideosButton } from '@/components/lc/demo-videos-button'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { Badge } from '@/components/ui/badge'
-import { BookOpen, Video, Users, Package, Clock, Radio, AlertCircle, RefreshCw } from 'lucide-react'
+import { BookOpen, Users, Package, Clock, Radio, AlertCircle, RefreshCw } from 'lucide-react'
 import { getBillingSettings, getTargetMonth } from '@/lib/subscription-billing'
 
 interface PageProps {
@@ -45,8 +45,6 @@ export default async function GradePage({ params }: PageProps) {
   const supabase = await createClient()
 
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
 
   const { data: grade } = await supabase
     .from('grades')
@@ -66,6 +64,11 @@ export default async function GradePage({ params }: PageProps) {
   const billing = await getBillingSettings(supabase)
   const target = getTargetMonth(now, billing.cutoffDay)
   const afterCutoff = !target.isCurrentMonth
+
+  // The live class schedule shown on this page is for the TARGET month (the one being sold —
+  // October once enrolment for September has closed), not always the current calendar month.
+  const targetMonthStart = new Date(target.year, target.month - 1, 1).toISOString()
+  const targetMonthEnd = new Date(target.year, target.month, 1).toISOString()
 
   // Next calendar month (used to offer re-subscribe when current month is already subscribed)
   const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
@@ -95,8 +98,8 @@ export default async function GradePage({ params }: PageProps) {
       .from('live_classes_catalogue')
       .select('*')
       .eq('grade_id', grade.id)
-      .gte('scheduled_at', monthStart)
-      .lt('scheduled_at', monthEnd)
+      .gte('scheduled_at', targetMonthStart)
+      .lt('scheduled_at', targetMonthEnd)
       .order('scheduled_at', { ascending: true }),
     supabase
       .from('chapters')
@@ -255,7 +258,6 @@ export default async function GradePage({ params }: PageProps) {
     }
   }
 
-  const totalVideos = videos?.length ?? 0
   const hasPackages = packages.length > 0
   const liveSubscriptionEnabled = (grade as any).live_subscription_enabled ?? false
   const liveSubscriptionPrice = (grade as any).live_subscription_price ?? 0
@@ -276,6 +278,7 @@ export default async function GradePage({ params }: PageProps) {
     name: p.name,
     price: p.price,
     chapterCount: p.chapterIds.length,
+    expiresDays: p.expires_days,
   }))
 
   return (
@@ -300,25 +303,6 @@ export default async function GradePage({ params }: PageProps) {
               <p className="text-sm text-muted-foreground mt-0.5">{grade.description}</p>
             )}
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary" className="gap-1">
-            <Video className="w-3 h-3" />
-            {totalVideos} {totalVideos === 1 ? 'video' : 'videos'}
-          </Badge>
-          {(chapters?.length ?? 0) > 0 && (
-            <Badge variant="secondary" className="gap-1">
-              <BookOpen className="w-3 h-3" />
-              {chapters!.length} {chapters!.length === 1 ? 'chapter' : 'chapters'}
-            </Badge>
-          )}
-          {hasPackages && (
-            <Badge variant="secondary" className="gap-1">
-              <Package className="w-3 h-3" />
-              {packages.length} video {packages.length === 1 ? 'package' : 'packages'}
-            </Badge>
-          )}
         </div>
       </header>
 
@@ -363,6 +347,9 @@ export default async function GradePage({ params }: PageProps) {
               ) : (
                 <p className="text-sm text-muted-foreground">Live classes for {liveMonthLabel}</p>
               )}
+              <p className="text-xs font-medium text-primary mt-2">
+                1 month access · Video recordings available after each class
+              </p>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">

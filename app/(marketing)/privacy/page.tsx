@@ -52,8 +52,8 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold text-foreground mb-2">5. Your Rights</h2>
           <p>
             You may request deletion of your account and personal data at any time by emailing us at{' '}
-            <a href="mailto:hello@lessoncomputer.mu" className="text-primary hover:underline">
-              hello@lessoncomputer.mu
+            <a href="mailto:support@lessoncomputer.mu" className="text-primary hover:underline">
+              support@lessoncomputer.mu
             </a>
             .
           </p>
@@ -63,8 +63,8 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold text-foreground mb-2">6. Contact</h2>
           <p>
             For any privacy-related questions, please contact us at{' '}
-            <a href="mailto:hello@lessoncomputer.mu" className="text-primary hover:underline">
-              hello@lessoncomputer.mu
+            <a href="mailto:support@lessoncomputer.mu" className="text-primary hover:underline">
+              support@lessoncomputer.mu
             </a>
             .
           </p>

@@ -4,6 +4,7 @@ import { formatMoney } from '@/lib/currency-format'
 import { VideoPackagesAccordion } from '@/components/lc/video-packages-accordion'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 import { DashboardGradeFilter } from '@/components/lc/dashboard-grade-filter'
+import { formatAccessDuration } from '@/lib/format-duration'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -76,7 +77,7 @@ export default async function MyVideoPackagesPage({ searchParams }: { searchPara
   }
 
   // Try to query with package_type='video' filter; fall back to all packages if column doesn't exist
-  const SELECT = 'id, name, description, price, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index))'
+  const SELECT = 'id, name, description, price, expires_days, month, year, subscription_package_chapters(chapter_id, chapter:chapters(id, title, description, order_index))'
 
   const { data: typedPackages, error: typeErr } = await supabase
     .from('subscription_packages')
@@ -214,6 +215,7 @@ export default async function MyVideoPackagesPage({ searchParams }: { searchPara
                         </Badge>
                       ))}
                     </div>
+                    <p className="text-xs font-medium text-primary mt-2">{formatAccessDuration(pkg.expires_days)}</p>
                   </div>
                   <div className="px-5 py-3 border-t border-border/60 flex items-center justify-between">
                     <span className="text-lg font-bold text-primary">{formatMoney(Number(pkg.price), currency)}</span>
@@ -223,6 +225,7 @@ export default async function MyVideoPackagesPage({ searchParams }: { searchPara
                         name: p.name,
                         price: Number(p.price),
                         chapterCount: getChapters(p).length,
+                        expiresDays: p.expires_days ?? null,
                       }))}
                       mandatoryPackageId={pkg.id}
                       subscribedPackageIds={[...subscribedPackageIds]}

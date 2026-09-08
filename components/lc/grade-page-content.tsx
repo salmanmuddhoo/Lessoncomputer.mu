@@ -9,6 +9,7 @@ import { StreamablePlayer } from '@/components/lc/streamable-player'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { formatAccessDuration } from '@/lib/format-duration'
 import {
   ChevronDown, ChevronUp, FolderOpen, Video,
   Package, Lock, CheckCircle2, ShoppingCart, Play,
@@ -44,6 +45,7 @@ interface SubscriptionPackage {
   description: string | null
   price: number
   chapterIds: string[]
+  expires_days?: number | null
 }
 
 interface Props {
@@ -102,6 +104,7 @@ export function GradePageContent({
     name: p.name,
     price: p.price,
     chapterCount: p.chapterIds.length,
+    expiresDays: p.expires_days,
   }))
 
   function renderChapterContent(ch: Chapter, chVideos: VideoRow[], chDocs: DocumentRow[]) {
@@ -185,6 +188,7 @@ export function GradePageContent({
                     {' · '}{totalVideos} video{totalVideos !== 1 ? 's' : ''}
                     {totalDocs > 0 ? ` · ${totalDocs} doc${totalDocs !== 1 ? 's' : ''}` : ''}
                   </p>
+                  <p className="text-xs font-medium text-primary mt-1">{formatAccessDuration(pkg.expires_days)}</p>
                 </div>
 
                 <div className="shrink-0 text-right flex flex-col items-end gap-2">
