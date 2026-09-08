@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { usePrice, useCurrency } from '@/components/lc/currency-provider'
+import { formatAccessDuration } from '@/lib/format-duration'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -19,6 +20,7 @@ interface VideoPackageItem {
   name: string
   price: number
   chapterCount: number
+  expiresDays?: number | null
 }
 
 interface LivePackageItem {
@@ -313,11 +315,12 @@ export function BuySubscribeDialog({
                                 Already Purchased
                               </Badge>
                             </div>
-                            <div className="flex items-center gap-3 mt-0.5">
+                            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                               <span className="text-sm font-semibold text-primary">{price(pkg.price)}</span>
                               <span className="text-xs text-muted-foreground">
                                 {pkg.chapterCount} chapter{pkg.chapterCount !== 1 ? 's' : ''}
                               </span>
+                              <span className="text-xs text-muted-foreground">{formatAccessDuration(pkg.expiresDays)}</span>
                             </div>
                           </div>
                         </div>
@@ -349,11 +352,12 @@ export function BuySubscribeDialog({
                               </Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 mt-0.5">
+                          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                             <span className="text-sm font-semibold text-primary">{price(pkg.price)}</span>
                             <span className="text-xs text-muted-foreground">
                               {pkg.chapterCount} chapter{pkg.chapterCount !== 1 ? 's' : ''}
                             </span>
+                            <span className="text-xs text-muted-foreground">{formatAccessDuration(pkg.expiresDays)}</span>
                           </div>
                         </div>
                       </label>

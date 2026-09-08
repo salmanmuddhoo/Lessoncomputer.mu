@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Mail, MapPin, MessageSquare } from 'lucide-react'
 import { ContactForm } from './contact-form'
+import { createClient } from '@/lib/supabase/server'
+import { formatWhatsAppDisplay, normalizeWhatsAppDigits } from '@/lib/phone'
 
 export const metadata: Metadata = {
   title: 'Contact Us',
@@ -12,7 +14,19 @@ export const metadata: Metadata = {
   },
 }
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const supabase = await createClient()
+  let whatsappNumber: string | null = null
+  try {
+    const { data: ss } = await (supabase as any)
+      .from('site_settings')
+      .select('whatsapp_number')
+      .eq('id', 1)
+      .single()
+    whatsappNumber = ss?.whatsapp_number ?? null
+  } catch { /* table may not exist yet */ }
+  const whatsappDigits = normalizeWhatsAppDigits(whatsappNumber)
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
       <div className="text-center mb-12">
@@ -35,17 +49,19 @@ export default function ContactPage() {
           </p>
         </div>
 
-        <div className="text-center p-6 rounded-xl border border-border/60 bg-card">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-            <MessageSquare className="w-5 h-5 text-primary" />
+        {whatsappDigits && (
+          <div className="text-center p-6 rounded-xl border border-border/60 bg-card">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+              <MessageSquare className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1">WhatsApp</h3>
+            <p className="text-sm text-muted-foreground">
+              <a href={`https://wa.me/${whatsappDigits}`} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                {formatWhatsAppDisplay(whatsappNumber)}
+              </a>
+            </p>
           </div>
-          <h3 className="font-semibold mb-1">WhatsApp</h3>
-          <p className="text-sm text-muted-foreground">
-            <a href="https://wa.me/23000000000" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-              +230 0000 0000
-            </a>
-          </p>
-        </div>
+        )}
 
         <div className="text-center p-6 rounded-xl border border-border/60 bg-card">
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">

@@ -4,9 +4,10 @@ import { useState } from 'react'
 import Link from 'next/link'
 import {
   ChevronDown, ChevronUp, FolderOpen, Play, Clock,
-  ListVideo, X, Package, Radio, FileText, BookOpen,
+  ListVideo, X, Package, Radio, FileText, BookOpen, Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -48,6 +49,8 @@ interface Props {
   isLiveContext: boolean
   gradeColor?: string
   currentGradeId?: string | null
+  studentId?: string | null
+  watchedVideoIds?: string[]
 }
 
 function totalItems(pkg: PlaylistPackage) {
@@ -65,8 +68,35 @@ function findLocation(playlist: PlaylistPackage[], videoId: string) {
   return null
 }
 
-export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeColor, currentGradeId }: Props) {
+export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeColor, currentGradeId, studentId, watchedVideoIds = [] }: Props) {
   const location = findLocation(playlist, currentVideoId)
+
+  // Completion ticks — a student marks a lesson done themselves (independent from the
+  // "opened = watched" auto-tracking); this is what the dashboard's completion % reads.
+  const [completed, setCompleted] = useState<Set<string>>(() => new Set(watchedVideoIds))
+  const [toggling, setToggling] = useState<string | null>(null)
+
+  async function toggleComplete(videoId: string, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!studentId || toggling) return
+    const isDone = completed.has(videoId)
+    setToggling(videoId)
+    setCompleted((prev) => {
+      const next = new Set(prev)
+      isDone ? next.delete(videoId) : next.add(videoId)
+      return next
+    })
+    const supabase = createClient()
+    if (isDone) {
+      await (supabase as any).from('video_progress').delete().eq('student_id', studentId).eq('video_id', videoId)
+    } else {
+      await (supabase as any)
+        .from('video_progress')
+        .upsert({ student_id: studentId, video_id: videoId, watched_at: new Date().toISOString() }, { onConflict: 'student_id,video_id' })
+    }
+    setToggling(null)
+  }
 
   // Distinct grades represented in this playlist. When a student is subscribed across more
   // than one grade, the sidebar offers a grade filter so each grade's content is separate.
@@ -192,43 +222,63 @@ export function VideoPlaylist({ playlist, currentVideoId, isLiveContext, gradeCo
                           {/* Videos */}
                           {ch.videos.map(v => {
                             const isCurrent = v.id === currentVideoId
+                            const isDone = completed.has(v.id)
                             const href = `/videos/${v.id}${isLiveContext ? '?live=1' : ''}`
                             return (
-                              <Link
+                              <div
                                 key={v.id}
-                                href={href}
                                 className={cn(
-                                  'flex items-start gap-2.5 px-5 py-2.5 transition-colors group',
+                                  'flex items-start gap-2 transition-colors group',
                                   isCurrent
                                     ? 'bg-primary/10 border-l-2 border-primary'
                                     : 'hover:bg-muted/30 border-l-2 border-transparent'
                                 )}
                               >
-                                <div className={cn(
-                                  'w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5',
-                                  isCurrent
-                                    ? 'bg-primary'
-                                    : 'bg-muted/60 group-hover:bg-primary/20'
-                                )}>
-                                  <Play className={cn(
-                                    'w-2.5 h-2.5 fill-current ml-0.5',
-                                    isCurrent ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-primary'
-                                  )} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className={cn(
-                                    'text-sm leading-snug line-clamp-2',
-                                    isCurrent ? 'font-semibold text-primary' : 'font-medium group-hover:text-primary transition-colors'
+                                {studentId && (
+                                  <button
+                                    onClick={(e) => toggleComplete(v.id, e)}
+                                    aria-label={isDone ? 'Mark as not completed' : 'Mark as completed'}
+                                    aria-pressed={isDone}
+                                    className={cn(
+                                      'shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-2.5 ml-5 transition-colors',
+                                      isDone
+                                        ? 'bg-primary border-primary'
+                                        : 'border-muted-foreground/30 hover:border-primary'
+                                    )}
+                                  >
+                                    {isDone && <Check className="w-3 h-3 text-primary-foreground" />}
+                                  </button>
+                                )}
+                                <Link
+                                  href={href}
+                                  className={cn('flex-1 min-w-0 flex items-start gap-2.5 py-2.5 pr-5', !studentId && 'pl-5')}
+                                >
+                                  <div className={cn(
+                                    'w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5',
+                                    isCurrent
+                                      ? 'bg-primary'
+                                      : 'bg-muted/60 group-hover:bg-primary/20'
                                   )}>
-                                    {v.title}
-                                  </p>
-                                  {v.duration_minutes && (
-                                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-0.5">
-                                      <Clock className="w-3 h-3" />{v.duration_minutes} min
+                                    <Play className={cn(
+                                      'w-2.5 h-2.5 fill-current ml-0.5',
+                                      isCurrent ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-primary'
+                                    )} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className={cn(
+                                      'text-sm leading-snug line-clamp-2',
+                                      isCurrent ? 'font-semibold text-primary' : isDone ? 'font-medium text-muted-foreground' : 'font-medium group-hover:text-primary transition-colors'
+                                    )}>
+                                      {v.title}
                                     </p>
-                                  )}
-                                </div>
-                              </Link>
+                                    {v.duration_minutes && (
+                                      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-0.5">
+                                        <Clock className="w-3 h-3" />{v.duration_minutes} min
+                                      </p>
+                                    )}
+                                  </div>
+                                </Link>
+                              </div>
                             )
                           })}
 

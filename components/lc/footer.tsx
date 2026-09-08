@@ -72,11 +72,11 @@ export async function Footer() {
               The leading online learning platform for Mauritian students, Grades 7–12.
             </p>
             <a
-              href="mailto:hello@lessoncomputer.mu"
+              href="mailto:support@lessoncomputer.mu"
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary lc-transition"
             >
               <Mail className="w-4 h-4" />
-              hello@lessoncomputer.mu
+              support@lessoncomputer.mu
             </a>
 
             {hasSocial && (

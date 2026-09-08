@@ -9,7 +9,7 @@ const FEATURES = [
   {
     icon: Users,
     title: 'Live Interactive Classes',
-    description: 'Join live sessions, ask questions in real time, and get instant feedback from expert teachers.',
+    description: 'Join live sessions, ask questions in real time, and get instant feedback from expert teachers. Missed a class? The video recording is available to watch right after.',
   },
   {
     icon: BookOpen,

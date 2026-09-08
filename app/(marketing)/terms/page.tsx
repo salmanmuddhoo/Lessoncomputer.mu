@@ -73,8 +73,8 @@ export default function TermsPage() {
           <h2 className="text-lg font-semibold text-foreground mb-2">7. Contact</h2>
           <p>
             Questions about these terms? Email us at{' '}
-            <a href="mailto:hello@lessoncomputer.mu" className="text-primary hover:underline">
-              hello@lessoncomputer.mu
+            <a href="mailto:support@lessoncomputer.mu" className="text-primary hover:underline">
+              support@lessoncomputer.mu
             </a>
             .
           </p>

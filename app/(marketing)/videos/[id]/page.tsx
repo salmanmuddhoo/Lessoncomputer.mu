@@ -136,6 +136,16 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
       .upsert({ student_id: user.id, video_id: video.id, watched_at: new Date().toISOString() }, { onConflict: 'student_id,video_id' })
   }
 
+  // Completion ticks in the playlist sidebar — every video this student has marked done.
+  let watchedVideoIds: string[] = []
+  if (user) {
+    const { data: watched } = await (supabase as any)
+      .from('video_progress')
+      .select('video_id')
+      .eq('student_id', user.id)
+    watchedVideoIds = ((watched ?? []) as { video_id: string }[]).map((w) => w.video_id)
+  }
+
   // Build playlist for authenticated users with subscriptions
   let playlistData: PlaylistPackage[] = []
   if (user && pkgIds.length > 0) {
@@ -374,6 +384,8 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
                   isLiveContext={isLiveContext}
                   gradeColor={grade?.color}
                   currentGradeId={meta.grade_id}
+                  studentId={user?.id ?? null}
+                  watchedVideoIds={watchedVideoIds}
                 />
               </div>
             )}
@@ -388,6 +400,8 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
                 isLiveContext={isLiveContext}
                 gradeColor={grade?.color}
                 currentGradeId={meta.grade_id}
+                studentId={user?.id ?? null}
+                watchedVideoIds={watchedVideoIds}
               />
             </div>
           )}
