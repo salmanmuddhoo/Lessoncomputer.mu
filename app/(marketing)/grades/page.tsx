@@ -4,12 +4,15 @@ import { GradesSection } from '@/components/lc/grades-section'
 import type { Grade } from '@/lib/types/database'
 
 export const metadata: Metadata = {
-  title: 'All Grades | LessonComputer.mu',
-  description: 'Browse video lessons and live classes for Grades 7 to 12 on LessonComputer.mu — Mauritius\'s online learning platform.',
+  title: 'Courses',
+  description: 'Browse Cambridge IGCSE, O Level and A Level Computer Science courses on LessonComputer.mu — video lessons and live classes.',
+  alternates: { canonical: '/grades' },
   openGraph: {
-    title: 'All Grades | LessonComputer.mu',
-    description: 'Browse video lessons and live classes for Grades 7 to 12.',
+    title: 'Courses | LessonComputer.mu',
+    description: 'Browse Cambridge IGCSE, O Level and A Level Computer Science courses — video lessons and live classes.',
     siteName: 'LessonComputer.mu',
+    url: '/grades',
+    type: 'website',
   },
 }
 

@@ -1,29 +1,34 @@
 import type { Metadata } from 'next'
-import { Mail, MapPin, MessageSquare } from 'lucide-react'
+import { Mail, MapPin, MessageSquare, Clock } from 'lucide-react'
 import { ContactForm } from './contact-form'
 import { createClient } from '@/lib/supabase/server'
 import { formatWhatsAppDisplay, normalizeWhatsAppDigits } from '@/lib/phone'
 
 export const metadata: Metadata = {
   title: 'Contact Us',
-  description: 'Get in touch with the LessonComputer.mu team. We\'re here to help Mauritian students and parents with any questions.',
+  description: 'Get in touch with the LessonComputer.mu team. We\'re here to help students and parents with any questions.',
+  alternates: { canonical: '/contact' },
   openGraph: {
     title: 'Contact Us | LessonComputer.mu',
     description: 'Reach out to the LessonComputer.mu team.',
     siteName: 'LessonComputer.mu',
+    url: '/contact',
+    type: 'website',
   },
 }
 
 export default async function ContactPage() {
   const supabase = await createClient()
   let whatsappNumber: string | null = null
+  let businessAddress: string | null = null
   try {
     const { data: ss } = await (supabase as any)
       .from('site_settings')
-      .select('whatsapp_number')
+      .select('whatsapp_number, business_address')
       .eq('id', 1)
       .single()
     whatsappNumber = ss?.whatsapp_number ?? null
+    businessAddress = ss?.business_address ?? null
   } catch { /* table may not exist yet */ }
   const whatsappDigits = normalizeWhatsAppDigits(whatsappNumber)
 
@@ -68,7 +73,21 @@ export default async function ContactPage() {
             <MapPin className="w-5 h-5 text-primary" />
           </div>
           <h3 className="font-semibold mb-1">Location</h3>
-          <p className="text-sm text-muted-foreground">Mauritius</p>
+          <p className="text-sm text-muted-foreground">{businessAddress ?? 'Mauritius'}</p>
+        </div>
+      </div>
+
+      {/* Office hours + reply time */}
+      <div className="max-w-xl mx-auto mb-10 rounded-xl border border-border/60 bg-card p-5 flex items-start gap-3">
+        <Clock className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+        <div className="text-sm text-muted-foreground leading-relaxed">
+          <p className="text-foreground font-medium mb-0.5">Office hours: Monday – Saturday, 9:00 AM – 5:00 PM (MUT, Mauritius time, GMT+4)</p>
+          <p>We reply within 24 hours, Monday to Saturday.</p>
+          {whatsappDigits && (
+            <p className="mt-2">
+              Outside Mauritius? WhatsApp is the fastest way to reach us — we answer messages from any country.
+            </p>
+          )}
         </div>
       </div>
 

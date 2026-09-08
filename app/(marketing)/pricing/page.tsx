@@ -6,12 +6,15 @@ import { getCurrencyInfo } from '@/lib/currency'
 import { formatMoney } from '@/lib/currency-format'
 
 export const metadata: Metadata = {
-  title: 'Pricing | LessonComputer.mu',
-  description: 'Affordable video lessons and live classes for Mauritian students, Grades 7–12. Pay per video or access all content.',
+  title: 'Pricing',
+  description: 'Affordable Cambridge Computer Science tuition — video lessons and live classes. Pay per package or access all content.',
+  alternates: { canonical: '/pricing' },
   openGraph: {
     title: 'Pricing | LessonComputer.mu',
-    description: 'Affordable learning for every Mauritian student.',
+    description: 'Affordable Cambridge Computer Science tuition for every student.',
     siteName: 'LessonComputer.mu',
+    url: '/pricing',
+    type: 'website',
   },
 }
 

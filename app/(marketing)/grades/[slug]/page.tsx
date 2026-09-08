@@ -25,18 +25,25 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     .eq('is_active', true)
     .single()
 
-  if (!grade) return { title: 'Grade Not Found' }
+  if (!grade) return { title: 'Course Not Found' }
 
-  const title = `${grade.name} Video Lessons | LessonComputer.mu`
+  const title = `${grade.name} — Cambridge Computer Science Tuition`
   const description =
     grade.description ??
-    `Explore ${grade.name} video lessons and live classes on LessonComputer.mu — Mauritius's online learning platform.`
+    `${grade.name} video lessons and live classes on LessonComputer.mu — expert Cambridge Computer Science tuition for Mauritius and worldwide.`
 
   return {
     title,
     description,
-    openGraph: { title, description, type: 'website', siteName: 'LessonComputer.mu' },
-    twitter: { card: 'summary', title, description },
+    alternates: { canonical: `/grades/${slug}` },
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      siteName: 'LessonComputer.mu',
+      url: `/grades/${slug}`,
+    },
+    twitter: { card: 'summary_large_image', title, description },
   }
 }
 
