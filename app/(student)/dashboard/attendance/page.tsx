@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ClipboardList, CheckCircle2, XCircle } from 'lucide-react'
 import { AttendanceMarkButton } from '@/components/lc/attendance-mark-button'
+import { currentOccurrenceDate, occurrencesUpTo } from '@/lib/attendance-occurrence'
 
 export const metadata: Metadata = { title: 'Attendance' }
 
@@ -54,7 +55,7 @@ export default async function StudentAttendancePage() {
   // Fetch all published live classes for this grade (most recent first)
   const { data: classesRaw } = await (supabase as any)
     .from('live_classes_catalogue')
-    .select('id, title, scheduled_at, attendance_open')
+    .select('id, title, scheduled_at, attendance_open, is_recurring, recurrence_day_of_week')
     .eq('grade_id', gradeId)
     .order('scheduled_at', { ascending: false })
     .limit(200)
@@ -64,34 +65,49 @@ export default async function StudentAttendancePage() {
     title: string
     scheduled_at: string
     attendance_open: boolean
+    is_recurring: boolean
+    recurrence_day_of_week: number | null
   }>
 
-  // Fetch student's attendance records
+  // Fetch student's attendance records — one per real occurrence now (a recurring class has a
+  // record per week, keyed by occurrence_date, not just one for the whole series).
   const classIds = classes.map((c) => c.id)
-  const attendanceByClass: Record<string, { entry_time: string; scheduled_end_time: string | null }> = {}
+  const attendanceByKey: Record<string, { entry_time: string; scheduled_end_time: string | null }> = {}
   if (classIds.length > 0) {
     const { data: records } = await (supabase as any)
       .from('live_attendance')
-      .select('live_class_id, entry_time, scheduled_end_time')
+      .select('live_class_id, occurrence_date, entry_time, scheduled_end_time')
       .eq('student_id', user.id)
       .in('live_class_id', classIds)
     for (const r of (records ?? []) as any[]) {
-      attendanceByClass[r.live_class_id] = {
+      attendanceByKey[`${r.live_class_id}::${r.occurrence_date}`] = {
         entry_time: r.entry_time,
         scheduled_end_time: r.scheduled_end_time,
       }
     }
   }
 
-  // Active session = a class with attendance_open = true
+  // Active session = a class with attendance_open = true, for THIS week's occurrence.
   const activeClass = classes.find((c) => c.attendance_open)
-  const activeRecord = activeClass ? attendanceByClass[activeClass.id] : null
+  const activeOccurrenceDate = activeClass
+    ? currentOccurrenceDate(activeClass.scheduled_at, activeClass.is_recurring, activeClass.recurrence_day_of_week)
+    : null
+  const activeRecord = activeClass && activeOccurrenceDate
+    ? attendanceByKey[`${activeClass.id}::${activeOccurrenceDate}`]
+    : null
 
-  // History = past classes (scheduled_at in the past)
-  const now = new Date()
-  const pastClasses = classes.filter((c) => new Date(c.scheduled_at) < now && !c.attendance_open)
+  // History = every real past occurrence of every class (a recurring class contributes one row
+  // per week it has already had), excluding whichever session is currently open.
+  const pastSessions: Array<{ classId: string; title: string; occurrenceDate: string }> = []
+  for (const c of classes) {
+    if (c.attendance_open) continue
+    for (const d of occurrencesUpTo(c.scheduled_at, c.is_recurring, c.recurrence_day_of_week)) {
+      pastSessions.push({ classId: c.id, title: c.title, occurrenceDate: d })
+    }
+  }
+  pastSessions.sort((a, b) => b.occurrenceDate.localeCompare(a.occurrenceDate))
 
-  const presentCount = pastClasses.filter((c) => !!attendanceByClass[c.id]?.scheduled_end_time).length
+  const presentCount = pastSessions.filter((s) => !!attendanceByKey[`${s.classId}::${s.occurrenceDate}`]?.scheduled_end_time).length
 
   return (
     <div className="space-y-8">
@@ -103,10 +119,10 @@ export default async function StudentAttendancePage() {
       </div>
 
       {/* Summary stats */}
-      {pastClasses.length > 0 && (
+      {pastSessions.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl border border-border/60 p-4 text-center">
-            <p className="text-2xl font-bold">{pastClasses.length}</p>
+            <p className="text-2xl font-bold">{pastSessions.length}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Total Classes</p>
           </div>
           <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 p-4 text-center">
@@ -114,7 +130,7 @@ export default async function StudentAttendancePage() {
             <p className="text-xs text-muted-foreground mt-0.5">Present</p>
           </div>
           <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 p-4 text-center">
-            <p className="text-2xl font-bold text-red-500">{pastClasses.length - presentCount}</p>
+            <p className="text-2xl font-bold text-red-500">{pastSessions.length - presentCount}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Absent</p>
           </div>
         </div>
@@ -143,6 +159,9 @@ export default async function StudentAttendancePage() {
             gradeId={gradeId}
             alreadyMarked={!!activeRecord?.scheduled_end_time}
             userId={user.id}
+            scheduledAt={activeClass.scheduled_at}
+            isRecurring={activeClass.is_recurring}
+            recurrenceDayOfWeek={activeClass.recurrence_day_of_week}
           />
         </div>
       ) : (
@@ -154,7 +173,7 @@ export default async function StudentAttendancePage() {
       )}
 
       {/* History */}
-      {pastClasses.length > 0 && (
+      {pastSessions.length > 0 && (
         <div>
           <h2 className="text-base font-semibold mb-3">Attendance History</h2>
           <div className="rounded-xl border border-border/60 overflow-hidden">
@@ -168,14 +187,14 @@ export default async function StudentAttendancePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
-                  {pastClasses.map((cls) => {
-                    const record = attendanceByClass[cls.id]
+                  {pastSessions.map((s) => {
+                    const record = attendanceByKey[`${s.classId}::${s.occurrenceDate}`]
                     const present = !!record?.scheduled_end_time
                     return (
-                      <tr key={cls.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="hidden sm:table-cell px-4 py-3 font-medium text-sm max-w-[180px] truncate">{cls.title}</td>
+                      <tr key={`${s.classId}::${s.occurrenceDate}`} className="hover:bg-muted/20 transition-colors">
+                        <td className="hidden sm:table-cell px-4 py-3 font-medium text-sm max-w-[180px] truncate">{s.title}</td>
                         <td className="px-4 py-3 text-muted-foreground text-sm whitespace-nowrap">
-                          {new Date(cls.scheduled_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
+                          {new Date(`${s.occurrenceDate}T00:00:00`).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                         </td>
                         <td className="px-4 py-3">
                           {present ? (

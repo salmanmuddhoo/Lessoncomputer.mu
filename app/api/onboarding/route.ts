@@ -11,8 +11,10 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-    const { gradeId, fullName, referralSource, referralOther } = await req.json() as { gradeId?: string; fullName?: string; referralSource?: string; referralOther?: string }
-    if (!gradeId) return NextResponse.json({ error: 'Please select your grade.' }, { status: 400 })
+    const { gradeId, fullName, referralSource, referralOther, country, countryOther } = await req.json() as {
+      gradeId?: string; fullName?: string; referralSource?: string; referralOther?: string; country?: string; countryOther?: string
+    }
+    if (!gradeId) return NextResponse.json({ error: 'Please select what you are studying.' }, { status: 400 })
 
     const admin = createServiceRoleClient()
 
@@ -25,6 +27,11 @@ export async function POST(req: NextRequest) {
     if (fullName && fullName.trim()) patch.full_name = fullName.trim()
     if (referralSource && referralSource.trim()) patch.referral_source = referralSource.trim()
     if (referralSource === 'other' && referralOther && referralOther.trim()) patch.referral_other = referralOther.trim()
+    // Self-reported country is more accurate than the IP-based fallback the auth callback
+    // already set for Google sign-ups — overwrite it here if the student picked one.
+    if (country && country.trim()) {
+      patch.signup_country = country === 'Other' ? (countryOther?.trim() || 'Other') : country.trim()
+    }
 
     const { error } = await (admin as any)
       .from('profiles')

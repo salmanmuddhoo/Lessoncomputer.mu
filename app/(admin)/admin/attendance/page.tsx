@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/select'
 import { Loader2, ClipboardList, Users, ChevronDown, ChevronUp, RefreshCw, Radio, Check, X, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
+import { occurrencesInMonth, currentOccurrenceDate, formatOccurrenceDate } from '@/lib/attendance-occurrence'
 
 interface Grade { id: string; name: string; color: string }
 interface LiveClass {
@@ -30,14 +31,18 @@ interface AttendeeRow {
   is_absent: boolean
   profile: { full_name: string | null } | null
 }
+// One real weekly session of a class within the selected month — a recurring class expands
+// into one Session per occurrence date; a one-off class has exactly one.
+interface Session {
+  key: string
+  cls: LiveClass
+  occurrenceDate: string
+}
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 // Timestamps are stored as UTC; always render them in Mauritius time so the displayed time
 // matches the local clock regardless of the admin's browser/server timezone.
-function fmt(iso: string) {
-  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Indian/Mauritius' })
-}
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-GB', { timeStyle: 'short', timeZone: 'Indian/Mauritius' })
 }
@@ -67,15 +72,13 @@ export default function AdminAttendancePage() {
 
   const load = useCallback(async (gid: string, m: number, y: number) => {
     setLoading(true)
-    const monthStart = new Date(y, m - 1, 1).toISOString()
-    const monthEnd = new Date(y, m, 1).toISOString()
-
+    // Recurring classes are anchored to whenever they were first scheduled — often a month
+    // before the one being viewed — so classes are NOT date-filtered here; occurrences for the
+    // selected month are computed client-side (occurrencesInMonth) from each class's own rule.
     let q = (supabase as any)
       .from('live_classes')
       .select('id, title, grade_id, scheduled_at, is_published, attendance_open, is_recurring, recurrence_day_of_week, grade:grades(name, color)')
       .eq('is_published', true)
-      .gte('scheduled_at', monthStart)
-      .lt('scheduled_at', monthEnd)
       .order('scheduled_at', { ascending: true })
     if (gid) q = q.eq('grade_id', gid)
 
@@ -89,16 +92,21 @@ export default function AdminAttendancePage() {
     // Collapse any open detail when the filter changes.
     setExpandedId(null)
 
-    if (cs.length > 0) {
-      const ids = cs.map((c) => c.id)
+    const ids = cs.map((c) => c.id)
+    if (ids.length > 0) {
+      const monthStart = new Date(y, m - 1, 1).toISOString().slice(0, 10)
+      const monthEnd = new Date(y, m, 1).toISOString().slice(0, 10)
       const { data: marks } = await (supabase as any)
         .from('live_attendance')
-        .select('live_class_id')
+        .select('live_class_id, occurrence_date')
         .in('live_class_id', ids)
+        .gte('occurrence_date', monthStart)
+        .lt('occurrence_date', monthEnd)
         .not('scheduled_end_time', 'is', null)
       const counts: Record<string, number> = {}
       for (const row of (marks ?? []) as any[]) {
-        counts[row.live_class_id] = (counts[row.live_class_id] ?? 0) + 1
+        const key = `${row.live_class_id}::${row.occurrence_date}`
+        counts[key] = (counts[key] ?? 0) + 1
       }
       setMarkCounts(counts)
     } else {
@@ -125,9 +133,10 @@ export default function AdminAttendancePage() {
     setTogglingId(null)
   }
 
-  async function handleExpand(cls: LiveClass) {
-    if (expandedId === cls.id) { setExpandedId(null); return }
-    setExpandedId(cls.id)
+  async function handleExpand(session: Session) {
+    const cls = session.cls
+    if (expandedId === session.key) { setExpandedId(null); return }
+    setExpandedId(session.key)
     setExpandLoading(true)
     setAddSelect('')
     // live_attendance.student_id references auth.users, not profiles, so PostgREST can't embed
@@ -136,6 +145,7 @@ export default function AdminAttendancePage() {
       .from('live_attendance')
       .select('id, student_id, entry_time, scheduled_end_time, is_absent')
       .eq('live_class_id', cls.id)
+      .eq('occurrence_date', session.occurrenceDate)
       .order('entry_time', { ascending: true })
     const rows = (data ?? []) as any[]
     const already = new Set(rows.map((r) => r.student_id))
@@ -166,7 +176,7 @@ export default function AdminAttendancePage() {
   const isPresent = (r: AttendeeRow) => !!r.scheduled_end_time && !r.is_absent
 
   // Correct a student's attendance: mark them present or absent.
-  async function setStatus(classId: string, row: AttendeeRow, status: 'present' | 'absent') {
+  async function setStatus(sessionKey: string, row: AttendeeRow, status: 'present' | 'absent') {
     setSavingMark(row.id)
     const patch = status === 'present'
       ? { scheduled_end_time: new Date().toISOString(), is_absent: false }
@@ -182,7 +192,7 @@ export default function AdminAttendancePage() {
       const nowPresent = status === 'present'
       setExpandedRows((prev) => prev.map((r) => r.id === row.id ? { ...r, ...patch } : r))
       if (wasPresent !== nowPresent) {
-        setMarkCounts((prev) => ({ ...prev, [classId]: Math.max(0, (prev[classId] ?? 0) + (nowPresent ? 1 : -1)) }))
+        setMarkCounts((prev) => ({ ...prev, [sessionKey]: Math.max(0, (prev[sessionKey] ?? 0) + (nowPresent ? 1 : -1)) }))
       }
       toast.success(status === 'present' ? 'Marked present' : 'Marked absent')
     }
@@ -190,7 +200,8 @@ export default function AdminAttendancePage() {
   }
 
   // Add a student who has no record yet (e.g. attended but couldn't join, or a no-show).
-  async function addAttendance(cls: LiveClass, studentId: string, status: 'present' | 'absent') {
+  async function addAttendance(session: Session, studentId: string, status: 'present' | 'absent') {
+    const cls = session.cls
     setSavingMark(studentId)
     const nowIso = new Date().toISOString()
     const patch = status === 'present'
@@ -198,7 +209,7 @@ export default function AdminAttendancePage() {
       : { scheduled_end_time: null, is_absent: true }
     const { data, error } = await (supabase as any)
       .from('live_attendance')
-      .insert({ live_class_id: cls.id, student_id: studentId, grade_id: cls.grade_id, entry_time: nowIso, ...patch })
+      .insert({ live_class_id: cls.id, student_id: studentId, grade_id: cls.grade_id, entry_time: nowIso, occurrence_date: session.occurrenceDate, ...patch })
       .select('id, student_id, entry_time, scheduled_end_time, is_absent')
       .single()
     if (error || !data) {
@@ -207,7 +218,7 @@ export default function AdminAttendancePage() {
       const name = candidates.find((c) => c.id === studentId)?.full_name ?? null
       setExpandedRows((prev) => [...prev, { ...data, profile: { full_name: name } } as AttendeeRow])
       setCandidates((prev) => prev.filter((c) => c.id !== studentId))
-      if (status === 'present') setMarkCounts((prev) => ({ ...prev, [cls.id]: (prev[cls.id] ?? 0) + 1 }))
+      if (status === 'present') setMarkCounts((prev) => ({ ...prev, [session.key]: (prev[session.key] ?? 0) + 1 }))
       setAddSelect('')
       toast.success(status === 'present' ? 'Student added as present' : 'Student added as absent')
     }
@@ -217,26 +228,30 @@ export default function AdminAttendancePage() {
   const openCount = classes.filter((c) => c.attendance_open).length
   const isPastMonth = year < nowD.getFullYear() || (year === nowD.getFullYear() && month < nowD.getMonth() + 1)
 
-  // Optional single-date filter: show only classes that fall on the chosen date. A weekly
-  // recurring class counts if the chosen date lands on its recurrence weekday.
-  function matchesDate(c: LiveClass): boolean {
-    if (!dateFilter) return true
-    const sel = new Date(`${dateFilter}T00:00:00`)
-    if (c.is_recurring && c.recurrence_day_of_week != null) return sel.getDay() === c.recurrence_day_of_week
-    const d = new Date(c.scheduled_at)
-    return d.getFullYear() === sel.getFullYear() && d.getMonth() === sel.getMonth() && d.getDate() === sel.getDate()
+  // Expand each class into one Session per real weekly occurrence within the selected month —
+  // this is what makes a recurring class show its correct date each week instead of always its
+  // original anchor date.
+  const allSessions: Session[] = []
+  for (const cls of classes) {
+    for (const d of occurrencesInMonth(cls.scheduled_at, cls.is_recurring, cls.recurrence_day_of_week, year, month)) {
+      allSessions.push({ key: `${cls.id}::${d}`, cls, occurrenceDate: d })
+    }
   }
-  const visibleClasses = classes.filter(matchesDate)
+  allSessions.sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate) || a.cls.title.localeCompare(b.cls.title))
+
+  // Optional single-date filter: show only sessions that fall on the chosen date.
+  const visibleSessions = dateFilter ? allSessions.filter((s) => s.occurrenceDate === dateFilter) : allSessions
 
   // Group by grade for display when no grade filter
-  const grouped: Array<{ key: string; label: string; items: LiveClass[] }> = []
+  const grouped: Array<{ key: string; label: string; items: Session[] }> = []
   const seenKeys = new Set<string>()
-  for (const cls of visibleClasses) {
-    if (!seenKeys.has(cls.grade_id)) {
-      seenKeys.add(cls.grade_id)
-      grouped.push({ key: cls.grade_id, label: cls.grade?.name ?? 'Unknown Grade', items: [] })
+  for (const s of visibleSessions) {
+    const gid = s.cls.grade_id
+    if (!seenKeys.has(gid)) {
+      seenKeys.add(gid)
+      grouped.push({ key: gid, label: s.cls.grade?.name ?? 'Unknown Grade', items: [] })
     }
-    grouped[grouped.length - 1].items.push(cls)
+    grouped.find((g) => g.key === gid)!.items.push(s)
   }
 
   const monthLabel = `${MONTHS[month - 1]} ${year}`
@@ -309,7 +324,7 @@ export default function AdminAttendancePage() {
         <div className="flex justify-center py-16">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
-      ) : visibleClasses.length === 0 ? (
+      ) : visibleSessions.length === 0 ? (
         <div className="py-20 text-center rounded-xl border border-border/60">
           <ClipboardList className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           {dateFilter ? (
@@ -347,22 +362,24 @@ export default function AdminAttendancePage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/40">
-                      {group.items.map((cls) => {
+                      {group.items.map((session) => {
+                        const cls = session.cls
                         const grade = cls.grade
-                        const count = markCounts[cls.id] ?? 0
-                        const isExpanded = expandedId === cls.id
+                        const count = markCounts[session.key] ?? 0
+                        const isExpanded = expandedId === session.key
                         const isToggling = togglingId === cls.id
+                        const isCurrentWeek = session.occurrenceDate === currentOccurrenceDate(cls.scheduled_at, cls.is_recurring, cls.recurrence_day_of_week)
                         return (
                           <>
                             <tr
-                              key={cls.id}
-                              className={cls.attendance_open
+                              key={session.key}
+                              className={cls.attendance_open && isCurrentWeek
                                 ? 'bg-green-50/50 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors'
                                 : 'hover:bg-muted/20 transition-colors'}
                             >
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2">
-                                  {cls.attendance_open && (
+                                  {cls.attendance_open && isCurrentWeek && (
                                     <span className="relative flex h-2 w-2 shrink-0">
                                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
                                       <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
@@ -384,7 +401,7 @@ export default function AdminAttendancePage() {
                                 </td>
                               )}
                               <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
-                                {fmt(cls.scheduled_at)}
+                                {formatOccurrenceDate(session.occurrenceDate)} · {fmtTime(cls.scheduled_at)}
                               </td>
                               <td className="px-4 py-3">
                                 <span className="flex items-center gap-1 font-medium text-sm">
@@ -393,25 +410,29 @@ export default function AdminAttendancePage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <Button
-                                  size="sm"
-                                  variant={cls.attendance_open ? 'default' : 'outline'}
-                                  className={cls.attendance_open
-                                    ? 'bg-green-600 hover:bg-green-700 text-white h-7 text-xs'
-                                    : 'h-7 text-xs'}
-                                  disabled={isToggling}
-                                  onClick={() => toggleAttendance(cls)}
-                                >
-                                  {isToggling && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
-                                  {cls.attendance_open ? 'Close' : 'Open Attendance'}
-                                </Button>
+                                {isCurrentWeek ? (
+                                  <Button
+                                    size="sm"
+                                    variant={cls.attendance_open ? 'default' : 'outline'}
+                                    className={cls.attendance_open
+                                      ? 'bg-green-600 hover:bg-green-700 text-white h-7 text-xs'
+                                      : 'h-7 text-xs'}
+                                    disabled={isToggling}
+                                    onClick={() => toggleAttendance(cls)}
+                                  >
+                                    {isToggling && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
+                                    {cls.attendance_open ? 'Close' : 'Open Attendance'}
+                                  </Button>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">Past session</span>
+                                )}
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 text-xs gap-1"
-                                  onClick={() => handleExpand(cls)}
+                                  onClick={() => handleExpand(session)}
                                 >
                                   {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                   {isExpanded ? 'Hide' : 'View / Edit'}
@@ -419,7 +440,7 @@ export default function AdminAttendancePage() {
                               </td>
                             </tr>
                             {isExpanded && (
-                              <tr key={`${cls.id}-exp`}>
+                              <tr key={`${session.key}-exp`}>
                                 <td colSpan={gradeFilter ? 5 : 6} className="px-4 pb-4 pt-2 bg-muted/10">
                                   {expandLoading ? (
                                     <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
@@ -461,7 +482,7 @@ export default function AdminAttendancePage() {
                                                           variant="ghost" size="sm"
                                                           className={`h-6 text-[11px] gap-1 ${present ? 'text-green-600 bg-green-50 dark:bg-green-950/20' : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20'}`}
                                                           disabled={savingMark === row.id || present}
-                                                          onClick={() => setStatus(cls.id, row, 'present')}
+                                                          onClick={() => setStatus(session.key, row, 'present')}
                                                         >
                                                           <Check className="w-3 h-3" /> Present
                                                         </Button>
@@ -469,7 +490,7 @@ export default function AdminAttendancePage() {
                                                           variant="ghost" size="sm"
                                                           className={`h-6 text-[11px] gap-1 ${absent ? 'text-red-600 bg-red-50 dark:bg-red-950/20' : 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20'}`}
                                                           disabled={savingMark === row.id || absent}
-                                                          onClick={() => setStatus(cls.id, row, 'absent')}
+                                                          onClick={() => setStatus(session.key, row, 'absent')}
                                                         >
                                                           {savingMark === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />} Absent
                                                         </Button>
@@ -497,7 +518,7 @@ export default function AdminAttendancePage() {
                                             size="sm"
                                             className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
                                             disabled={!addSelect || savingMark === addSelect}
-                                            onClick={() => addSelect && addAttendance(cls, addSelect, 'present')}
+                                            onClick={() => addSelect && addAttendance(session, addSelect, 'present')}
                                           >
                                             {savingMark === addSelect ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <UserPlus className="w-3 h-3 mr-1" />}
                                             Present
@@ -507,7 +528,7 @@ export default function AdminAttendancePage() {
                                             variant="outline"
                                             className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950/20"
                                             disabled={!addSelect || savingMark === addSelect}
-                                            onClick={() => addSelect && addAttendance(cls, addSelect, 'absent')}
+                                            onClick={() => addSelect && addAttendance(session, addSelect, 'absent')}
                                           >
                                             Absent
                                           </Button>

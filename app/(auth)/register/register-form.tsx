@@ -17,11 +17,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner'
 import { GoogleSignInButton } from '@/components/lc/google-signin-button'
 import { REFERRAL_SOURCES } from '@/lib/referral-sources'
+import { COUNTRIES } from '@/lib/countries'
 
 const schema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email'),
-  grade_id: z.string().min(1, 'Please select your grade'),
+  grade_id: z.string().min(1, 'Please select what you are studying'),
+  country: z.string().min(1, 'Please select your country'),
+  country_other: z.string().optional(),
   referral_source: z.string().min(1, 'Please tell us how you heard about us'),
   referral_other: z.string().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -32,6 +35,9 @@ const schema = z.object({
 }).refine((d) => d.referral_source !== 'other' || !!d.referral_other?.trim(), {
   message: 'Please tell us where you heard about us',
   path: ['referral_other'],
+}).refine((d) => d.country !== 'Other' || !!d.country_other?.trim(), {
+  message: 'Please tell us your country',
+  path: ['country_other'],
 })
 
 type FormData = z.infer<typeof schema>
@@ -51,6 +57,9 @@ export function RegisterForm({ grades }: RegisterFormProps) {
   async function onSubmit(data: FormData) {
     setLoading(true)
     const supabase = createClient()
+    // Self-reported country is more accurate than IP-based geolocation (which the auth
+    // callback falls back to for Google sign-ups) — take whichever the student actually chose.
+    const country = data.country === 'Other' ? (data.country_other?.trim() || 'Other') : data.country
 
     const { data: authData, error } = await supabase.auth.signUp({
       email: data.email,
@@ -72,7 +81,7 @@ export function RegisterForm({ grades }: RegisterFormProps) {
       return
     }
 
-    // Also save grade_id to profiles immediately (trigger creates the profile)
+    // Also save grade_id/country to profiles immediately (trigger creates the profile)
     if (authData.user) {
       await supabase
         .from('profiles')
@@ -81,7 +90,8 @@ export function RegisterForm({ grades }: RegisterFormProps) {
           full_name: data.fullName,
           referral_source: data.referral_source,
           referral_other: data.referral_source === 'other' ? (data.referral_other?.trim() || null) : null,
-        })
+          signup_country: country,
+        } as any)
         .eq('id', authData.user.id)
     }
 
@@ -132,7 +142,7 @@ export function RegisterForm({ grades }: RegisterFormProps) {
       <CardContent>
         <GoogleSignInButton label="Sign up with Google" />
         <p className="text-xs text-muted-foreground text-center mt-2">
-          You&apos;ll pick your grade right after — takes a second.
+          You&apos;ll tell us what you&apos;re studying right after — takes a second.
         </p>
         <div className="flex items-center gap-3 my-4">
           <div className="flex-1 border-t border-border/60" />
@@ -159,10 +169,10 @@ export function RegisterForm({ grades }: RegisterFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Your grade</Label>
+            <Label>What are you studying?</Label>
             <Select onValueChange={(v) => setValue('grade_id', v)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select your grade" />
+                <SelectValue placeholder="Select your course" />
               </SelectTrigger>
               <SelectContent>
                 {grades.map((g) => (
@@ -171,6 +181,27 @@ export function RegisterForm({ grades }: RegisterFormProps) {
               </SelectContent>
             </Select>
             {errors.grade_id && <p className="text-xs text-destructive">{errors.grade_id.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Country</Label>
+            <Select onValueChange={(v) => setValue('country', v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select your country" />
+              </SelectTrigger>
+              <SelectContent>
+                {COUNTRIES.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.country && <p className="text-xs text-destructive">{errors.country.message}</p>}
+            {watch('country') === 'Other' && (
+              <div className="pt-1">
+                <Input placeholder="Please tell us your country" {...register('country_other')} />
+                {errors.country_other && <p className="text-xs text-destructive mt-1">{errors.country_other.message}</p>}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

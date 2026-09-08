@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
 import { AccountForm } from './account-form'
 import { SiteSettingsForm } from '@/components/lc/site-settings-form'
+import { BannerSettingsForm } from '@/components/lc/banner-settings-form'
 import { BillingSettingsForm } from '@/components/lc/billing-settings-form'
 import { ManageAdmins } from '@/components/lc/manage-admins'
 import { CurrencySettingsForm } from '@/components/lc/currency-settings-form'
@@ -20,7 +21,7 @@ export default async function AdminSettingsPage() {
       .single(),
     (supabase as any)
       .from('site_settings')
-      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, billing_day, cutoff_day, usd_rate')
+      .select('facebook_url, instagram_url, tiktok_url, whatsapp_number, mips_environment, billing_day, cutoff_day, usd_rate, banner_enabled, banner_text, banner_link')
       .eq('id', 1)
       .single(),
     (supabase as any)
@@ -46,6 +47,9 @@ export default async function AdminSettingsPage() {
     billing_day: number | null
     cutoff_day: number | null
     usd_rate: number | null
+    banner_enabled: boolean | null
+    banner_text: string | null
+    banner_link: string | null
   }
 
   return (
@@ -71,6 +75,14 @@ export default async function AdminSettingsPage() {
               instagram_url: ss.instagram_url ?? '',
               tiktok_url: ss.tiktok_url ?? '',
               whatsapp_number: ss.whatsapp_number ?? '',
+            }}
+          />
+
+          <BannerSettingsForm
+            initial={{
+              banner_enabled: ss.banner_enabled ?? false,
+              banner_text: ss.banner_text ?? '',
+              banner_link: ss.banner_link ?? '',
             }}
           />
         </div>

@@ -14,9 +14,11 @@ const DEFAULT_GRADES: { name: string; slug: string }[] = []
 interface HeaderProps {
   user?: { email?: string; role?: string } | null
   grades?: { name: string; slug: string }[]
+  // Shifts the header down below the scrolling top banner (TopBanner), when it's shown.
+  hasBanner?: boolean
 }
 
-export function Header({ user, grades }: HeaderProps) {
+export function Header({ user, grades, hasBanner = false }: HeaderProps) {
   const gradeList = grades && grades.length > 0 ? grades : DEFAULT_GRADES
   const [mobileOpen, setMobileOpen] = useState(false)
   const [gradesOpen, setGradesOpen] = useState(false)
@@ -41,7 +43,7 @@ export function Header({ user, grades }: HeaderProps) {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
+    <header className={`fixed left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border ${hasBanner ? 'top-8' : 'top-0'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-[72px]">
 
@@ -60,7 +62,7 @@ export function Header({ user, grades }: HeaderProps) {
                 onClick={() => setGradesOpen((v) => !v)}
                 className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground lc-transition rounded-lg hover:bg-secondary"
               >
-                Grades <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${gradesOpen ? 'rotate-180' : ''}`} />
+                Courses <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${gradesOpen ? 'rotate-180' : ''}`} />
               </button>
               {gradesOpen && gradeList.length > 0 && (
                 <div className="absolute top-full left-0 mt-1 w-44 bg-card border border-border rounded-xl lc-shadow py-1.5 animate-scale-fade-in z-20 max-h-[70vh] overflow-y-auto">
@@ -132,7 +134,7 @@ export function Header({ user, grades }: HeaderProps) {
               </Link>
             ))}
             {gradeList.length > 0 && (
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-3 pt-3 pb-1">Grades</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-3 pt-3 pb-1">Courses</p>
             )}
             {gradeList.map((g) => (
               <Link key={g.slug} href={`/grades/${g.slug}`} className="block px-3 py-2.5 text-sm hover:bg-secondary rounded-xl lc-transition" onClick={() => setMobileOpen(false)}>

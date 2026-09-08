@@ -253,8 +253,16 @@ export default function AdminBroadcastsPage() {
           target_audience: audience,
         })
         .eq('id', editingId)
-      if (error) toast.error(`Failed: ${error.message}`)
-      else { toast.success('Message updated'); setDialogOpen(false); load() }
+      if (error) {
+        toast.error(`Failed: ${error.message}`)
+      } else {
+        // Clear every student's read state so the edited message shows as unread again —
+        // otherwise a student who already read it never learns it changed.
+        await (supabase as any).from('broadcast_reads').delete().eq('broadcast_id', editingId)
+        toast.success('Message updated — students will see it as unread again')
+        setDialogOpen(false)
+        load()
+      }
       setSaving(false)
       return
     }
