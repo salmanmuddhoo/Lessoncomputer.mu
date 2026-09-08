@@ -120,7 +120,7 @@ export async function Footer() {
           </div>
 
           {[
-            { title: 'Grades', links: gradeLinks },
+            { title: 'Courses', links: gradeLinks },
             { title: 'Company', links: COMPANY_LINKS },
             { title: 'Legal', links: LEGAL_LINKS },
           ].map((col) => (

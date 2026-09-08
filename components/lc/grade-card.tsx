@@ -8,7 +8,7 @@ interface GradeCardProps {
 
 export function GradeCard({ grade }: GradeCardProps) {
   return (
-    <Link href={`/grades/${grade.slug}`} className="group block">
+    <Link href={`/grades/${grade.slug}`} className="group block" aria-label={grade.name}>
       <div className="bg-card rounded-2xl overflow-hidden lc-shadow lc-card-hover border border-border/50">
 
         {/* — Image area (Boty product photo equivalent) — */}
@@ -42,9 +42,6 @@ export function GradeCard({ grade }: GradeCardProps) {
                   </span>
                 )
               })()}
-              <span className="relative text-xs font-semibold tracking-[0.2em] uppercase mt-1" style={{ color: grade.color, opacity: 0.7 }}>
-                Grade
-              </span>
             </>
           )}
 
@@ -64,12 +61,6 @@ export function GradeCard({ grade }: GradeCardProps) {
 
         {/* — Info area (Boty product info equivalent) — */}
         <div className="p-5">
-          {/* Grade name — like product name in Boty (serif) */}
-          <h3 className="font-serif font-semibold text-lg text-foreground mb-3 group-hover:text-primary lc-transition break-words">
-            {grade.name}
-            {grade.name.includes('SC') || grade.name.includes('HSC') ? '' : ' — Secondary'}
-          </h3>
-
           {/* Rating row */}
           <div className="flex items-center gap-1 mb-3">
             {[1,2,3,4,5].map((s) => (
@@ -99,7 +90,7 @@ export function GradeCard({ grade }: GradeCardProps) {
 
           {/* CTA — like "Add to Cart" in Boty */}
           <div className="w-full py-2.5 px-4 rounded-xl bg-secondary text-center text-sm font-semibold text-foreground group-hover:bg-primary group-hover:text-primary-foreground lc-transition">
-            Explore Grade
+            Explore
           </div>
         </div>
       </div>

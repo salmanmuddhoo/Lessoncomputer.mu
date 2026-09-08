@@ -5,6 +5,7 @@ import { ExternalLink, Loader2, Clock, Phone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { ParentContactDialog } from '@/components/lc/parent-contact-dialog'
+import { currentOccurrenceDate } from '@/lib/attendance-occurrence'
 
 interface Props {
   liveClassId: string
@@ -82,8 +83,9 @@ export function JoinLiveClassButton({ liveClassId, meetUrl, gradeId, scheduledAt
               student_id: user.id,
               grade_id: gradeId,
               entry_time: new Date().toISOString(),
+              occurrence_date: currentOccurrenceDate(scheduledAt, isRecurring, recurrenceDayOfWeek),
             },
-            { onConflict: 'live_class_id,student_id', ignoreDuplicates: true }
+            { onConflict: 'live_class_id,student_id,occurrence_date', ignoreDuplicates: true }
           )
         if (error) {
           toast.warning(`Attendance not recorded: ${error.message}`)

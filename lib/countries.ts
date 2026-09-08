@@ -1,0 +1,31 @@
+// Country picker for signup — Mauritius pinned first since it's the primary market, then
+// other countries students commonly sign up from, alphabetically. "Other" lets a student in
+// a country not listed still tell us where they are, for marketing/reporting purposes.
+export const COUNTRIES = [
+  'Mauritius',
+  'Australia',
+  'Canada',
+  'China',
+  'France',
+  'Germany',
+  'India',
+  'Ireland',
+  'Kenya',
+  'Madagascar',
+  'Malaysia',
+  'Nigeria',
+  'Réunion',
+  'Rwanda',
+  'Seychelles',
+  'Singapore',
+  'South Africa',
+  'Sri Lanka',
+  'Tanzania',
+  'Uganda',
+  'United Arab Emirates',
+  'United Kingdom',
+  'United States',
+  'Zambia',
+  'Zimbabwe',
+  'Other',
+] as const

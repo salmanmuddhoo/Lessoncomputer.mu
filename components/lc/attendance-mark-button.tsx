@@ -5,15 +5,19 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { currentOccurrenceDate } from '@/lib/attendance-occurrence'
 
 interface Props {
   liveClassId: string
   gradeId: string
   alreadyMarked: boolean
   userId: string
+  scheduledAt: string
+  isRecurring: boolean
+  recurrenceDayOfWeek: number | null
 }
 
-export function AttendanceMarkButton({ liveClassId, gradeId, alreadyMarked, userId }: Props) {
+export function AttendanceMarkButton({ liveClassId, gradeId, alreadyMarked, userId, scheduledAt, isRecurring, recurrenceDayOfWeek }: Props) {
   const [marked, setMarked] = useState(alreadyMarked)
   const [loading, setLoading] = useState(false)
 
@@ -32,8 +36,9 @@ export function AttendanceMarkButton({ liveClassId, gradeId, alreadyMarked, user
           grade_id: gradeId,
           entry_time: now,
           scheduled_end_time: now,
+          occurrence_date: currentOccurrenceDate(scheduledAt, isRecurring, recurrenceDayOfWeek),
         },
-        { onConflict: 'live_class_id,student_id' }
+        { onConflict: 'live_class_id,student_id,occurrence_date' }
       )
     if (error) {
       toast.error('Could not mark attendance. Please try again.')

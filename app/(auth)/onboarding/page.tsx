@@ -27,7 +27,7 @@ export default async function OnboardingPage() {
     <Card className="w-full max-w-md border-border/60 bg-card shadow-xl">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Almost there!</CardTitle>
-        <CardDescription>Choose your grade so we can set up your learning space.</CardDescription>
+        <CardDescription>Tell us what you&apos;re studying so we can set up your learning space.</CardDescription>
       </CardHeader>
       <CardContent>
         <OnboardingForm grades={(grades ?? []) as { id: string; name: string }[]} initialName={initialName} />

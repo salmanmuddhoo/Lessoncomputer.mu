@@ -9,18 +9,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { REFERRAL_SOURCES } from '@/lib/referral-sources'
+import { COUNTRIES } from '@/lib/countries'
 
 export function OnboardingForm({ grades, initialName }: { grades: { id: string; name: string }[]; initialName: string }) {
   const router = useRouter()
   const [fullName, setFullName] = useState(initialName)
   const [gradeId, setGradeId] = useState('')
+  const [country, setCountry] = useState('')
+  const [countryOther, setCountryOther] = useState('')
   const [referralSource, setReferralSource] = useState('')
   const [referralOther, setReferralOther] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function save() {
     if (saving) return
-    if (!gradeId) { toast.error('Please select your grade'); return }
+    if (!gradeId) { toast.error('Please select what you are studying'); return }
+    if (!country) { toast.error('Please select your country'); return }
+    if (country === 'Other' && !countryOther.trim()) { toast.error('Please tell us your country'); return }
     if (!referralSource) { toast.error('Please tell us how you heard about us'); return }
     if (referralSource === 'other' && !referralOther.trim()) { toast.error('Please tell us where you heard about us'); return }
     setSaving(true)
@@ -31,6 +36,8 @@ export function OnboardingForm({ grades, initialName }: { grades: { id: string; 
         body: JSON.stringify({
           gradeId,
           fullName: fullName.trim() || undefined,
+          country,
+          countryOther: country === 'Other' ? countryOther.trim() : undefined,
           referralSource,
           referralOther: referralSource === 'other' ? referralOther.trim() : undefined,
         }),
@@ -53,13 +60,30 @@ export function OnboardingForm({ grades, initialName }: { grades: { id: string; 
         <Input id="ob-name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" />
       </div>
       <div className="space-y-2">
-        <Label>Your grade</Label>
+        <Label>What are you studying?</Label>
         <Select onValueChange={setGradeId}>
-          <SelectTrigger><SelectValue placeholder="Select your grade" /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder="Select your course" /></SelectTrigger>
           <SelectContent>
             {grades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
           </SelectContent>
         </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Country</Label>
+        <Select onValueChange={setCountry}>
+          <SelectTrigger><SelectValue placeholder="Select your country" /></SelectTrigger>
+          <SelectContent>
+            {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {country === 'Other' && (
+          <Input
+            value={countryOther}
+            onChange={(e) => setCountryOther(e.target.value)}
+            placeholder="Please tell us your country"
+            className="mt-2"
+          />
+        )}
       </div>
       <div className="space-y-2">
         <Label>How did you hear about us?</Label>
