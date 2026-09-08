@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Loader2, ClipboardList, Users, ChevronDown, ChevronUp, RefreshCw, Radio, Check, X, UserPlus } from 'lucide-react'
+import { Loader2, ClipboardList, Users, ChevronDown, ChevronUp, RefreshCw, Radio, Check, X, UserPlus, Folder, FolderOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { occurrencesInMonth, currentOccurrenceDate, formatOccurrenceDate } from '@/lib/attendance-occurrence'
 
@@ -64,6 +64,7 @@ export default function AdminAttendancePage() {
   const [savingMark, setSavingMark] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<{ id: string; full_name: string | null }[]>([])
   const [addSelect, setAddSelect] = useState('')
+  const [openClasses, setOpenClasses] = useState<Record<string, boolean>>({})
 
   const supabase = createClient()
 
@@ -242,16 +243,24 @@ export default function AdminAttendancePage() {
   // Optional single-date filter: show only sessions that fall on the chosen date.
   const visibleSessions = dateFilter ? allSessions.filter((s) => s.occurrenceDate === dateFilter) : allSessions
 
-  // Group by grade for display when no grade filter
-  const grouped: Array<{ key: string; label: string; items: Session[] }> = []
-  const seenKeys = new Set<string>()
+  // Group by grade, then by class — each class folder lists every date attendance was opened
+  // for it (most recent first), so an admin sees "G7 September Live Class" once, with every
+  // session date underneath it, instead of dates from different classes interleaved.
+  const grouped: Array<{ key: string; label: string; classes: Array<{ key: string; cls: LiveClass; sessions: Session[] }> }> = []
   for (const s of visibleSessions) {
     const gid = s.cls.grade_id
-    if (!seenKeys.has(gid)) {
-      seenKeys.add(gid)
-      grouped.push({ key: gid, label: s.cls.grade?.name ?? 'Unknown Grade', items: [] })
-    }
-    grouped.find((g) => g.key === gid)!.items.push(s)
+    let g = grouped.find((x) => x.key === gid)
+    if (!g) { g = { key: gid, label: s.cls.grade?.name ?? 'Unknown Grade', classes: [] }; grouped.push(g) }
+    let c = g.classes.find((x) => x.key === s.cls.id)
+    if (!c) { c = { key: s.cls.id, cls: s.cls, sessions: [] }; g.classes.push(c) }
+    c.sessions.push(s)
+  }
+  for (const g of grouped) {
+    for (const c of g.classes) c.sessions.sort((a, b) => b.occurrenceDate.localeCompare(a.occurrenceDate))
+  }
+
+  function toggleClass(key: string) {
+    setOpenClasses((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
   const monthLabel = `${MONTHS[month - 1]} ${year}`
@@ -348,23 +357,52 @@ export default function AdminAttendancePage() {
                   <Radio className="w-3.5 h-3.5" /> {group.label}
                 </h2>
               )}
-              <div className="rounded-xl border border-border/60 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[640px]">
-                    <thead className="bg-muted/30 border-b border-border/60">
+              <div className="space-y-3">
+                {group.classes.map((classGroup) => {
+                  const cls = classGroup.cls
+                  const grade = cls.grade
+                  const classOpen = openClasses[classGroup.key] ?? true
+                  const presentTotal = classGroup.sessions.reduce((n, s) => n + (markCounts[s.key] ?? 0), 0)
+                  return (
+                    <div key={classGroup.key} className="rounded-xl border border-border/60 overflow-hidden">
+                      {/* Class folder header — every attendance date for this class lives underneath it */}
+                      <button
+                        onClick={() => toggleClass(classGroup.key)}
+                        className="w-full flex items-center gap-2 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
+                      >
+                        {classOpen
+                          ? <FolderOpen className="w-4 h-4 text-primary shrink-0" />
+                          : <Folder className="w-4 h-4 text-muted-foreground shrink-0" />
+                        }
+                        <span className="font-medium">{cls.title}</span>
+                        {cls.is_recurring && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">Weekly</Badge>
+                        )}
+                        {!gradeFilter && grade && (
+                          <Badge variant="outline" className="text-[10px]" style={{ borderColor: `${grade.color}40`, color: grade.color, backgroundColor: `${grade.color}10` }}>
+                            {grade.name}
+                          </Badge>
+                        )}
+                        <span className="ml-auto text-xs text-muted-foreground flex items-center gap-3 shrink-0">
+                          <span>{classGroup.sessions.length} date{classGroup.sessions.length !== 1 ? 's' : ''}</span>
+                          <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {presentTotal} present total</span>
+                          {classOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </span>
+                      </button>
+
+                      {classOpen && (
+                <div className="overflow-x-auto border-t border-border/60">
+                  <table className="w-full text-sm min-w-[560px]">
+                    <thead className="bg-muted/10 border-b border-border/60">
                       <tr>
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Class</th>
-                        {!gradeFilter && <th className="text-left px-4 py-3 font-medium text-muted-foreground">Grade</th>}
-                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Scheduled</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
                         <th className="text-left px-4 py-3 font-medium text-muted-foreground">Present</th>
                         <th className="text-left px-4 py-3 font-medium text-muted-foreground">Attendance</th>
                         <th className="text-right px-4 py-3 font-medium text-muted-foreground">Details</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/40">
-                      {group.items.map((session) => {
-                        const cls = session.cls
-                        const grade = cls.grade
+                      {classGroup.sessions.map((session) => {
                         const count = markCounts[session.key] ?? 0
                         const isExpanded = expandedId === session.key
                         const isToggling = togglingId === cls.id
@@ -377,7 +415,7 @@ export default function AdminAttendancePage() {
                                 ? 'bg-green-50/50 dark:bg-green-950/10 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors'
                                 : 'hover:bg-muted/20 transition-colors'}
                             >
-                              <td className="px-4 py-3">
+                              <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
                                 <div className="flex items-center gap-2">
                                   {cls.attendance_open && isCurrentWeek && (
                                     <span className="relative flex h-2 w-2 shrink-0">
@@ -385,23 +423,8 @@ export default function AdminAttendancePage() {
                                       <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
                                     </span>
                                   )}
-                                  <span className="font-medium">{cls.title}</span>
-                                  {cls.is_recurring && (
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">Weekly</Badge>
-                                  )}
+                                  {formatOccurrenceDate(session.occurrenceDate)} · {fmtTime(cls.scheduled_at)}
                                 </div>
-                              </td>
-                              {!gradeFilter && (
-                                <td className="px-4 py-3">
-                                  {grade && (
-                                    <Badge variant="outline" style={{ borderColor: `${grade.color}40`, color: grade.color, backgroundColor: `${grade.color}10` }}>
-                                      {grade.name}
-                                    </Badge>
-                                  )}
-                                </td>
-                              )}
-                              <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
-                                {formatOccurrenceDate(session.occurrenceDate)} · {fmtTime(cls.scheduled_at)}
                               </td>
                               <td className="px-4 py-3">
                                 <span className="flex items-center gap-1 font-medium text-sm">
@@ -441,7 +464,7 @@ export default function AdminAttendancePage() {
                             </tr>
                             {isExpanded && (
                               <tr key={`${session.key}-exp`}>
-                                <td colSpan={gradeFilter ? 5 : 6} className="px-4 pb-4 pt-2 bg-muted/10">
+                                <td colSpan={4} className="px-4 pb-4 pt-2 bg-muted/10">
                                   {expandLoading ? (
                                     <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
                                   ) : (
@@ -550,6 +573,10 @@ export default function AdminAttendancePage() {
                     </tbody>
                   </table>
                 </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ))}

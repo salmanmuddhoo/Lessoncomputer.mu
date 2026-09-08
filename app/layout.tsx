@@ -4,6 +4,7 @@ import { DM_Sans, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { CookieConsent } from '@/components/lc/cookie-consent'
+import { PWAInstallPrompt } from '@/components/lc/pwa-install-prompt'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
@@ -36,6 +37,11 @@ export const metadata: Metadata = {
       { url: '/icon.svg?v=2', type: 'image/svg+xml' },
     ],
     apple: '/apple-icon.png?v=2',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'LessonComputer.mu',
   },
   openGraph: {
     siteName: 'LessonComputer.mu',
@@ -70,6 +76,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
           <CookieConsent />
+          <PWAInstallPrompt />
           <Toaster richColors />
           <Analytics />
         </ThemeProvider>
