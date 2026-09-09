@@ -10,8 +10,10 @@ export function formatMoney(mur: number, info: CurrencyInfo = DEFAULT_CURRENCY):
   const n = Number(mur) || 0
   if (info.currency === 'USD' && info.rate > 0) {
     // USD is shown rounded to the nearest whole dollar (e.g. 14.13 → $14, 11.96 → $12).
+    // Always lead with the three-letter ISO code — a bare "$" is ambiguous between USD,
+    // SGD, AUD, HKD and others.
     const usd = Math.round(n / info.rate)
-    return `$${usd.toLocaleString('en-US')}`
+    return `USD ${usd.toLocaleString('en-US')}`
   }
-  return `Rs ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `MUR ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }

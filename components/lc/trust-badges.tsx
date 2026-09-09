@@ -1,10 +1,10 @@
 import { ShieldCheck, Video, GraduationCap, Users } from 'lucide-react'
 
 const BADGES = [
-  { icon: ShieldCheck,   label: 'Qualified Teachers',       sub: 'Certified Mauritian educators' },
-  { icon: Video,         label: 'HD Video Lessons',          sub: 'Watch on any device, anytime' },
-  { icon: GraduationCap, label: 'SC & HSC Aligned',          sub: 'Follows national curriculum'   },
-  { icon: Users,         label: 'Live Interactive Classes',  sub: 'Join & ask questions in real time' },
+  { icon: ShieldCheck,   label: 'One specialist teacher',    sub: 'Every class taught by the same person, not a rota of tutors' },
+  { icon: Video,         label: 'Recorded lessons',          sub: 'Watch on phone, tablet or laptop, and rewind as often as you need' },
+  { icon: GraduationCap, label: 'Cambridge syllabuses',       sub: 'IGCSE 0478 · O Level 2210 · AS & A Level 9618' },
+  { icon: Users,         label: 'Live weekly classes',        sub: 'Shown in your local time, and recorded if you cannot attend' },
 ]
 
 export function TrustBadges() {

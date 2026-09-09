@@ -49,12 +49,12 @@ export function GradeCard({ grade }: GradeCardProps) {
           {(grade as any).is_mauritius_only === false && (
             <div className="absolute top-2 right-2 flex items-center gap-1 bg-background/90 backdrop-blur-sm text-foreground text-[10px] font-semibold px-2 py-1 rounded-full border border-border/50">
               <Globe className="w-3 h-3" />
-              International
+              Open to students worldwide
             </div>
           )}
           {(grade as any).is_mauritius_only !== false && (
             <div className="absolute top-2 right-2 flex items-center gap-1 bg-primary/90 backdrop-blur-sm text-primary-foreground text-[10px] font-semibold px-2 py-1 rounded-full">
-              🇲🇺 Mauritius Only
+              🇲🇺 Mauritius national curriculum
             </div>
           )}
         </div>

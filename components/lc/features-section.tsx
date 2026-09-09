@@ -28,8 +28,8 @@ const FEATURES = [
   },
   {
     icon: Award,
-    title: 'Exam-Focused Lessons',
-    description: 'Targeted at Cambridge exam syllabi to give you the best possible shot at top results.',
+    title: 'Built around the exam',
+    description: 'Past-paper questions by topic, mark schemes, and the exact wording Cambridge examiners expect.',
   },
 ]
 
