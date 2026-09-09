@@ -13,8 +13,8 @@ const FEATURES = [
   },
   {
     icon: BookOpen,
-    title: 'Grade-Organised Content',
-    description: 'Every lesson mapped to the Mauritius national curriculum — from Grade 7 right through to HSC.',
+    title: 'Syllabus-Organised Content',
+    description: 'Every lesson mapped to your exact Cambridge syllabus — IGCSE 0478, O Level 2210, or AS & A Level 9618.',
   },
   {
     icon: Zap,
@@ -23,13 +23,13 @@ const FEATURES = [
   },
   {
     icon: Shield,
-    title: 'Trusted by Students',
-    description: 'Content created and verified by qualified, experienced Mauritian educators you can trust.',
+    title: 'Cambridge-Focused Teaching',
+    description: 'Content created and taught by an experienced Cambridge Computer Science teacher you can trust.',
   },
   {
     icon: Award,
     title: 'Exam-Focused Lessons',
-    description: 'Targeted at SC and HSC exam syllabi to give you the best possible shot at top results.',
+    description: 'Targeted at Cambridge exam syllabi to give you the best possible shot at top results.',
   },
 ]
 
