@@ -69,7 +69,7 @@ export function LoginForm() {
     <Card className="w-full max-w-md border-border/60 bg-card shadow-xl">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
-        <CardDescription>Sign in to your LessonComputer.mu account</CardDescription>
+        <CardDescription>Sign in to watch your lessons and join your live classes.</CardDescription>
         {errorParam === 'account_suspended' && (
           <p className="mt-2 text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
             Your account has been suspended. Please contact support.

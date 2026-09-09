@@ -136,7 +136,7 @@ export function RegisterForm({ grades }: RegisterFormProps) {
     <Card className="w-full max-w-md border-border/60 bg-card shadow-xl">
       <CardHeader className="text-center">
         <CardTitle className="font-serif text-2xl font-bold">Create your account</CardTitle>
-        <CardDescription>Start learning with LessonComputer.mu today</CardDescription>
+        <CardDescription>Create your account to enrol, watch lessons and join live classes.</CardDescription>
       </CardHeader>
 
       <CardContent>
