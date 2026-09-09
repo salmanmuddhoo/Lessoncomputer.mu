@@ -16,9 +16,12 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-2">1. Information We Collect</h2>
           <p>
-            When you create an account on LessonComputer.mu, we collect your name and email address.
-            We also collect information about your usage — such as which videos you watch and live classes
-            you attend — to personalise your learning experience.
+            When you create an account on LessonComputer.mu, we collect: your name, email address,
+            country, time zone, and the syllabus or exam series you tell us you are studying; payment
+            details processed by our payment processor (MIPS) — we do not store your full card
+            details ourselves; records of which videos you watch, which live classes you attend, and
+            other attendance and viewing information; and any messages you send us through the
+            contact form or elsewhere.
           </p>
         </section>
 
@@ -36,16 +39,25 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-2">3. Data Storage & Security</h2>
           <p>
-            Your data is stored securely using Supabase (hosted in the EU). We use industry-standard
-            encryption for data in transit and at rest. We never sell your personal data to third parties.
+            Your data is stored securely using Supabase (database and storage, hosted in the EU). We
+            use industry-standard encryption for data in transit and at rest. We never sell your
+            personal data to third parties.
+          </p>
+          <p className="mt-2">
+            We also share data with the following sub-processors, each only for the purpose stated:
+            Supabase (database and storage, EU), MIPS (payment processing, Mauritius), and
+            [EMAIL PROVIDER] (transactional emails). Your data may be transferred outside your
+            country of residence to these providers' hosting locations, under their respective data
+            protection safeguards.
           </p>
         </section>
 
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-2">4. Cookies</h2>
           <p>
-            We use session cookies solely for authentication purposes. We do not use tracking or
-            advertising cookies.
+            We use cookies that are necessary for the site to work, and — with your consent —
+            analytics and advertising cookies that help us understand how people find us. You can
+            accept or reject each category, and change your choice at any time.
           </p>
         </section>
 
@@ -56,12 +68,30 @@ export default function PrivacyPage() {
             <a href="mailto:support@lessoncomputer.mu" className="text-primary hover:underline">
               support@lessoncomputer.mu
             </a>
-            .
+            . You also have the right to complain to the Data Protection Commissioner in Mauritius if
+            you believe your data has been mishandled.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">6. Contact</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">6. Data Controller, Retention &amp; Minors</h2>
+          <p>
+            The data controller for LessonComputer.mu is [REGISTERED COMPANY NAME], registered at
+            [FULL ADDRESS], Mauritius, contactable at{' '}
+            <a href="mailto:support@lessoncomputer.mu" className="text-primary hover:underline">
+              support@lessoncomputer.mu
+            </a>
+            . We process your data on the basis of performing our contract with you (account and
+            course access), our legitimate interests (improving the platform), and, where applicable,
+            your consent (analytics and advertising cookies). We keep account data for as long as
+            your account is active, and for [RETENTION PERIOD] after closure to meet legal and
+            accounting obligations. Where a student is under 18, we rely on the consent of a parent or
+            guardian, obtained at signup, to process that student's data.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">7. Contact</h2>
           <p>
             For any privacy-related questions, please contact us at{' '}
             <a href="mailto:support@lessoncomputer.mu" className="text-primary hover:underline">

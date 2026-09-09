@@ -29,7 +29,7 @@ export function Newsletter() {
             Never miss a new class
           </h2>
           <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
-            Get notified when new video lessons and live classes are published for your grade.
+            Get notified when the next Cambridge cohort opens, and when new lessons are published for your syllabus.
           </p>
 
           <form onSubmit={handleSubmit} className="flex gap-2 max-w-sm mx-auto">

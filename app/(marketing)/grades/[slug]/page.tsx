@@ -313,6 +313,18 @@ export default async function GradePage({ params }: PageProps) {
         </div>
       </header>
 
+      {(slug === 'o-level-paper1-0478-2210' || slug === 'grade-11') && (
+        <div className="mb-8 p-4 rounded-xl border border-border/60 bg-card">
+          <p className="text-sm font-semibold text-foreground mb-1">0478 or 2210 — which am I on?</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Cambridge IGCSE Computer Science 0478 and Cambridge O Level Computer Science 2210 share the
+            same subject content and the same two papers. Your syllabus code is printed at the top of
+            your past papers and on your statement of entry. Students on either syllabus are taught
+            together in the same class, and your past-paper practice is matched to your code.
+          </p>
+        </div>
+      )}
+
       <DemoVideosButton videos={demoVideosForButton} />
 
       {/* Live class subscription banner */}

@@ -20,10 +20,10 @@ export function Hero() {
 
         {/* Headline — Playfair Display, exactly like Boty */}
         <h1 className="animate-blur-in-delay-1 font-serif text-[3.25rem] sm:text-6xl md:text-7xl lg:text-[5.25rem] font-bold leading-[1.08] tracking-tight text-foreground mb-6">
-          Learn at home,
+          Cambridge Computer Science,
           <br />
           <span className="relative">
-            excel at school
+            taught properly
             <span className="absolute bottom-2 left-0 right-0 h-[6px] bg-primary/35 rounded-sm -z-10" />
           </span>
           .

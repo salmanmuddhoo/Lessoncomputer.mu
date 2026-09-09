@@ -22,8 +22,7 @@ export function CTASection({ isLoggedIn = false, dashboardHref = '/dashboard' }:
             Ready to start learning?
           </h2>
           <p className="relative text-background/60 text-base md:text-lg mb-10 font-light leading-relaxed">
-            Join students worldwide improving their Cambridge Computer Science grades
-            with expert-led video lessons and live classes, taught from Mauritius.
+            Watch a full Cambridge lesson before you pay anything — no card, no account needed.
           </p>
           <div className="relative flex flex-col sm:flex-row gap-3 justify-center">
             <Button

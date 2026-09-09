@@ -46,12 +46,13 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-2">4. Intellectual Property</h2>
           <p>
-            All content on LessonComputer.mu is the sole property of the Company. This includes,
-            without limitation, all video lessons, live classes, course materials, documents,
-            revision notes, text, graphics, logos, trademarks, designs, and software. No content
-            may be copied, reproduced, redistributed, resold, publicly displayed, or otherwise used
-            without the Company's prior written consent. Unauthorised use is strictly prohibited and
-            may result in account termination and legal action.
+            All content on LessonComputer.mu is the sole property of [REGISTERED COMPANY NAME],
+            Business Registration Number [BRN], registered at [ADDRESS], Mauritius (&quot;the
+            Company&quot;). This includes, without limitation, all video lessons, live classes,
+            course materials, documents, revision notes, text, graphics, logos, trademarks, designs,
+            and software. No content may be copied, reproduced, redistributed, resold, publicly
+            displayed, or otherwise used without the Company's prior written consent. Unauthorised
+            use is strictly prohibited and may result in account termination and legal action.
           </p>
         </section>
 
@@ -73,7 +74,44 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">7. Contact</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">7. Governing Law</h2>
+          <p>
+            These Terms are governed by the laws of Mauritius. Any dispute will be subject to the
+            exclusive jurisdiction of the courts of Mauritius.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">8. Subscription Cancellation &amp; Renewal</h2>
+          <p>
+            Monthly subscriptions renew automatically on the same date each month until cancelled.
+            You may cancel at any time from your account. Cancellation takes effect at the end of the
+            month already paid for, and you keep access until that date. We do not pro-rate part
+            months.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">9. Minors &amp; Parental Consent</h2>
+          <p>
+            Students under 18 must have the consent of a parent or guardian to create an account and
+            to purchase a course. Where the student is under 18, the contract is with the parent or
+            guardian.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">10. Live Classes: Recording &amp; Conduct</h2>
+          <p>
+            Live classes are recorded so that students who cannot attend can watch afterwards.
+            Recordings capture the teacher's screen and voice. Students may keep their camera off at
+            all times. Recordings are available only to students enrolled in that course and must not
+            be shared, downloaded, or redistributed.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">11. Contact</h2>
           <p>
             Questions about these terms? Email us at{' '}
             <a href="mailto:support@lessoncomputer.mu" className="text-primary hover:underline">

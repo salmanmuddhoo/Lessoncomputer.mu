@@ -6,11 +6,11 @@ import { formatWhatsAppDisplay, normalizeWhatsAppDigits } from '@/lib/phone'
 
 export const metadata: Metadata = {
   title: 'Contact Us',
-  description: 'Get in touch with the LessonComputer.mu team. We\'re here to help students and parents with any questions.',
+  description: 'Contact LessonComputer — questions about Cambridge Computer Science courses, class times or enrolment. We reply within 24 hours, from any country.',
   alternates: { canonical: '/contact' },
   openGraph: {
     title: 'Contact Us | LessonComputer.mu',
-    description: 'Reach out to the LessonComputer.mu team.',
+    description: 'Questions about Cambridge Computer Science courses, class times or enrolment — we reply within 24 hours.',
     siteName: 'LessonComputer.mu',
     url: '/contact',
     type: 'website',
@@ -37,7 +37,7 @@ export default async function ContactPage() {
       <div className="text-center mb-12">
         <h1 className="text-3xl sm:text-4xl font-bold mb-4">Get in Touch</h1>
         <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-          Have a question about our courses, subscriptions, or your account? We&apos;re happy to help.
+          Have a question before you enrol? Message us and the teacher will reply personally.
         </p>
       </div>
 
@@ -73,7 +73,8 @@ export default async function ContactPage() {
             <MapPin className="w-5 h-5 text-primary" />
           </div>
           <h3 className="font-semibold mb-1">Location</h3>
-          <p className="text-sm text-muted-foreground">{businessAddress ?? 'Mauritius'}</p>
+          <p className="text-sm text-muted-foreground">[REGISTERED COMPANY NAME]</p>
+          <p className="text-sm text-muted-foreground">{businessAddress ?? '[FULL REGISTERED ADDRESS]'}, Mauritius</p>
         </div>
       </div>
 
