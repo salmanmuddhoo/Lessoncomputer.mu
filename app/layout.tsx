@@ -24,11 +24,11 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://lessoncomputer.mu'
 
 export const metadata: Metadata = {
   title: {
-    default: 'LessonComputer.mu | Cambridge Computer Science Tuition',
+    default: 'Cambridge Computer Science Online Tuition — IGCSE 0478, O Level 2210, A Level 9618',
     template: '%s | LessonComputer.mu',
   },
-  description: 'Expert-led Cambridge IGCSE, O Level and A Level Computer Science tuition (0478, 2210, 9618) — video lessons and live classes for students in Mauritius and worldwide.',
-  keywords: ['Cambridge Computer Science', 'IGCSE Computer Science 0478', 'O Level Computer Science 2210', 'A Level Computer Science 9618', 'Mauritius', 'online tuition', 'live classes', 'video lessons'],
+  description: 'Online Cambridge Computer Science tuition — live classes and full video courses for IGCSE 0478, O Level 2210 and AS & A Level 9618. Taught from Mauritius, open to students worldwide.',
+  // No `keywords` tag — it's obsolete and ignored by every major search engine.
   metadataBase: new URL(SITE_URL),
   alternates: { canonical: '/' },
   icons: {
@@ -45,16 +45,16 @@ export const metadata: Metadata = {
   },
   openGraph: {
     siteName: 'LessonComputer.mu',
-    title: 'LessonComputer.mu | Cambridge Computer Science Tuition',
-    description: 'Expert-led Cambridge IGCSE, O Level and A Level Computer Science tuition — video lessons and live classes for students in Mauritius and worldwide.',
+    title: 'Cambridge Computer Science Online Tuition | LessonComputer.mu',
+    description: 'Cambridge Computer Science taught live from Mauritius, to students anywhere in the world.',
     url: SITE_URL,
     type: 'website',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'LessonComputer.mu | Cambridge Computer Science Tuition',
-    description: 'Expert-led Cambridge IGCSE, O Level and A Level Computer Science tuition — video lessons and live classes for students in Mauritius and worldwide.',
+    title: 'Cambridge Computer Science Online Tuition | LessonComputer.mu',
+    description: 'Cambridge Computer Science taught live from Mauritius, to students anywhere in the world.',
   },
 }
 

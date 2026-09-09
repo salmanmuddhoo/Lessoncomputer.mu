@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service | LessonComputer.mu',
-  description: 'Terms of Service for LessonComputer.mu — the rules and conditions for using our platform.',
+  title: 'Terms of Service',
+  description: 'Terms of Service for LessonComputer — Cambridge Computer Science tuition, the rules and conditions for using our platform.',
+  alternates: { canonical: '/terms' },
 }
 
 export default function TermsPage() {
@@ -34,9 +36,10 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-2">3. Purchases & Payments</h2>
           <p>
-            All purchases are final unless covered by our Refund Policy. Prices are displayed in
-            Mauritian Rupees (MRU). We reserve the right to change pricing at any time; existing
-            purchases will not be affected.
+            All purchases are final unless covered by our{' '}
+            <Link href="/refunds" className="text-primary hover:underline">Refund Policy</Link>. Prices
+            may be displayed in Mauritian Rupees (MUR) or other currencies depending on your location.
+            We reserve the right to change pricing at any time; existing purchases will not be affected.
           </p>
         </section>
 

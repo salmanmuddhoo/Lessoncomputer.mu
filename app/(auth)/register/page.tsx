@@ -2,7 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { RegisterForm } from './register-form'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Create Account | LessonComputer.mu' }
+export const metadata: Metadata = {
+  title: 'Create Account',
+  description: 'Create your account to enrol, watch lessons and join live classes.',
+  alternates: { canonical: '/register' },
+}
 
 export default async function RegisterPage() {
   const supabase = await createClient()

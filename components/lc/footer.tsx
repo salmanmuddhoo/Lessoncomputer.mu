@@ -69,7 +69,7 @@ export async function Footer() {
           <div className="col-span-2 md:col-span-1">
             <Logo className="mb-5" />
             <p className="text-sm text-muted-foreground leading-relaxed mb-5">
-              The leading online learning platform for Mauritian students, Grades 7–12.
+              Cambridge Computer Science and ICT tuition. Taught from Mauritius. Open to students worldwide.
             </p>
             <a
               href="mailto:support@lessoncomputer.mu"
@@ -143,8 +143,12 @@ export async function Footer() {
         </div>
 
         <div className="border-t border-border pt-7 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} LessonComputer.mu. All rights reserved.</p>
-          <p>Made with dedication for Mauritian students</p>
+          <div className="text-center sm:text-left space-y-0.5">
+            <p>&copy; {new Date().getFullYear()} [REGISTERED COMPANY NAME]. All rights reserved.</p>
+            <p>Business Registration Number: [BRN]</p>
+            <p>Registered address: [FULL ADDRESS], Mauritius</p>
+          </div>
+          <p>Taught from Mauritius. Open to students worldwide.</p>
         </div>
       </div>
     </footer>

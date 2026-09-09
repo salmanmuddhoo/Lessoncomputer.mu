@@ -5,11 +5,11 @@ import type { Grade } from '@/lib/types/database'
 
 export const metadata: Metadata = {
   title: 'Courses',
-  description: 'Browse Cambridge IGCSE, O Level and A Level Computer Science courses on LessonComputer.mu — video lessons and live classes.',
+  description: 'Browse Cambridge IGCSE 0478, O Level 2210 and AS & A Level 9618 Computer Science courses on LessonComputer.mu — video lessons and live classes, taught from Mauritius, open to students worldwide.',
   alternates: { canonical: '/grades' },
   openGraph: {
     title: 'Courses | LessonComputer.mu',
-    description: 'Browse Cambridge IGCSE, O Level and A Level Computer Science courses — video lessons and live classes.',
+    description: 'Browse Cambridge IGCSE, O Level and A Level Computer Science courses — video lessons and live classes, open to students worldwide.',
     siteName: 'LessonComputer.mu',
     url: '/grades',
     type: 'website',
@@ -34,9 +34,10 @@ export default async function GradesPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="mb-10 text-center">
-        <h1 className="text-3xl sm:text-4xl font-bold mb-3">Browse by Grade</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold mb-3">Browse Courses</h1>
         <p className="text-muted-foreground max-w-xl mx-auto">
-          Select your grade to access video lessons and live classes tailored to the Mauritian curriculum.
+          Select your Cambridge syllabus to access video lessons and live classes — taught from
+          Mauritius, open to students worldwide.
         </p>
       </div>
       <GradesSection grades={grades ?? undefined} embedded />

@@ -7,12 +7,15 @@ import Link from 'next/link'
 import { Users, Clock } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Live Classes | LessonComputer.mu',
-  description: 'Join live online classes with expert teachers for Grades 7–12. Interactive sessions tailored to the Mauritian curriculum.',
+  title: 'Live Classes',
+  description: 'Join live online Cambridge Computer Science classes — IGCSE 0478, O Level 2210, AS & A Level 9618 — taught from Mauritius, open to students worldwide.',
+  alternates: { canonical: '/live-classes' },
   openGraph: {
     title: 'Live Classes | LessonComputer.mu',
-    description: 'Join live online classes for Grades 7–12.',
+    description: 'Join live online Cambridge Computer Science classes, open to students worldwide.',
     siteName: 'LessonComputer.mu',
+    url: '/live-classes',
+    type: 'website',
   },
 }
 

@@ -22,8 +22,8 @@ export function CTASection({ isLoggedIn = false, dashboardHref = '/dashboard' }:
             Ready to start learning?
           </h2>
           <p className="relative text-background/60 text-base md:text-lg mb-10 font-light leading-relaxed">
-            Join thousands of Mauritian students already improving their grades
-            with expert-led video lessons and live classes.
+            Join students worldwide improving their Cambridge Computer Science grades
+            with expert-led video lessons and live classes, taught from Mauritius.
           </p>
           <div className="relative flex flex-col sm:flex-row gap-3 justify-center">
             <Button

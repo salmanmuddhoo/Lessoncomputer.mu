@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | LessonComputer.mu',
-  description: 'Privacy Policy for LessonComputer.mu — how we collect, use and protect your personal data.',
+  title: 'Privacy Policy',
+  description: 'Privacy Policy for LessonComputer — Cambridge Computer Science tuition, how we collect, use and protect your personal data.',
+  alternates: { canonical: '/privacy' },
 }
 
 export default function PrivacyPage() {

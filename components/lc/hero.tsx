@@ -14,7 +14,7 @@ export function Hero() {
         {/* Eyebrow */}
         <p className="animate-blur-in inline-flex items-center gap-2 text-xs font-semibold tracking-[0.15em] text-primary uppercase mb-6">
           <span className="w-6 h-px bg-primary" />
-          Mauritius Online Learning Platform
+          Cambridge Computer Science, Taught from Mauritius
           <span className="w-6 h-px bg-primary" />
         </p>
 
@@ -31,15 +31,15 @@ export function Hero() {
 
         {/* Subtitle — DM Sans */}
         <p className="animate-blur-in-delay-2 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed font-light">
-          Premium video lessons and live classes for Grades&nbsp;7–12,
-          designed around the Mauritius national curriculum.
+          Live classes and full video courses for Cambridge IGCSE 0478, O Level 2210 and
+          AS &amp; A Level 9618 Computer Science — taught from Mauritius, open to students worldwide.
         </p>
 
         {/* CTAs */}
         <div className="animate-blur-in-delay-3 flex flex-col sm:flex-row gap-3 justify-center">
           <Button size="lg" asChild className="bg-foreground text-background hover:bg-foreground/90 font-semibold rounded-full px-9 h-12 text-[15px]">
             <Link href="/grades">
-              Browse Grades <ArrowRight className="ml-2 w-4 h-4" />
+              Browse Courses <ArrowRight className="ml-2 w-4 h-4" />
             </Link>
           </Button>
         </div>

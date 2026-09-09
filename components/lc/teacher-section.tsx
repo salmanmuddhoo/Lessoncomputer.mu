@@ -10,25 +10,26 @@ export function TeacherSection() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/placeholder-user.jpg"
-            alt="Your teacher at LessonComputer.mu"
+            alt="Shoheb Muddhoo, Cambridge Computer Science teacher"
             className="w-32 h-32 sm:w-40 sm:h-40 rounded-2xl object-cover border-4 border-primary/20 shrink-0"
           />
           <div className="text-center sm:text-left">
             <p className="text-xs font-semibold tracking-[0.15em] text-primary uppercase mb-2">Meet Your Teacher</p>
             <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-2">
-              [Teacher Name] — Grade 7–12 Computer Science
+              Shoheb Muddhoo — Cambridge Computer Science Teacher
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground max-w-xl leading-relaxed mb-4">
-              With years of experience teaching the Mauritius national curriculum, our lead
-              teacher has helped hundreds of students build confidence and top their exams —
-              through clear video lessons and live interactive classes.
+              With 15+ years teaching Cambridge IGCSE, O Level and A Level Computer Science,
+              Shoheb has helped hundreds of students build confidence and top their exams —
+              through clear video lessons and live interactive classes, taught from Mauritius
+              to students worldwide.
             </p>
             <div className="flex flex-wrap justify-center sm:justify-start gap-4 text-xs sm:text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
-                <GraduationCap className="w-4 h-4 text-primary" /> Qualified educator
+                <GraduationCap className="w-4 h-4 text-primary" /> Cambridge-qualified educator
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-primary" /> Years of teaching experience
+                <Award className="w-4 h-4 text-primary" /> 15+ years teaching experience
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-primary" /> Hundreds of students taught

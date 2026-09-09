@@ -42,10 +42,10 @@ export default async function AboutPage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/placeholder-user.jpg"
-          alt="[Teacher Name], Cambridge Computer Science teacher"
+          alt="Shoheb Muddhoo, Cambridge Computer Science teacher"
           className="w-32 h-32 rounded-full object-cover mx-auto mb-5 border-4 border-primary/20"
         />
-        <h1 className="text-2xl sm:text-3xl font-bold">[Teacher Name]</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Shoheb Muddhoo</h1>
         <p className="text-muted-foreground mt-1">Cambridge Computer Science Teacher</p>
       </div>
 

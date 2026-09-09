@@ -74,7 +74,7 @@ export function GradeCard({ grade }: GradeCardProps) {
             {(grade.videoCount ?? 0) > 0 && (
               <span className="flex items-center gap-1.5">
                 <Video className="w-3.5 h-3.5 text-primary" />
-                {grade.videoCount} videos
+                {grade.videoCount} video{grade.videoCount === 1 ? '' : 's'}
               </span>
             )}
             {(grade.liveClassCount ?? 0) > 0 && (

@@ -6,11 +6,11 @@ import { Badge } from '@/components/ui/badge'
 
 export const metadata: Metadata = {
   title: 'Blog',
-  description: 'Tips, guides and news for Cambridge Computer Science students.',
+  description: 'Tips, guides and news for Cambridge IGCSE, O Level and A Level Computer Science students.',
   alternates: { canonical: '/blog' },
   openGraph: {
     title: 'Blog | LessonComputer.mu',
-    description: 'Tips, guides and news for Cambridge Computer Science students.',
+    description: 'Tips, guides and news for Cambridge IGCSE, O Level and A Level Computer Science students.',
     siteName: 'LessonComputer.mu',
     url: '/blog',
     type: 'website',
@@ -34,7 +34,7 @@ export default async function BlogPage() {
             Tips & Guides
           </h1>
           <p className="text-muted-foreground mt-4 text-base max-w-xl mx-auto">
-            Study tips, ICT guides and updates for Mauritian students.
+            Study tips, Computer Science guides and updates for Cambridge students, wherever they're studying from.
           </p>
         </div>
 
