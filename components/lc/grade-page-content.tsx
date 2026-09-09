@@ -185,7 +185,7 @@ export function GradePageContent({
                   )}
                   <p className="text-xs text-muted-foreground mt-1">
                     {pkgChapters.length} chapter{pkgChapters.length !== 1 ? 's' : ''}
-                    {' · '}{totalVideos} video{totalVideos !== 1 ? 's' : ''}
+                    {totalVideos > 0 ? ` · ${totalVideos} video${totalVideos !== 1 ? 's' : ''}` : ''}
                     {totalDocs > 0 ? ` · ${totalDocs} doc${totalDocs !== 1 ? 's' : ''}` : ''}
                   </p>
                   <p className="text-xs font-medium text-primary mt-1">{formatAccessDuration(pkg.expires_days)}</p>

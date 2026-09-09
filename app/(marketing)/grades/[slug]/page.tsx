@@ -478,7 +478,10 @@ export default async function GradePage({ params }: PageProps) {
       {!hasPackages && !liveSubscriptionEnabled && (
         <div className="py-24 text-center">
           <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">No content available for this grade yet. Check back soon!</p>
+          <p className="text-muted-foreground">
+            This course opens for the [MONTH YEAR] cohort. Join the waitlist and we will email you
+            the moment enrolment opens.
+          </p>
         </div>
       )}
     </div>
