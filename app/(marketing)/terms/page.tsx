@@ -38,8 +38,10 @@ export default function TermsPage() {
           <p>
             All purchases are final unless covered by our{' '}
             <Link href="/refunds" className="text-primary hover:underline">Refund Policy</Link>. Prices
-            may be displayed in Mauritian Rupees (MUR) or other currencies depending on your location.
-            We reserve the right to change pricing at any time; existing purchases will not be affected.
+            for Cambridge courses are charged in US Dollars (USD). Prices for Mauritius national
+            curriculum courses are charged in Mauritian Rupees (MUR). Any other currency shown is an
+            estimate only, clearly labelled, and is never the amount actually charged. We reserve the
+            right to change pricing at any time; existing purchases will not be affected.
           </p>
         </section>
 

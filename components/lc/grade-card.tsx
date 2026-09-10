@@ -84,7 +84,9 @@ export function GradeCard({ grade }: GradeCardProps) {
               </span>
             )}
             {!grade.videoCount && !grade.liveClassCount && (
-              <span className="text-muted-foreground text-xs">Content coming soon</span>
+              <span className="text-muted-foreground text-xs">
+                Opens for the [MONTH YEAR] cohort — join the waitlist
+              </span>
             )}
           </div>
 
