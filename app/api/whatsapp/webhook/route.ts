@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
           const studentId = await resolveStudentIdByPhone(admin, fromDigits)
           const preview = String(msg.text.body).slice(0, 200)
 
-          const { data: convo } = await (admin as any)
+          const { data: convo, error: convoError } = await (admin as any)
             .from('whatsapp_conversations')
             .upsert(
               {
@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
             )
             .select('id, unread_count')
             .single()
+          if (convoError) console.error('[whatsapp] failed to upsert conversation', convoError)
           if (!convo) continue
 
           const { error: insertError } = await (admin as any)
@@ -104,7 +105,9 @@ export async function POST(req: NextRequest) {
             })
           // Unique violation on wa_message_id = Meta redelivered the same event; skip the
           // unread bump so retries don't inflate the admin's unread count.
-          if (!insertError) {
+          if (insertError) {
+            console.error('[whatsapp] failed to insert message', insertError)
+          } else {
             await (admin as any)
               .from('whatsapp_conversations')
               .update({ unread_count: (convo.unread_count ?? 0) + 1 })
