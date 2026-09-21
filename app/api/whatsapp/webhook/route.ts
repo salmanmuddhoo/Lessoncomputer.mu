@@ -26,6 +26,7 @@ export function GET(req: NextRequest) {
   if (mode === 'subscribe' && expected && token === expected) {
     return new NextResponse(challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } })
   }
+  console.warn('[whatsapp] webhook verification failed', { mode, tokenMatches: token === expected, tokenConfigured: !!expected })
   return new NextResponse('Forbidden', { status: 403 })
 }
 
@@ -54,10 +55,22 @@ export async function POST(req: NextRequest) {
     for (const entry of body.entry ?? []) {
       for (const change of entry.changes ?? []) {
         const value = change.value ?? {}
+        // Diagnostic: if Meta is calling this endpoint but no conversation ever shows up
+        // in the admin inbox, check Vercel logs for this line — it confirms delivery is
+        // reaching us and shows exactly what field/message type was sent.
+        console.log('[whatsapp] webhook change', {
+          field: change.field,
+          messageCount: (value.messages ?? []).length,
+          messageTypes: (value.messages ?? []).map((m: any) => m.type),
+          statusCount: (value.statuses ?? []).length,
+        })
 
         // Inbound messages — the two-way inbox.
         for (const msg of value.messages ?? []) {
-          if (msg.type !== 'text' || !msg.text?.body) continue // only free-form text for now
+          if (msg.type !== 'text' || !msg.text?.body) {
+            console.log('[whatsapp] skipping non-text inbound message', { type: msg.type })
+            continue
+          }
 
           const fromDigits = normalizeWhatsAppDigits(msg.from)
           if (!fromDigits) continue
