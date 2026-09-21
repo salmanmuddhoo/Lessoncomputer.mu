@@ -20,16 +20,17 @@ function GoogleIcon({ className }: { className?: string }) {
 // One-click Google sign-in / sign-up. After Google auth the browser returns to
 // /api/auth/callback, which creates the session; students without a grade are then
 // sent to /onboarding to complete it.
-export function GoogleSignInButton({ label = 'Continue with Google' }: { label?: string }) {
+export function GoogleSignInButton({ label = 'Continue with Google', redirectTo }: { label?: string; redirectTo?: string }) {
   const [loading, setLoading] = useState(false)
 
   async function handleGoogle() {
     setLoading(true)
     try {
       const supabase = createClient()
+      const callbackUrl = `${window.location.origin}/api/auth/callback${redirectTo ? `?next=${encodeURIComponent(redirectTo)}` : ''}`
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/api/auth/callback` },
+        options: { redirectTo: callbackUrl },
       })
       if (error) {
         toast.error(error.message)

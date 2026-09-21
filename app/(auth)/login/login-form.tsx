@@ -25,7 +25,8 @@ type FormData = z.infer<typeof schema>
 export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') ?? '/dashboard'
+  const rawRedirectTo = searchParams.get('redirectTo')
+  const redirectTo = rawRedirectTo ?? '/dashboard'
   const errorParam = searchParams.get('error')
   const [loading, setLoading] = useState(false)
 
@@ -49,7 +50,7 @@ export function LoginForm() {
     }
 
     // If there's an explicit redirectTo param, honour it; otherwise route by role
-    if (searchParams.get('redirectTo')) {
+    if (rawRedirectTo) {
       router.push(redirectTo)
       router.refresh()
       return
@@ -78,7 +79,7 @@ export function LoginForm() {
       </CardHeader>
 
       <CardContent>
-        <GoogleSignInButton label="Sign in with Google" />
+        <GoogleSignInButton label="Sign in with Google" redirectTo={rawRedirectTo ?? undefined} />
         <div className="flex items-center gap-3 my-4">
           <div className="flex-1 border-t border-border/60" />
           <span className="text-xs text-muted-foreground">or</span>
@@ -139,7 +140,10 @@ export function LoginForm() {
       <CardFooter className="justify-center border-t border-border/40 pt-4">
         <p className="text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
-          <Link href="/register" className="text-primary font-medium hover:underline">
+          <Link
+            href={rawRedirectTo ? `/register?redirectTo=${encodeURIComponent(rawRedirectTo)}` : '/register'}
+            className="text-primary font-medium hover:underline"
+          >
             Sign up for free
           </Link>
         </p>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ShoppingCart, Radio, Lock, RefreshCw, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,7 @@ interface Props {
   triggerSize?: 'sm' | 'default'
   isLoggedIn?: boolean
   isNextMonthMode?: boolean
+  autoOpen?: boolean
 }
 
 export function BuySubscribeDialog({
@@ -64,6 +65,7 @@ export function BuySubscribeDialog({
   triggerSize = 'default',
   isLoggedIn,
   isNextMonthMode = false,
+  autoOpen = false,
 }: Props) {
   const price = usePrice()
   const currency = useCurrency()
@@ -93,6 +95,20 @@ export function BuySubscribeDialog({
     setAgreed(false)
     setOpen(true)
   }
+
+  // Resume a purchase a guest started before signing in: the grade page passes autoOpen=true
+  // (decoded from a `?buy=...` param preserved through the login/register redirect) so the
+  // dialog reopens by itself instead of dropping the new customer on a bare page.
+  const autoOpenedRef = useRef(false)
+  useEffect(() => {
+    if (autoOpen && !autoOpenedRef.current) {
+      autoOpenedRef.current = true
+      handleOpen()
+      // Strip the one-time intent params so a refresh/back-navigation doesn't reopen it.
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen])
 
   function toggle(id: string) {
     if (id === mandatoryPackageId) return

@@ -66,6 +66,7 @@ interface Props {
   liveMonthLabel?: string
   liveMonthPackageId?: string
   pastLivePackages?: { id: string; name: string; month: number; year: number }[]
+  autoOpenPackageId?: string
 }
 
 export function GradePageContent({
@@ -86,6 +87,7 @@ export function GradePageContent({
   liveMonthLabel,
   liveMonthPackageId,
   pastLivePackages = [],
+  autoOpenPackageId,
 }: Props) {
   const price = usePrice()
   const [openChapters, setOpenChapters] = useState<Record<string, boolean>>({})
@@ -215,10 +217,11 @@ export function GradePageContent({
                           triggerLabel="Buy"
                           triggerSize="sm"
                           isLoggedIn={isLoggedIn}
+                          autoOpen={autoOpenPackageId === pkg.id}
                         />
                       ) : (
                         <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
-                          <Link href={`/login?redirectTo=/grades/${gradeSlug}`}>
+                          <Link href={`/login?redirectTo=${encodeURIComponent(`/grades/${gradeSlug}?buy=video&pkg=${pkg.id}`)}`}>
                             <ShoppingCart className="w-4 h-4 mr-2" />
                             Buy
                           </Link>
