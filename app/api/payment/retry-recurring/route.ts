@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
-import { claimMipsPayment, type MipsEnvironment } from '@/lib/mips'
+import { claimMipsPayment, toMipsOrderId, type MipsEnvironment } from '@/lib/mips'
 import { getMonthDateRange } from '@/lib/subscription-billing'
 import crypto from 'crypto'
 
@@ -140,16 +140,17 @@ export async function POST(req: NextRequest) {
       await (admin as any)
         .from('mips_orders')
         .insert({
-          id:           claimOrderId,
-          student_id:   user.id,
-          order_type:   'live',
-          package_ids:  [livePkg.id],
-          is_recurring: true,
+          id:                   claimOrderId,
+          student_id:           user.id,
+          order_type:           'live',
+          package_ids:          [livePkg.id],
+          is_recurring:         true,
           amount,
-          currency:     token.currency ?? order.currency ?? 'MUR',
-          description:  `Live classes (retry) — ${livePkg.month}/${livePkg.year}`,
-          status:       'paid',
-          metadata:     { env, claim: true, retry: true },
+          currency:             token.currency ?? order.currency ?? 'MUR',
+          description:          `Live classes (retry) — ${livePkg.month}/${livePkg.year}`,
+          status:               'paid',
+          mips_transaction_id:  toMipsOrderId(claimOrderId),
+          metadata:             { env, claim: true, retry: true },
         })
 
       await (admin as any)
