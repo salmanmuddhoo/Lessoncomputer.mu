@@ -6,6 +6,7 @@ import { formatMoney } from '@/lib/currency-format'
 import { GradePageContent } from '@/components/lc/grade-page-content'
 import { DemoVideosButton } from '@/components/lc/demo-videos-button'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
+import { RestoreRecurringButton } from '@/components/lc/restore-recurring-button'
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { Badge } from '@/components/ui/badge'
 import { BookOpen, Users, Package, Clock, Radio, AlertCircle, RefreshCw } from 'lucide-react'
@@ -163,13 +164,14 @@ export default async function GradePage({ params }: PageProps) {
   let isLiveSubscribed = false
   let isNextMonthSubscribed = false
   let hasRecurringLive = false
+  let restorableSubscriptionId: string | null = null
 
   if (user) {
     const today = new Date().toISOString().split('T')[0]!
     // No date filter — we need all active subs including upcoming ones for the recurring check
     const { data: subs } = await supabase
       .from('student_subscriptions')
-      .select('package_id, is_recurring, valid_from, valid_until')
+      .select('id, package_id, is_recurring, valid_from, valid_until')
       .eq('student_id', user.id)
       .eq('status', 'active')
       .not('package_id', 'is', null)
@@ -211,6 +213,17 @@ export default async function GradePage({ params }: PageProps) {
       // Recurring check has no date gate — an upcoming recurring sub still blocks a new purchase
       if ((s as any).is_recurring && allGradeLiveIds.has(s.package_id)) {
         hasRecurringLive = true
+      }
+
+      // Already paid for the current/next sellable month but auto-renewal was cancelled
+      // (is_recurring=false) — offer "Restore recurring" instead of a fresh purchase.
+      // No date gate: a future paid month (valid_from > today) still counts.
+      const isTargetMonth =
+        (currentLivePackage && s.package_id === (currentLivePackage as any).id) ||
+        (nextMonthLivePackage && s.package_id === (nextMonthLivePackage as any).id)
+      const notExpired = !s.valid_until || s.valid_until >= today
+      if (isTargetMonth && !(s as any).is_recurring && notExpired) {
+        restorableSubscriptionId = s.id
       }
     }
   }
@@ -399,6 +412,10 @@ export default async function GradePage({ params }: PageProps) {
                       isLoggedIn={!!user}
                     />
                   )}
+                  {/* Next month already paid for but auto-renewal was cancelled */}
+                  {!hasRecurringLive && isNextMonthSubscribed && restorableSubscriptionId && user && (
+                    <RestoreRecurringButton subscriptionId={restorableSubscriptionId} />
+                  )}
                 </div>
               ) : hasRecurringLive ? (
                 <div className="flex flex-col items-end gap-1">
@@ -406,6 +423,11 @@ export default async function GradePage({ params }: PageProps) {
                     <RefreshCw className="w-3 h-3" /> Auto-renewal active
                   </Badge>
                   <span className="text-xs text-muted-foreground">Next month charged on day {billing.billingDay}</span>
+                </div>
+              ) : restorableSubscriptionId && user ? (
+                <div className="flex flex-col items-end gap-1">
+                  <RestoreRecurringButton subscriptionId={restorableSubscriptionId} />
+                  <span className="text-xs text-muted-foreground">Already paid for {liveMonthLabel} — just resume auto-renewal</span>
                 </div>
               ) : user ? (
                 <BuySubscribeDialog

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Video, Users, BookOpen,
   LogOut, Settings, ChevronRight, ChevronDown, Radio, Menu, X, Package, CalendarDays,
-  BarChart2, ClipboardList, Megaphone, UserCheck, CreditCard, Newspaper, Landmark, MessageSquareQuote, GraduationCap, Contact,
+  BarChart2, ClipboardList, Megaphone, UserCheck, CreditCard, Newspaper, Landmark, MessageSquareQuote, GraduationCap, Contact, MessageCircle,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
 import { ThemeToggle } from '@/components/lc/theme-toggle'
@@ -29,6 +29,7 @@ const NAV: NavEntry[] = [
   ] },
   { type: 'link', label: 'Students',     href: '/admin/students',     icon: Users },
   { type: 'link', label: 'Messages',     href: '/admin/broadcasts',   icon: Megaphone },
+  { type: 'link', label: 'WhatsApp',     href: '/admin/whatsapp',     icon: MessageCircle },
   { type: 'link', label: 'Parent Groups', href: '/admin/parent-groups', icon: Contact },
   { type: 'link', label: 'Attendance',   href: '/admin/attendance',   icon: UserCheck },
   { type: 'link', label: 'Finance',      href: '/admin/finance',      icon: Landmark },
@@ -72,7 +73,34 @@ function useUnreadNotificationCount() {
   return count
 }
 
-function NavContent({ onNav, unreadCount = 0, canAccessFinance = false }: { onNav?: () => void; unreadCount?: number; canAccessFinance?: boolean }) {
+// Unread inbound WhatsApp messages (sum of whatsapp_conversations.unread_count), shown as
+// a badge on the WhatsApp menu item. Same refetch cadence as the Messages badge above.
+function useWhatsAppUnreadCount() {
+  const [count, setCount] = useState(0)
+  const pathname = usePathname()
+  useEffect(() => {
+    let active = true
+    const supabase = createClient()
+    async function fetchCount() {
+      const { data, error } = await (supabase as any)
+        .from('whatsapp_conversations')
+        .select('unread_count')
+        .gt('unread_count', 0)
+        .limit(1000)
+      if (error) console.error('[admin-sidebar] unread whatsapp count failed:', error.message)
+      const total = (Array.isArray(data) ? data : []).reduce((sum: number, r: any) => sum + (r.unread_count ?? 0), 0)
+      if (active) setCount(total)
+    }
+    fetchCount()
+    const interval = setInterval(fetchCount, 60_000)
+    const onFocus = () => fetchCount()
+    window.addEventListener('focus', onFocus)
+    return () => { active = false; clearInterval(interval); window.removeEventListener('focus', onFocus) }
+  }, [pathname])
+  return count
+}
+
+function NavContent({ onNav, unreadCount = 0, whatsappUnreadCount = 0, canAccessFinance = false }: { onNav?: () => void; unreadCount?: number; whatsappUnreadCount?: number; canAccessFinance?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -127,6 +155,10 @@ function NavContent({ onNav, unreadCount = 0, canAccessFinance = false }: { onNa
                 {entry.href === '/admin/broadcasts' && unreadCount > 0 ? (
                   <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
                     {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                ) : entry.href === '/admin/whatsapp' && whatsappUnreadCount > 0 ? (
+                  <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                    {whatsappUnreadCount > 99 ? '99+' : whatsappUnreadCount}
                   </span>
                 ) : isActive(entry.href, entry.exact) ? (
                   <ChevronRight className="w-3 h-3 ml-auto" />
@@ -200,6 +232,7 @@ function NavContent({ onNav, unreadCount = 0, canAccessFinance = false }: { onNa
 export function AdminSidebar({ canAccessFinance = false }: { canAccessFinance?: boolean }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const unreadCount = useUnreadNotificationCount()
+  const whatsappUnreadCount = useWhatsAppUnreadCount()
 
   return (
     <>
@@ -209,7 +242,7 @@ export function AdminSidebar({ canAccessFinance = false }: { canAccessFinance?: 
           <Logo size="sm" onDark />
           <span className="text-xs text-muted-foreground mt-1 block">Admin Panel</span>
         </div>
-        <NavContent unreadCount={unreadCount} canAccessFinance={canAccessFinance} />
+        <NavContent unreadCount={unreadCount} whatsappUnreadCount={whatsappUnreadCount} canAccessFinance={canAccessFinance} />
       </aside>
 
       {/* ── Mobile top bar ── */}
@@ -218,12 +251,12 @@ export function AdminSidebar({ canAccessFinance = false }: { canAccessFinance?: 
         <button
           onClick={() => setMobileOpen(true)}
           className="relative p-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-          aria-label={unreadCount > 0 ? `Open menu (${unreadCount} unread)` : 'Open menu'}
+          aria-label={unreadCount + whatsappUnreadCount > 0 ? `Open menu (${unreadCount + whatsappUnreadCount} unread)` : 'Open menu'}
         >
           <Menu className="w-5 h-5" />
-          {unreadCount > 0 && (
+          {unreadCount + whatsappUnreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {unreadCount + whatsappUnreadCount > 99 ? '99+' : unreadCount + whatsappUnreadCount}
             </span>
           )}
         </button>
@@ -243,7 +276,7 @@ export function AdminSidebar({ canAccessFinance = false }: { canAccessFinance?: 
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <NavContent onNav={() => setMobileOpen(false)} unreadCount={unreadCount} canAccessFinance={canAccessFinance} />
+            <NavContent onNav={() => setMobileOpen(false)} unreadCount={unreadCount} whatsappUnreadCount={whatsappUnreadCount} canAccessFinance={canAccessFinance} />
           </aside>
         </div>
       )}

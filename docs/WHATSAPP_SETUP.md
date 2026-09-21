@@ -78,6 +78,34 @@ messaging your number. Since parents won't have messaged you first, a broadcast 
 - **Live-class enrolment** — when a student submits their parent's number, the parent is added to
   their grade's current-year cohort and (if you set a group invite link) sent that link to
   self-join the real WhatsApp group.
+- **Admin → WhatsApp** — a two-way inbox. When a parent messages your business number directly,
+  it shows up here and an admin can reply from the platform (see Part 3).
 
 > Reminder: the WhatsApp API cannot add anyone to a group or post to a group — that's why the app
 > sends 1-to-1 messages and an invite link, rather than posting in a group.
+
+---
+
+## Part 3 — Two-way inbox (Admin → WhatsApp)
+
+Meta only delivers inbound messages (and delivery/read receipts) to your server if you configure
+a **webhook**. The app already has the endpoint; you just need to point Meta at it.
+
+| Variable | Value |
+| --- | --- |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Any secret string you choose — must match exactly what you type into Meta below. |
+
+### Steps
+1. Add `WHATSAPP_WEBHOOK_VERIFY_TOKEN` to Vercel (Production, and Preview if needed) alongside
+   the two credentials above, and redeploy.
+2. In **Meta → your app → WhatsApp → Configuration → Webhooks**, click **Edit**:
+   - **Callback URL**: `https://<your-domain>/api/whatsapp/webhook`
+   - **Verify token**: the exact same string as `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
+   - Click **Verify and save** (Meta calls the URL once to confirm).
+3. Under the same webhook, click **Manage** → subscribe to the **messages** field.
+
+Once subscribed, a parent's message to your business number appears in **Admin → WhatsApp**
+within a few seconds, and the admin can reply directly from there. Replies only deliver within
+WhatsApp's 24-hour customer-service window (opened by the parent's own message), so an admin
+reply to an old, expired conversation will fail — ask the parent to message again, or use a
+template-based broadcast instead for anything time-sensitive.
