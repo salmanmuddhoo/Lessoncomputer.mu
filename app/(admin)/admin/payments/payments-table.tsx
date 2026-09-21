@@ -116,7 +116,7 @@ export function PaymentsTable({ initialOrders, grades = [] }: { initialOrders: M
               const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.failed
               const StatusIcon = cfg.icon
               const date = new Date(order.created_at)
-              const canActivate = order.status === 'pending' || order.status === 'failed'
+              const canActivate = order.status === 'pending'
               return (
                 <tr key={order.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">

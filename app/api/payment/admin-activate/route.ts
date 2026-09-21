@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { getMonthDateRange } from '@/lib/subscription-billing'
 
-// Admin-only: manually activate subscriptions for a pending/failed order
+// Admin-only: manually activate subscriptions for a pending order (e.g. a bank transfer or
+// cash payment reconciled outside MIPS). A failed order was never actually paid — it must be
+// retried or re-purchased by the student, not activated for free.
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -24,6 +26,9 @@ export async function POST(req: NextRequest) {
 
   if (!orderRaw) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   if (orderRaw.status === 'paid') return NextResponse.json({ ok: true, alreadyPaid: true })
+  if (orderRaw.status !== 'pending') {
+    return NextResponse.json({ error: `Only pending orders can be manually activated (this order is ${orderRaw.status}).` }, { status: 400 })
+  }
 
   // Resolve valid_from/valid_until for live packages
   const { data: pkgRows } = await (admin as any)

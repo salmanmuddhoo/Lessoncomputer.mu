@@ -743,7 +743,7 @@ export default function AdminStudentsPage() {
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={statusBadge(p.status)}>{p.status}</span>
                           <span className="text-sm font-semibold">{formatMoney(p.amount)}</span>
-                          {(p.status === 'pending' || p.status === 'failed') && (
+                          {p.status === 'pending' && (
                             <Button
                               size="sm"
                               variant="outline"
