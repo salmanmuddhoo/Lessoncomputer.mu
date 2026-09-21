@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -47,6 +48,8 @@ interface RegisterFormProps {
 }
 
 export function RegisterForm({ grades }: RegisterFormProps) {
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirectTo') ?? undefined
   const [loading, setLoading] = useState(false)
   const [confirmedEmail, setConfirmedEmail] = useState<string | null>(null)
 
@@ -71,7 +74,7 @@ export function RegisterForm({ grades }: RegisterFormProps) {
           referral_source: data.referral_source,
           referral_other: data.referral_source === 'other' ? (data.referral_other?.trim() || null) : null,
         },
-        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/api/auth/callback${redirectTo ? `?next=${encodeURIComponent(redirectTo)}` : ''}`,
       },
     })
 
@@ -124,7 +127,12 @@ export function RegisterForm({ grades }: RegisterFormProps) {
         <CardFooter className="justify-center border-t border-border/40 pt-4 pb-5">
           <p className="text-sm text-muted-foreground">
             Already confirmed?{' '}
-            <Link href="/login" className="text-primary font-medium hover:underline">Sign in</Link>
+            <Link
+              href={redirectTo ? `/login?redirectTo=${encodeURIComponent(redirectTo)}` : '/login'}
+              className="text-primary font-medium hover:underline"
+            >
+              Sign in
+            </Link>
           </p>
         </CardFooter>
       </Card>
@@ -140,7 +148,7 @@ export function RegisterForm({ grades }: RegisterFormProps) {
       </CardHeader>
 
       <CardContent>
-        <GoogleSignInButton label="Sign up with Google" />
+        <GoogleSignInButton label="Sign up with Google" redirectTo={redirectTo} />
         <p className="text-xs text-muted-foreground text-center mt-2">
           You&apos;ll tell us what you&apos;re studying right after — takes a second.
         </p>
@@ -260,7 +268,12 @@ export function RegisterForm({ grades }: RegisterFormProps) {
       <CardFooter className="justify-center border-t border-border/40 pt-4">
         <p className="text-sm text-muted-foreground">
           Already have an account?{' '}
-          <Link href="/login" className="text-primary font-medium hover:underline">Sign in</Link>
+          <Link
+            href={redirectTo ? `/login?redirectTo=${encodeURIComponent(redirectTo)}` : '/login'}
+            className="text-primary font-medium hover:underline"
+          >
+            Sign in
+          </Link>
         </p>
       </CardFooter>
     </Card>

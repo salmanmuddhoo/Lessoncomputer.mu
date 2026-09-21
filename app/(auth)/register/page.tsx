@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { RegisterForm } from './register-form'
 import type { Metadata } from 'next'
@@ -16,5 +17,9 @@ export default async function RegisterPage() {
     .eq('is_active', true)
     .order('order_index')
 
-  return <RegisterForm grades={grades ?? []} />
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm grades={grades ?? []} />
+    </Suspense>
+  )
 }

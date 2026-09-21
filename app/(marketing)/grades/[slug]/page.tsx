@@ -14,6 +14,7 @@ import { getBillingSettings, getTargetMonth } from '@/lib/subscription-billing'
 
 interface PageProps {
   params: Promise<{ slug: string }>
+  searchParams: Promise<{ buy?: string; pkg?: string }>
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -48,8 +49,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function GradePage({ params }: PageProps) {
+export default async function GradePage({ params, searchParams }: PageProps) {
   const { slug } = await params
+  // A guest who clicked Subscribe/Buy is sent to /login?redirectTo=<this page>?buy=... —
+  // once they're back here signed in, these tell us which purchase dialog to auto-open so
+  // they can continue straight away instead of landing on a bare grade page (or dashboard).
+  const { buy: buyIntent, pkg: buyPackageId } = await searchParams
   const supabase = await createClient()
 
   const now = new Date()
@@ -444,10 +449,11 @@ export default async function GradePage({ params }: PageProps) {
                   triggerLabel={afterCutoff ? `Subscribe for ${liveMonthLabel}` : 'Subscribe'}
                   isNextMonthMode={afterCutoff}
                   isLoggedIn={!!user}
+                  autoOpen={buyIntent === 'live'}
                 />
               ) : (
                 <a
-                  href={`/login?redirectTo=/grades/${grade.slug}`}
+                  href={`/login?redirectTo=${encodeURIComponent(`/grades/${grade.slug}?buy=live`)}`}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-accent text-sm font-medium transition-colors"
                 >
                   <Radio className="w-4 h-4" />
@@ -493,6 +499,7 @@ export default async function GradePage({ params }: PageProps) {
             liveMonthLabel={liveMonthLabel}
             liveMonthPackageId={(currentLivePackage as any)?.id}
             pastLivePackages={(pastLivePackages ?? []) as any}
+            autoOpenPackageId={buyIntent === 'video' ? buyPackageId : undefined}
           />
         </section>
       )}
