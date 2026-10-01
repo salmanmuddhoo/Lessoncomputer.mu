@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Loader2, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { track } from '@/lib/track'
 
 export function ContactForm() {
   const [name, setName] = useState('')
@@ -33,6 +34,10 @@ export function ContactForm() {
         return
       }
       setSent(true)
+      track('generate_lead', {
+        lead_type: 'contact_form',
+        user_data: { email, first_name: name.split(' ')[0], last_name: name.split(' ').slice(1).join(' ') || undefined },
+      })
     } catch {
       toast.error('Could not send your message. Please check your connection and try again.')
     } finally {

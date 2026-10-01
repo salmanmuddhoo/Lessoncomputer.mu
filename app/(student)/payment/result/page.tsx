@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { CheckCircle2, XCircle, Clock, ArrowRight, ShoppingCart } from 'lucide-react'
 import type { Metadata } from 'next'
 import { PaymentPendingPoller } from '@/components/lc/payment-pending-poller'
+import { PurchaseTracker } from '@/components/lc/purchase-tracker'
+import type { Product } from '@/lib/track'
 
 export const metadata: Metadata = { title: 'Payment Result' }
 
@@ -23,7 +25,7 @@ export default async function PaymentResultPage({ searchParams }: PageProps) {
   // Poll order status (MIPS may take a few seconds for the IMN callback)
   const { data: orderRaw } = await (supabase as any)
     .from('mips_orders')
-    .select('id, status, amount, description, order_type')
+    .select('id, status, amount, description, order_type, package_ids')
     .eq('id', orderId)
     .eq('student_id', user.id)
     .single()
@@ -34,17 +36,59 @@ export default async function PaymentResultPage({ searchParams }: PageProps) {
     amount: number
     description: string
     order_type: string
+    package_ids: string[]
   } | null
 
   if (!order) redirect('/dashboard')
 
   const status = cancelled === '1' ? 'cancelled' : order.status
 
+  // Build the purchase's line items for the client-side `purchase` tracking event —
+  // only needed when we're about to show the success state.
+  let purchaseItems: Product[] = []
+  let fullName: string | null = null
+  if (status === 'paid') {
+    const [{ data: pkgRows }, { data: profile }] = await Promise.all([
+      (supabase as any)
+        .from('subscription_packages')
+        .select('id, name, price, package_type, month, year, grade:grades(slug, live_subscription_price)')
+        .in('id', order.package_ids ?? []),
+      (supabase as any).from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
+    ])
+    fullName = (profile as any)?.full_name ?? null
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+    purchaseItems = ((pkgRows ?? []) as any[]).map((p) => {
+      const isLive = p.package_type === 'live_month'
+      return {
+        item_id: p.id,
+        item_name: isLive ? `${MONTHS[p.month - 1]} ${p.year} Live Classes` : p.name,
+        item_category: isLive ? 'live_class' : 'video_package',
+        item_category2: p.grade?.slug ?? '',
+        price: isLive ? Number(p.grade?.live_subscription_price ?? 0) : Number(p.price ?? 0),
+        quantity: 1,
+      } as Product
+    })
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {status === 'paid' ? (
           <div className="text-center space-y-4">
+            <PurchaseTracker
+              orderId={order.id}
+              userId={user.id}
+              email={user.email ?? null}
+              fullName={fullName}
+              items={purchaseItems.length > 0 ? purchaseItems : [{
+                item_id: order.id,
+                item_name: order.description ?? 'Order',
+                item_category: order.order_type === 'live' ? 'live_class' : 'video_package',
+                item_category2: '',
+                price: order.amount,
+                quantity: 1,
+              }]}
+            />
             <div className="w-16 h-16 bg-green-100 dark:bg-green-950/30 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-9 h-9 text-green-600 dark:text-green-400" />
             </div>

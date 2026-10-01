@@ -162,6 +162,17 @@ export async function POST(req: NextRequest) {
       .single()
     const env: MipsEnvironment = (settings?.mips_environment as MipsEnvironment) ?? 'test'
 
+    // Ad-tracking cookies/headers, captured now so the server-side Meta Purchase event (fired
+    // once MIPS confirms payment) can match this sale back to the browser session that started
+    // it — see docs/TRACKING.md Step 4. Never blocks the order if any of these are absent.
+    const tracking = {
+      fbp: req.cookies.get('_fbp')?.value,
+      fbc: req.cookies.get('_fbc')?.value,
+      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
+      ua: req.headers.get('user-agent') ?? undefined,
+      page_url: req.headers.get('referer') ?? undefined,
+    }
+
     // Create pending order record first to get the UUID (used to derive MIPS id_order)
     const { data: order, error: orderError } = await (supabase as any)
       .from('mips_orders')
@@ -174,6 +185,7 @@ export async function POST(req: NextRequest) {
         currency:    'MUR',
         description,
         status:      'pending',
+        tracking,
         metadata:    { env, recurringAmount: effectiveRecurring ? serverLiveAmount : null },
       })
       .select('id')

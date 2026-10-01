@@ -4,10 +4,10 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { VideoCard } from '@/components/lc/video-card'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
+import { TrackedBuyLink } from '@/components/lc/tracked-buy-link'
 import { usePrice } from '@/components/lc/currency-provider'
 import { StreamablePlayer } from '@/components/lc/streamable-player'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatAccessDuration } from '@/lib/format-duration'
 import {
@@ -208,6 +208,7 @@ export function GradePageContent({
                           subscribedPackageIds={subscribedVideoPackageIds}
                           subscribedLivePackageIds={subscribedLivePackageIds}
                           gradeName={gradeName}
+                          gradeSlug={gradeSlug}
                           liveSubscriptionPrice={liveSubscriptionPrice}
                           liveSubscriptionEnabled={liveSubscriptionEnabled}
                           liveMonthPackageId={liveMonthPackageId}
@@ -220,12 +221,15 @@ export function GradePageContent({
                           autoOpen={autoOpenPackageId === pkg.id}
                         />
                       ) : (
-                        <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-accent">
-                          <Link href={`/login?redirectTo=${encodeURIComponent(`/grades/${gradeSlug}?buy=video&pkg=${pkg.id}`)}`}>
-                            <ShoppingCart className="w-4 h-4 mr-2" />
-                            Buy
-                          </Link>
-                        </Button>
+                        <TrackedBuyLink
+                          href={`/login?redirectTo=${encodeURIComponent(`/grades/${gradeSlug}?buy=video&pkg=${pkg.id}`)}`}
+                          grade={gradeSlug}
+                          product={{ item_id: pkg.id, item_name: pkg.name, item_category: 'video_package', item_category2: gradeSlug, price: pkg.price, quantity: 1 }}
+                          className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-accent text-sm font-medium transition-colors"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          Buy
+                        </TrackedBuyLink>
                       )}
                     </>
                   )}

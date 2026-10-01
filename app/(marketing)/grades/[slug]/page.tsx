@@ -7,6 +7,9 @@ import { GradePageContent } from '@/components/lc/grade-page-content'
 import { DemoVideosButton } from '@/components/lc/demo-videos-button'
 import { BuySubscribeDialog } from '@/components/lc/buy-subscribe-dialog'
 import { RestoreRecurringButton } from '@/components/lc/restore-recurring-button'
+import { TrackedBuyLink } from '@/components/lc/tracked-buy-link'
+import { GradePageViewTracker } from '@/components/lc/grade-page-view-tracker'
+import type { Product } from '@/lib/track'
 import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import { Badge } from '@/components/ui/badge'
 import { BookOpen, Users, Package, Clock, Radio, AlertCircle, RefreshCw } from 'lucide-react'
@@ -298,6 +301,26 @@ export default async function GradePage({ params, searchParams }: PageProps) {
     ? ((currentLivePackage as any).subscription_package_chapters ?? []).map((c: any) => c.chapter_id)
     : []
 
+  // Every paid product shown on this page, for the view_item tracking event.
+  const viewItemProducts: Product[] = [
+    ...(liveSubscriptionEnabled ? [{
+      item_id: (currentLivePackage as any)?.id ?? `live-${grade.slug}`,
+      item_name: `${liveMonthLabel} Live Classes`,
+      item_category: 'live_class' as const,
+      item_category2: grade.slug,
+      price: liveSubscriptionPrice,
+      quantity: 1 as const,
+    }] : []),
+    ...packages.map((p) => ({
+      item_id: p.id,
+      item_name: p.name,
+      item_category: 'video_package' as const,
+      item_category2: grade.slug,
+      price: p.price,
+      quantity: 1 as const,
+    })),
+  ]
+
   const dialogPackageList = packages.map((p) => ({
     id: p.id,
     name: p.name,
@@ -343,7 +366,8 @@ export default async function GradePage({ params, searchParams }: PageProps) {
         </div>
       )}
 
-      <DemoVideosButton videos={demoVideosForButton} />
+      <GradePageViewTracker grade={grade.slug} products={viewItemProducts} />
+      <DemoVideosButton videos={demoVideosForButton} grade={grade.slug} />
 
       {/* Live class subscription banner */}
       {liveSubscriptionEnabled && (
@@ -404,6 +428,7 @@ export default async function GradePage({ params, searchParams }: PageProps) {
                       videoPackages={dialogPackageList}
                       subscribedPackageIds={subscribedVideoPackageIds}
                       gradeName={grade.name}
+                      gradeSlug={grade.slug}
                       liveSubscriptionPrice={liveSubscriptionPrice}
                       liveSubscriptionEnabled={liveSubscriptionEnabled}
                       liveMonthPackageId={(nextMonthLivePackage as any).id}
@@ -439,6 +464,7 @@ export default async function GradePage({ params, searchParams }: PageProps) {
                   videoPackages={dialogPackageList}
                   subscribedPackageIds={subscribedVideoPackageIds}
                   gradeName={grade.name}
+                  gradeSlug={grade.slug}
                   liveSubscriptionPrice={liveSubscriptionPrice}
                   liveSubscriptionEnabled={liveSubscriptionEnabled}
                   liveMonthPackageId={(currentLivePackage as any)?.id}
@@ -452,13 +478,22 @@ export default async function GradePage({ params, searchParams }: PageProps) {
                   autoOpen={buyIntent === 'live'}
                 />
               ) : (
-                <a
+                <TrackedBuyLink
                   href={`/login?redirectTo=${encodeURIComponent(`/grades/${grade.slug}?buy=live`)}`}
+                  grade={grade.slug}
+                  product={{
+                    item_id: (currentLivePackage as any)?.id ?? `live-${grade.slug}`,
+                    item_name: `${liveMonthLabel} Live Classes`,
+                    item_category: 'live_class',
+                    item_category2: grade.slug,
+                    price: liveSubscriptionPrice,
+                    quantity: 1,
+                  }}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-accent text-sm font-medium transition-colors"
                 >
                   <Radio className="w-4 h-4" />
                   Subscribe
-                </a>
+                </TrackedBuyLink>
               )}
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { getMonthDateRange } from '@/lib/subscription-billing'
+import { sendMetaPurchase } from '@/lib/meta-capi'
 
 // Admin-only: manually activate subscriptions for a pending order (e.g. a bank transfer or
 // cash payment reconciled outside MIPS). A failed order was never actually paid — it must be
@@ -91,6 +92,12 @@ export async function POST(req: NextRequest) {
     .from('mips_orders')
     .update({ status: 'paid', updated_at: new Date().toISOString() })
     .eq('id', orderId)
+
+  // A manually-activated order is still a real sale (e.g. a bank transfer reconciled
+  // outside MIPS) — no browser session exists for it, so this is the only Purchase signal.
+  await sendMetaPurchase(admin, orderId).catch((err) =>
+    console.error('[admin-activate] sendMetaPurchase failed:', err)
+  )
 
   console.log('[admin-activate] Manually activated order:', orderId, 'by admin:', user.id)
   return NextResponse.json({ ok: true })

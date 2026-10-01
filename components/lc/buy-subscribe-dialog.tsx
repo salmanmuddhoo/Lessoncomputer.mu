@@ -12,6 +12,7 @@ import {
 import { toast } from 'sonner'
 import { usePrice, useCurrency } from '@/components/lc/currency-provider'
 import { formatAccessDuration } from '@/lib/format-duration'
+import { track, cart, type Product } from '@/lib/track'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -36,6 +37,7 @@ interface Props {
   subscribedPackageIds?: string[]
   subscribedLivePackageIds?: string[]
   gradeName: string
+  gradeSlug?: string
   liveSubscriptionPrice: number
   liveSubscriptionEnabled: boolean
   liveMonthPackageId?: string
@@ -55,6 +57,7 @@ export function BuySubscribeDialog({
   subscribedPackageIds = [],
   subscribedLivePackageIds = [],
   gradeName,
+  gradeSlug = '',
   liveSubscriptionPrice,
   liveSubscriptionEnabled,
   liveMonthPackageId,
@@ -77,6 +80,20 @@ export function BuySubscribeDialog({
   // current month yet (done in Admin → Monthly Content) — so there is nothing to charge.
   const liveNotSetUp = defaultMode === 'live' && liveSubscriptionEnabled && !liveMonthPackageId
 
+  // The product this specific trigger button represents, for add_to_cart/begin_checkout —
+  // derived from how this dialog instance was configured, not from in-dialog selections
+  // (which only exist once it's already open).
+  const clickedProduct: Product | null = defaultMode === 'live'
+    ? (liveMonthPackageId
+      ? { item_id: liveMonthPackageId, item_name: `${liveMonthLabel ?? gradeName} Live Classes`, item_category: 'live_class', item_category2: gradeSlug, price: liveSubscriptionPrice, quantity: 1 }
+      : null)
+    : (mandatoryPackageId
+      ? (() => {
+          const pkg = videoPackages.find((p) => p.id === mandatoryPackageId)
+          return pkg ? { item_id: pkg.id, item_name: pkg.name, item_category: 'video_package', item_category2: gradeSlug, price: pkg.price, quantity: 1 } : null
+        })()
+      : null)
+
   const [open, setOpen] = useState(false)
   const [includeLive, setIncludeLive] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(
@@ -94,6 +111,12 @@ export function BuySubscribeDialog({
     setSelectedPastLive(new Set())
     setAgreed(false)
     setOpen(true)
+    // The "payment step" is now showing with the chosen product — covers both a direct
+    // click and the ?buy= auto-resume flow after login, which has no click of its own.
+    // (user_id/user_data omitted — this dialog isn't passed the logged-in user's id/email.)
+    if (clickedProduct) {
+      track('begin_checkout', cart([clickedProduct]))
+    }
   }
 
   // Resume a purchase a guest started before signing in: the grade page passes autoOpen=true
@@ -175,6 +198,20 @@ export function BuySubscribeDialog({
         toast.error(data.error ?? 'Failed to initiate payment. Please try again.')
         return
       }
+
+      const liveItems: Product[] = hasLiveSelected
+        ? [
+          { item_id: liveMonthPackageId!, item_name: liveMonthLabel ?? gradeName, item_category: 'live_class', item_category2: gradeSlug, price: liveSubscriptionPrice, quantity: 1 },
+          ...unsubscribedPastPackages.filter((p) => selectedPastLive.has(p.id)).map((p): Product => ({
+            item_id: p.id, item_name: `${MONTHS[p.month - 1]} ${p.year} Live Classes`, item_category: 'live_class', item_category2: gradeSlug, price: liveSubscriptionPrice, quantity: 1,
+          })),
+        ]
+        : []
+      const videoItems: Product[] = selectedPackages.map((p) => ({
+        item_id: p.id, item_name: p.name, item_category: 'video_package', item_category2: gradeSlug, price: p.price, quantity: 1,
+      }))
+      track('add_payment_info', cart([...liveItems, ...videoItems], { payment_type: 'card' }))
+
       window.location.href = data.paymentUrl
     } catch {
       toast.error('Network error. Please try again.')
@@ -188,7 +225,10 @@ export function BuySubscribeDialog({
   return (
     <>
       <Button
-        onClick={handleOpen}
+        onClick={() => {
+          if (clickedProduct) track('add_to_cart', { grade: gradeSlug, ...cart([clickedProduct]) })
+          handleOpen()
+        }}
         size={triggerSize}
         className="bg-primary text-primary-foreground hover:bg-accent"
       >

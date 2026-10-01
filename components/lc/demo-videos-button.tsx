@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PlayCircle } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StreamablePlayer } from '@/components/lc/streamable-player'
+import { track } from '@/lib/track'
 
 interface DemoVideo {
   id: string
@@ -13,13 +14,22 @@ interface DemoVideo {
 
 interface Props {
   videos: DemoVideo[]
+  grade?: string
 }
 
 // A single, prominent entry point to a grade's free preview videos — works the same
 // whether the student is here for live classes or video packages, since neither
 // requires a subscription to watch a demo.
-export function DemoVideosButton({ videos }: Props) {
+export function DemoVideosButton({ videos, grade }: Props) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
+
+  // The player itself is a cross-origin Streamable iframe with no onPlay hook available, so
+  // opening it (with autoplay) to a given video is the closest in-app signal to "started
+  // playing" — fires again on switching to a different demo video, not just the first one.
+  useEffect(() => {
+    if (activeIdx !== null) track('watch_sample', { grade, video_title: videos[activeIdx]?.title })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIdx])
 
   if (videos.length === 0) return null
 

@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { GoogleSignInButton } from '@/components/lc/google-signin-button'
+import { track } from '@/lib/track'
 import { toast } from 'sonner'
 
 const schema = z.object({
@@ -48,6 +49,8 @@ export function LoginForm() {
       setLoading(false)
       return
     }
+
+    track('login', { method: 'email', user_id: authData.user.id })
 
     // If there's an explicit redirectTo param, honour it; otherwise route by role
     if (rawRedirectTo) {
