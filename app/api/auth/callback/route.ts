@@ -10,10 +10,24 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // Google sign-in has no form-submit moment to fire sign_up/login from (it's a full-page
+      // redirect through here), so detect first-ever session server-side and hand it to the
+      // browser via a one-time query param — AuthEventTracker fires the right event and
+      // strips it. created_at/last_sign_in_at are essentially equal only on the very first
+      // session; any later login moves last_sign_in_at forward. Gated to the Google provider
+      // only: this same route also runs when an EMAIL signup's confirmation link is clicked,
+      // and that account's sign_up already fired at form-submit time (register-form.tsx) —
+      // firing it again here would double-count it.
+      let authEvent: 'signup' | 'login' | null = null
       // Ensure the profile carries the name/grade captured at signup. The DB trigger
       // should do this, but we backfill here (service role) so it's reliable regardless.
       try {
         const { data: { user } } = await supabase.auth.getUser()
+        if (user && user.app_metadata?.provider === 'google') {
+          const createdAt = new Date(user.created_at).getTime()
+          const lastSignInAt = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : createdAt
+          authEvent = Math.abs(lastSignInAt - createdAt) < 10_000 ? 'signup' : 'login'
+        }
         const meta = (user?.user_metadata ?? {}) as { full_name?: string; name?: string; grade_id?: string }
         // Google returns `name` (and sometimes `full_name`); email signup sends full_name/grade_id.
         const metaName = meta.full_name ?? meta.name
@@ -46,6 +60,16 @@ export async function GET(request: Request) {
         }
       } catch (e) {
         console.error('[auth/callback] profile backfill failed:', e)
+      }
+
+      if (authEvent) {
+        const { data: { user } } = await supabase.auth.getUser()
+        // No personal data in the URL (see docs/TRACKING.md rules) — AuthEventTracker fetches
+        // email itself client-side from the now-established session before firing the event.
+        const url = new URL(`${origin}${next}`)
+        url.searchParams.set('authEvent', authEvent)
+        if (user) url.searchParams.set('uid', user.id)
+        return NextResponse.redirect(url.toString())
       }
       return NextResponse.redirect(`${origin}${next}`)
     }

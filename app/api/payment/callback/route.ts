@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { decryptImnCallback, verifyImnChecksum, type MipsEnvironment } from '@/lib/mips'
 import { getMonthDateRange } from '@/lib/subscription-billing'
+import { sendMetaPurchase } from '@/lib/meta-capi'
 
 // MIPS requires the response body to be the literal string "success" or "fail"
 const imn = (s: 'success' | 'fail') =>
@@ -211,6 +212,13 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', order.id)
+
+      // Server-side Purchase — the browser's own push (lib/track.ts, success page) is lost
+      // whenever the parent closes the tab before it loads; this is the authoritative one.
+      // Never let a Meta error block the payment flow.
+      await sendMetaPurchase(admin, order.id).catch((err) =>
+        console.error('[payment/callback] sendMetaPurchase failed:', err)
+      )
 
       // ODRP token: check the known fields first, then deep-scan for any token-like key
       const idToken = details.id_token ?? details.token?.id_token ?? findOdrpToken(details)

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { track } from '@/lib/track'
 
 export function Newsletter() {
   const [email, setEmail] = useState('')
@@ -13,8 +14,10 @@ export function Newsletter() {
     e.preventDefault()
     if (!email) return
     setLoading(true)
-    // Placeholder — connect to your email provider in Phase 2
+    // Placeholder — connect to your email provider in Phase 2 (the subscription itself is
+    // not actually persisted anywhere yet; this fires once the (fake) save "succeeds").
     await new Promise((r) => setTimeout(r, 800))
+    track('newsletter_signup', { user_data: { email } })
     toast.success('You\'re subscribed! We\'ll notify you about new classes.')
     setEmail('')
     setLoading(false)

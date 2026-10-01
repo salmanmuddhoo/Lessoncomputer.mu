@@ -1,5 +1,7 @@
 'use client'
 
+import { track } from '@/lib/track'
+
 export function WhatsAppButton({ phoneNumber }: { phoneNumber: string }) {
   return (
     <a
@@ -7,6 +9,7 @@ export function WhatsAppButton({ phoneNumber }: { phoneNumber: string }) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with us on WhatsApp"
+      onClick={() => track('whatsapp_click')}
       className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#25D366] text-white shadow-xl hover:bg-[#1ebe5d] hover:scale-110 transition-all duration-200 flex items-center justify-center"
     >
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { claimMipsPayment, toMipsOrderId, type MipsEnvironment } from '@/lib/mips'
 import { getMonthDateRange } from '@/lib/subscription-billing'
+import { sendMetaPurchase } from '@/lib/meta-capi'
 import crypto from 'crypto'
 
 // POST /api/payment/retry-recurring
@@ -157,6 +158,11 @@ export async function POST(req: NextRequest) {
         .from('mips_orders')
         .update({ metadata: { ...(order.metadata ?? {}), resolved: true, retriedOrderId: claimOrderId }, updated_at: new Date().toISOString() })
         .eq('id', order.id)
+
+      // A successful retry is its own Purchase — the month wasn't paid for until now.
+      await sendMetaPurchase(admin, claimOrderId).catch((err) =>
+        console.error('[payment/retry-recurring] sendMetaPurchase failed:', err)
+      )
 
       return NextResponse.json({ ok: true })
     }

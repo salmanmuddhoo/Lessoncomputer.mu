@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
+import { track } from '@/lib/track'
 import { GoogleSignInButton } from '@/components/lc/google-signin-button'
 import { REFERRAL_SOURCES } from '@/lib/referral-sources'
 import { COUNTRIES } from '@/lib/countries'
@@ -96,6 +97,18 @@ export function RegisterForm({ grades }: RegisterFormProps) {
           signup_country: country,
         } as any)
         .eq('id', authData.user.id)
+    }
+
+    // Account created (first time only — this form only ever runs once per account).
+    // The student's own phone isn't collected here (only a parent's, added later), so
+    // user_data carries name/email only.
+    if (authData.user) {
+      const [firstName, ...rest] = data.fullName.split(' ').filter(Boolean)
+      track('sign_up', {
+        method: 'email',
+        user_id: authData.user.id,
+        user_data: { email: data.email, first_name: firstName, last_name: rest.join(' ') || undefined },
+      })
     }
 
     setConfirmedEmail(data.email)

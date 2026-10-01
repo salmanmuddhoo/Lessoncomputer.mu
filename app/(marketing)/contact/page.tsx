@@ -3,6 +3,7 @@ import { Mail, MapPin, MessageSquare, Clock } from 'lucide-react'
 import { ContactForm } from './contact-form'
 import { createClient } from '@/lib/supabase/server'
 import { formatWhatsAppDisplay, normalizeWhatsAppDigits } from '@/lib/phone'
+import { TrackedWhatsAppLink } from '@/components/lc/tracked-whatsapp-link'
 
 export const metadata: Metadata = {
   title: 'Contact Us',
@@ -61,9 +62,9 @@ export default async function ContactPage() {
             </div>
             <h3 className="font-semibold mb-1">WhatsApp</h3>
             <p className="text-sm text-muted-foreground">
-              <a href={`https://wa.me/${whatsappDigits}`} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+              <TrackedWhatsAppLink href={`https://wa.me/${whatsappDigits}`} className="hover:text-primary transition-colors">
                 {formatWhatsAppDisplay(whatsappNumber)}
-              </a>
+              </TrackedWhatsAppLink>
             </p>
           </div>
         )}

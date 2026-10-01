@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { claimMipsPayment, toMipsOrderId, type MipsEnvironment } from '@/lib/mips'
 import { getBillingSettings, getMonthDateRange } from '@/lib/subscription-billing'
+import { sendMetaPurchase } from '@/lib/meta-capi'
 import crypto from 'crypto'
 
 // Allow up to 5 minutes — the loop charges cards sequentially via MIPS.
@@ -232,6 +233,12 @@ export async function GET(req: NextRequest) {
           .from('mips_orders')
           .update({ status: 'paid', updated_at: new Date().toISOString() })
           .eq('id', claimOrderId)
+
+        // Each monthly auto-charge is its own Purchase (no auto-renewal discount/merge) —
+        // there's no browser session for an off-session charge, so this is the only signal.
+        await sendMetaPurchase(admin, claimOrderId).catch((err) =>
+          console.error('[cron/billing] sendMetaPurchase failed:', err)
+        )
 
         results.push({ studentId: token.student_id, status: 'SUCCESS' })
       } else {
