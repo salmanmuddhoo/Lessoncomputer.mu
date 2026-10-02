@@ -3,6 +3,7 @@ import { Logo } from '@/components/lc/logo'
 import { Mail, Facebook, Instagram } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { CookieSettingsButton } from '@/components/ConsentManager'
+import { CardLogos } from '@/components/lc/card-logos'
 
 const GRADE_LINKS = [
   { name: 'Grade 7',       href: '/grades/grade-7' },
@@ -202,7 +203,13 @@ export async function Footer() {
               <a href="https://wa.me/23059151012" target="_blank" rel="noopener noreferrer" className="hover:text-foreground lc-transition">+230 5915 1012</a>
             </p>
           </div>
-          <p>Developed by Salman. Contact on +230 5822 2428</p>
+          <div className="flex flex-col items-center sm:items-end gap-2">
+            <div className="flex items-center gap-2">
+              <span>We accept</span>
+              <CardLogos className="h-6" />
+            </div>
+            <p>Developed by Salman. Contact on +230 5822 2428</p>
+          </div>
         </div>
       </div>
     </footer>
