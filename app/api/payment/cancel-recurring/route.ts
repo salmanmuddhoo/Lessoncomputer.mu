@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 
 // POST /api/payment/cancel-recurring
-// Soft-cancels recurring billing: sets is_recurring = false so the cron skips this
-// student next month, but keeps the ODRP token alive so the student can undo via
-// restore-recurring without needing to re-enter payment details.
+// Cancels recurring billing: sets is_recurring = false so the cron skips this student next
+// month, and deactivates the stored MIPS token so no further payment can be taken with it
+// (Terms §8). Access to the month already paid for is untouched. restore-recurring
+// re-activates the same token, so undoing doesn't require re-entering card details.
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
@@ -35,6 +36,12 @@ export async function POST(req: NextRequest) {
       console.error('[payment/cancel-recurring] update failed:', updateError)
       return NextResponse.json({ error: 'Could not cancel recurring billing. Please try again.' }, { status: 500 })
     }
+
+    const { error: tokenError } = await (admin as any)
+      .from('student_payment_tokens')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('student_id', user.id)
+    if (tokenError) console.error('[payment/cancel-recurring] token deactivation failed:', tokenError)
 
     // Notify admins on their Messages page that this student cancelled. Best-effort —
     // never fail the cancellation itself if the notification insert has an issue.

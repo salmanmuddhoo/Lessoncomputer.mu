@@ -28,18 +28,19 @@ export async function GET(request: Request) {
           const lastSignInAt = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : createdAt
           authEvent = Math.abs(lastSignInAt - createdAt) < 10_000 ? 'signup' : 'login'
         }
-        const meta = (user?.user_metadata ?? {}) as { full_name?: string; name?: string; grade_id?: string }
+        const meta = (user?.user_metadata ?? {}) as { full_name?: string; name?: string; grade_id?: string; age_confirmed_at?: string }
         // Google returns `name` (and sometimes `full_name`); email signup sends full_name/grade_id.
         const metaName = meta.full_name ?? meta.name
         if (user) {
           const admin = createServiceRoleClient()
-          if (metaName || meta.grade_id) {
+          if (metaName || meta.grade_id || meta.age_confirmed_at) {
             const { data: existing } = await (admin as any)
-              .from('profiles').select('full_name, grade_id').eq('id', user.id).maybeSingle()
+              .from('profiles').select('full_name, grade_id, age_confirmed_at').eq('id', user.id).maybeSingle()
 
             const patch: Record<string, unknown> = {}
             if (!existing?.full_name && metaName) patch.full_name = metaName
             if (!existing?.grade_id && meta.grade_id) patch.grade_id = meta.grade_id
+            if (!existing?.age_confirmed_at && meta.age_confirmed_at) patch.age_confirmed_at = meta.age_confirmed_at
 
             if (Object.keys(patch).length > 0) {
               await (admin as any).from('profiles').upsert({ id: user.id, ...patch }, { onConflict: 'id' })

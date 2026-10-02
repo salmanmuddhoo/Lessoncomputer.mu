@@ -13,6 +13,11 @@ import { toast } from 'sonner'
 import { usePrice, useCurrency } from '@/components/lc/currency-provider'
 import { formatAccessDuration } from '@/lib/format-duration'
 import { track, cart, type Product } from '@/lib/track'
+import { formatMoney, DEFAULT_CURRENCY } from '@/lib/currency-format'
+import { CardLogos } from '@/components/lc/card-logos'
+import {
+  CONSENT_TEXT, RECORDING_NOTICE, PAYMENT_PROCESSOR_LINE, type ConsentType, type ConsentTicks,
+} from '@/lib/legal/checkout-consents'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -49,6 +54,7 @@ interface Props {
   isLoggedIn?: boolean
   isNextMonthMode?: boolean
   autoOpen?: boolean
+  renewalDateLabel?: string
 }
 
 export function BuySubscribeDialog({
@@ -69,6 +75,7 @@ export function BuySubscribeDialog({
   isLoggedIn,
   isNextMonthMode = false,
   autoOpen = false,
+  renewalDateLabel,
 }: Props) {
   const price = usePrice()
   const currency = useCurrency()
@@ -101,7 +108,23 @@ export function BuySubscribeDialog({
   )
   const [selectedPastLive, setSelectedPastLive] = useState<Set<string>>(new Set())
   const [paying, setPaying] = useState(false)
-  const [agreed, setAgreed] = useState(false)
+  // Checkout tick boxes (Developer Work §5): none pre-ticked; each stores when it was ticked.
+  const [ticks, setTicks] = useState<Partial<Record<ConsentType, string>>>({})
+  const [studentUnder18, setStudentUnder18] = useState<boolean | null>(null)
+  const international = !!currency.international
+  const consentsOk =
+    !!ticks.terms &&
+    studentUnder18 !== null &&
+    (!studentUnder18 || !!ticks.guardian) &&
+    (!international || !!ticks.immediate_access)
+  function setTick(type: ConsentType, on: boolean) {
+    setTicks((prev) => {
+      const next = { ...prev }
+      if (on) next[type] = new Date().toISOString()
+      else delete next[type]
+      return next
+    })
+  }
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
 
@@ -109,7 +132,8 @@ export function BuySubscribeDialog({
     setIncludeLive(defaultMode === 'live' && canIncludeLive)
     setSelected(new Set(mandatoryPackageId ? [mandatoryPackageId] : []))
     setSelectedPastLive(new Set())
-    setAgreed(false)
+    setTicks({})
+    setStudentUnder18(null)
     setOpen(true)
     // The "payment step" is now showing with the chosen product — covers both a direct
     // click and the ?buy= auto-resume flow after login, which has no click of its own.
@@ -162,7 +186,7 @@ export function BuySubscribeDialog({
   const orderType = hasLiveSelected && hasVideoSelected ? 'mixed' : hasLiveSelected ? 'live' : 'video'
 
   async function initiatePayment() {
-    if (paying || combinedTotal === 0 || !agreed) return
+    if (paying || combinedTotal === 0 || !consentsOk) return
     setPaying(true)
     try {
       const videoIds = Array.from(selected)
@@ -190,6 +214,7 @@ export function BuySubscribeDialog({
           description,
           isRecurring: hasLiveSelected,
           liveAmount: hasLiveSelected ? liveSubscriptionPrice : undefined,
+          consents: { ...ticks, studentUnder18: studentUnder18 ?? undefined } satisfies ConsentTicks,
         }),
       })
 
@@ -423,17 +448,26 @@ export function BuySubscribeDialog({
               </div>
             )}
 
-            {/* Recurring notice (only when live is included) */}
+            {/* Subscription terms (only when live is included) — Developer Work §4 */}
             {hasLiveSelected && (
               <div className="flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/20">
                 <RefreshCw className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  <span className="font-medium text-foreground">
-                    Auto-renews at {price(liveSubscriptionPrice)}/month
-                  </span>
-                  {' '}— live classes renew automatically each month. Cancel anytime from your{' '}
-                  <span className="font-medium">Subscriptions</span> page.
-                </p>
+                <div className="text-xs text-muted-foreground leading-relaxed space-y-1.5">
+                  <p>
+                    <span className="font-medium text-foreground">Monthly subscription: {formatMoney(liveSubscriptionPrice, DEFAULT_CURRENCY)} per month</span>
+                    {currency.currency === 'USD' && <> (shown as {price(liveSubscriptionPrice)})</>}, charged automatically to the same card each month until you cancel.
+                  </p>
+                  {renewalDateLabel && <p>Next renewal: <span className="font-medium text-foreground">{renewalDateLabel}</span>.</p>}
+                  <p>
+                    To cancel, go to <span className="font-medium">Orders and Subscriptions</span> in your account and choose
+                    Cancel recurring. You keep access until the end of the month you have paid for.
+                  </p>
+                  <p>
+                    A secure payment token is stored with MIPS so the same card can be charged each month. The token is
+                    limited to a maximum of {formatMoney(liveSubscriptionPrice, DEFAULT_CURRENCY)} per monthly payment, and
+                    cancelling the subscription deactivates it.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -459,8 +493,8 @@ export function BuySubscribeDialog({
                   </tbody>
                   <tfoot>
                     <tr className="bg-muted/20">
-                      <td className="px-3 py-2 font-semibold">Total</td>
-                      <td className="px-3 py-2 text-right font-bold text-primary">{price(combinedTotal)}</td>
+                      <td className="px-3 py-2 font-semibold">Total payable (incl. any tax)</td>
+                      <td className="px-3 py-2 text-right font-bold text-primary">{formatMoney(combinedTotal, DEFAULT_CURRENCY)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -468,29 +502,75 @@ export function BuySubscribeDialog({
             )}
           </div>
 
-          {currency.currency === 'USD' && (
+          {currency.currency === 'USD' && combinedTotal > 0 && (
             <p className="text-[11px] text-muted-foreground pt-1">
-              Prices are shown in USD for convenience. Payment is processed in Mauritian Rupees (MUR)
-              at checkout; your bank may apply its own conversion.
+              Prices are shown in USD as an indication ({price(combinedTotal)}). Your card is charged exactly{' '}
+              <span className="font-medium text-foreground">{formatMoney(combinedTotal, DEFAULT_CURRENCY)}</span> in Mauritian
+              Rupees; your bank may apply its own exchange rate and fees.
             </p>
           )}
 
-          {/* Terms agreement — required before paying */}
+          {/* Payment details, policies and confirmations — Developer Work §4–5 */}
           {!liveNotSetUp && (
-          <label className="flex items-start gap-2 pt-3 border-t border-border/40 cursor-pointer">
-            <Checkbox
-              checked={agreed}
-              onCheckedChange={(v) => setAgreed(!!v)}
-              className="mt-0.5 shrink-0"
-            />
-            <span className="text-xs text-muted-foreground leading-relaxed">
-              I have read and agree to the{' '}
-              <Link href="/terms" target="_blank" className="text-primary hover:underline">
-                Terms &amp; Conditions
-              </Link>{' '}
-              of LessonComputer.mu.
-            </span>
-          </label>
+            <div className="pt-3 border-t border-border/40 space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <CardLogos />
+                <p className="text-[11px] text-muted-foreground flex-1 min-w-[180px]">{PAYMENT_PROCESSOR_LINE}</p>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Read our{' '}
+                <Link href="/terms" target="_blank" className="text-primary hover:underline">Terms of Service</Link>,{' '}
+                <Link href="/refunds" target="_blank" className="text-primary hover:underline">Refund Policy</Link> and{' '}
+                <Link href="/delivery" target="_blank" className="text-primary hover:underline">Delivery Policy</Link>.
+              </p>
+
+              <fieldset className="space-y-1.5">
+                <legend className="text-xs font-medium text-foreground mb-1">Who is the student?</legend>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {[
+                    { value: true, label: 'Under 18 — I am their parent or guardian' },
+                    { value: false, label: '18 or over' },
+                  ].map((opt) => (
+                    <label key={String(opt.value)} className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs cursor-pointer ${studentUnder18 === opt.value ? 'border-primary/50 bg-primary/5' : 'border-border/60'}`}>
+                      <input
+                        type="radio"
+                        name="student-age"
+                        checked={studentUnder18 === opt.value}
+                        onChange={() => { setStudentUnder18(opt.value); if (!opt.value) setTick('guardian', false) }}
+                        className="accent-primary"
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <label className="flex items-start gap-2 cursor-pointer">
+                <Checkbox checked={!!ticks.terms} onCheckedChange={(v) => setTick('terms', !!v)} className="mt-0.5 shrink-0" />
+                <span className="text-xs text-muted-foreground leading-relaxed">
+                  I have read and accept the{' '}
+                  <Link href="/terms" target="_blank" className="text-primary hover:underline">Terms of Service</Link>, the{' '}
+                  <Link href="/refunds" target="_blank" className="text-primary hover:underline">Refund Policy</Link> and the{' '}
+                  <Link href="/privacy" target="_blank" className="text-primary hover:underline">Privacy Policy</Link>.
+                </span>
+              </label>
+
+              {studentUnder18 && (
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox checked={!!ticks.guardian} onCheckedChange={(v) => setTick('guardian', !!v)} className="mt-0.5 shrink-0" />
+                  <span className="text-xs text-muted-foreground leading-relaxed">{CONSENT_TEXT.guardian}</span>
+                </label>
+              )}
+
+              {international && (
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox checked={!!ticks.immediate_access} onCheckedChange={(v) => setTick('immediate_access', !!v)} className="mt-0.5 shrink-0" />
+                  <span className="text-xs text-muted-foreground leading-relaxed">{CONSENT_TEXT.immediate_access}</span>
+                </label>
+              )}
+
+              <p className="text-[11px] text-muted-foreground leading-relaxed">{RECORDING_NOTICE}</p>
+            </div>
           )}
 
           <DialogFooter className="flex gap-2 justify-end">
@@ -498,7 +578,7 @@ export function BuySubscribeDialog({
             {!liveNotSetUp && (
               <Button
                 onClick={initiatePayment}
-                disabled={!mounted || paying || combinedTotal === 0 || !agreed}
+                disabled={!mounted || paying || combinedTotal === 0 || !consentsOk}
                 className="bg-primary text-primary-foreground hover:bg-accent"
               >
                 {paying
@@ -509,7 +589,7 @@ export function BuySubscribeDialog({
                   ? 'Loading…'
                   : paying
                     ? 'Redirecting…'
-                    : `Pay ${price(combinedTotal)}`
+                    : `Pay ${formatMoney(combinedTotal, DEFAULT_CURRENCY)}`
                 }
               </Button>
             )}

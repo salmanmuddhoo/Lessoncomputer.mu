@@ -2,10 +2,14 @@
 // names/shapes from drifting across call sites and clears the previous `ecommerce` object,
 // which GA4 requires before pushing a new one.
 
+import { isTrackingAllowed } from '@/lib/consent'
+
 type UserData = { email?: string; phone?: string; first_name?: string; last_name?: string }
 
 export function track(event: string, data: Record<string, unknown> = {}) {
-  if (typeof window === 'undefined') return
+  // No consent (or a student-area page for an account not known to be an adult) → nothing is
+  // pushed at all, so nothing can be replayed to GTM if it loads later.
+  if (!isTrackingAllowed()) return
   const w = window as any
   w.dataLayer = w.dataLayer || []
   if ('ecommerce' in data) w.dataLayer.push({ ecommerce: null })

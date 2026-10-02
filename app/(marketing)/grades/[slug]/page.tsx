@@ -301,6 +301,15 @@ export default async function GradePage({ params, searchParams }: PageProps) {
     ? ((currentLivePackage as any).subscription_package_chapters ?? []).map((c: any) => c.chapter_id)
     : []
 
+  // Next automatic charge for a recurring purchase of a given month: the billing cron charges
+  // on the billing day of the paid month (capped to month length) for the following month.
+  const renewalDateLabel = (month: number, year: number) => {
+    const day = Math.min(billing.billingDay, new Date(year, month, 0).getDate())
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    const d = new Date(Math.max(new Date(year, month - 1, day).getTime(), tomorrow.getTime()))
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
+
   // Every paid product shown on this page, for the view_item tracking event.
   const viewItemProducts: Product[] = [
     ...(liveSubscriptionEnabled ? [{
@@ -433,6 +442,7 @@ export default async function GradePage({ params, searchParams }: PageProps) {
                       liveSubscriptionEnabled={liveSubscriptionEnabled}
                       liveMonthPackageId={(nextMonthLivePackage as any).id}
                       liveMonthLabel={`${MONTHS[(nextMonthLivePackage as any).month - 1]} ${(nextMonthLivePackage as any).year}`}
+                      renewalDateLabel={renewalDateLabel((nextMonthLivePackage as any).month, (nextMonthLivePackage as any).year)}
                       pastLivePackages={(pastLivePackages ?? []) as any}
                       subscribedLivePackageIds={subscribedLivePackageIds}
                       defaultMode="live"
@@ -469,6 +479,7 @@ export default async function GradePage({ params, searchParams }: PageProps) {
                   liveSubscriptionEnabled={liveSubscriptionEnabled}
                   liveMonthPackageId={(currentLivePackage as any)?.id}
                   liveMonthLabel={liveMonthLabel}
+                  renewalDateLabel={currentLivePackage ? renewalDateLabel((currentLivePackage as any).month, (currentLivePackage as any).year) : undefined}
                   pastLivePackages={(pastLivePackages ?? []) as any}
                   subscribedLivePackageIds={subscribedLivePackageIds}
                   defaultMode="live"

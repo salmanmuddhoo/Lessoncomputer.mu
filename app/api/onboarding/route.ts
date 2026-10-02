@@ -11,10 +11,12 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-    const { gradeId, fullName, referralSource, referralOther, country, countryOther } = await req.json() as {
-      gradeId?: string; fullName?: string; referralSource?: string; referralOther?: string; country?: string; countryOther?: string
+    const { gradeId, fullName, referralSource, referralOther, country, countryOther, ageConfirmed } = await req.json() as {
+      gradeId?: string; fullName?: string; referralSource?: string; referralOther?: string; country?: string; countryOther?: string; ageConfirmed?: boolean
     }
     if (!gradeId) return NextResponse.json({ error: 'Please select what you are studying.' }, { status: 400 })
+    // Minimum age 11 (Terms §3, Privacy §6) — no account is completed without this confirmation.
+    if (ageConfirmed !== true) return NextResponse.json({ error: 'You must be at least 11 years old to use LessonComputer.mu.' }, { status: 400 })
 
     const admin = createServiceRoleClient()
 
@@ -23,7 +25,7 @@ export async function POST(req: NextRequest) {
       .from('grades').select('id').eq('id', gradeId).eq('is_active', true).maybeSingle()
     if (!grade) return NextResponse.json({ error: 'Invalid grade selected.' }, { status: 400 })
 
-    const patch: Record<string, unknown> = { id: user.id, grade_id: gradeId }
+    const patch: Record<string, unknown> = { id: user.id, grade_id: gradeId, age_confirmed_at: new Date().toISOString() }
     if (fullName && fullName.trim()) patch.full_name = fullName.trim()
     if (referralSource && referralSource.trim()) patch.referral_source = referralSource.trim()
     if (referralSource === 'other' && referralOther && referralOther.trim()) patch.referral_other = referralOther.trim()

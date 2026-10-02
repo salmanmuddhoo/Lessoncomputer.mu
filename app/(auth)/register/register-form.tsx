@@ -30,6 +30,7 @@ const schema = z.object({
   referral_source: z.string().min(1, 'Please tell us how you heard about us'),
   referral_other: z.string().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  ageConfirmed: z.boolean().refine((v) => v, 'You must be at least 11 years old to create an account'),
   confirmPassword: z.string(),
 }).refine((d) => d.password === d.confirmPassword, {
   message: 'Passwords do not match',
@@ -74,6 +75,7 @@ export function RegisterForm({ grades }: RegisterFormProps) {
           grade_id: data.grade_id,
           referral_source: data.referral_source,
           referral_other: data.referral_source === 'other' ? (data.referral_other?.trim() || null) : null,
+          age_confirmed_at: new Date().toISOString(),
         },
         emailRedirectTo: `${window.location.origin}/api/auth/callback${redirectTo ? `?next=${encodeURIComponent(redirectTo)}` : ''}`,
       },
@@ -95,6 +97,7 @@ export function RegisterForm({ grades }: RegisterFormProps) {
           referral_source: data.referral_source,
           referral_other: data.referral_source === 'other' ? (data.referral_other?.trim() || null) : null,
           signup_country: country,
+          age_confirmed_at: new Date().toISOString(),
         } as any)
         .eq('id', authData.user.id)
     }
@@ -262,6 +265,14 @@ export function RegisterForm({ grades }: RegisterFormProps) {
               <Input id="confirmPassword" type="password" placeholder="Repeat your password" autoComplete="new-password" className="pl-9" {...register('confirmPassword')} />
             </div>
             {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" {...register('ageConfirmed')} className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
+              <span className="text-xs text-muted-foreground">I confirm the student is at least 11 years old.</span>
+            </label>
+            {errors.ageConfirmed && <p className="text-xs text-destructive">{errors.ageConfirmed.message}</p>}
           </div>
 
           <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-full h-11" disabled={loading}>

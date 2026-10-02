@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Logo } from '@/components/lc/logo'
 import { Mail, Facebook, Instagram } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { CookieSettingsButton } from '@/components/ConsentManager'
 
 const GRADE_LINKS = [
   { name: 'Grade 7',       href: '/grades/grade-7' },
@@ -19,8 +20,13 @@ const COMPANY_LINKS = [
 ]
 
 const LEGAL_LINKS = [
-  { name: 'Privacy Policy',   href: '/privacy' },
-  { name: 'Terms of Service', href: '/terms' },
+  { name: 'Terms of Service',             href: '/terms' },
+  { name: 'Refund Policy',                href: '/refunds' },
+  { name: 'Delivery Policy',              href: '/delivery' },
+  { name: 'Privacy Policy',               href: '/privacy' },
+  { name: 'Payment & Security',           href: '/payment' },
+  { name: 'Safeguarding & Class Conduct', href: '/safeguarding' },
+  { name: 'Cookie Policy',                href: '/cookies' },
 ]
 
 function TikTokIcon({ className }: { className?: string }) {
@@ -175,6 +181,11 @@ export async function Footer() {
                     </Link>
                   </li>
                 ))}
+                {col.title === 'Legal' && (
+                  <li>
+                    <CookieSettingsButton className="text-sm text-muted-foreground hover:text-foreground lc-transition text-left" />
+                  </li>
+                )}
               </ul>
             </div>
           ))}
@@ -185,6 +196,11 @@ export async function Footer() {
             <p>&copy; {new Date().getFullYear()} Lesson Computer Ltd. All rights reserved.</p>
             <p>Registered in Mauritius | Business Registration No.: C24215107</p>
             <p>Registered Address: Belvedere Road, Brisée Verdière, 1402-03, Mauritius</p>
+            <p>
+              <a href="mailto:lessonscomputers@gmail.com" className="hover:text-foreground lc-transition">lessonscomputers@gmail.com</a>
+              {' | '}
+              <a href="https://wa.me/23059151012" target="_blank" rel="noopener noreferrer" className="hover:text-foreground lc-transition">+230 5915 1012</a>
+            </p>
           </div>
           <p>Developed by Salman. Contact on +230 5822 2428</p>
         </div>

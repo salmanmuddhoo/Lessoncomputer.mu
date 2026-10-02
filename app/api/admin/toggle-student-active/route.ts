@@ -22,7 +22,8 @@ export async function POST(req: NextRequest) {
     const admin = createServiceRoleClient()
     const { error } = await (admin as any)
       .from('profiles')
-      .update({ is_active: isActive })
+      // closed_at starts the 12-month retention clock (cron/retention); reactivating clears it.
+      .update({ is_active: isActive, closed_at: isActive ? null : new Date().toISOString() })
       .eq('id', studentId)
 
     if (error) {

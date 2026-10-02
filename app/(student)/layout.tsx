@@ -4,6 +4,7 @@ import { StudentSidebar } from '@/components/lc/student-sidebar'
 import { WhatsAppButton } from '@/components/lc/whatsapp-button'
 import { getCurrencyInfo } from '@/lib/currency'
 import { CurrencyProvider } from '@/components/lc/currency-provider'
+import { TrackingAudience } from '@/components/ConsentManager'
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -14,7 +15,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
   const [{ data: profile }, { data: subs }, { data: siteSettingsRaw }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('role, full_name, grade_id, grade:grades(name)')
+      .select('role, full_name, grade_id, is_under_18, grade:grades(name)')
       .eq('id', user.id)
       .single(),
     supabase
@@ -138,6 +139,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
   return (
     <CurrencyProvider value={currency}>
+      <TrackingAudience knownAdult={(profile as any)?.is_under_18 === false} />
       <div className="flex bg-background h-screen overflow-hidden">
         <StudentSidebar
           userName={userName}
