@@ -27,6 +27,25 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
 const currentYear = new Date().getFullYear()
+
+// Human-readable schedule for a class notice, e.g. "every Tuesday, 17:00–18:30 (October 2026)".
+function describeSchedule(c: { scheduled_at: string; is_recurring?: boolean | null; recurrence_day_of_week?: number | null; end_time?: string | null }) {
+  const d = new Date(c.scheduled_at)
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  const span = c.end_time ? `${time}–${c.end_time.slice(0, 5)}` : time
+  const month = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`
+  return c.is_recurring && c.recurrence_day_of_week != null
+    ? `every ${DAYS[c.recurrence_day_of_week]}, ${span} (${month})`
+    : `${span}, ${month}`
+}
+
+async function notifyClassChange(body: { gradeId: string; classTitle: string; kind: 'moved' | 'cancelled'; detail?: string }) {
+  const res = await fetch('/api/admin/notices/class-change', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  })
+  if (res.ok) toast.success('Students and parents have been notified.')
+  else toast.error('Saved, but the class notice could not be sent.')
+}
 // Last year through several years ahead, so classes can be scheduled well beyond the current year.
 const YEARS = Array.from({ length: 8 }, (_, i) => currentYear - 1 + i)
 
@@ -115,6 +134,12 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
       const { error } = await supabase.from('live_classes').update(payload).eq('id', liveClass.id)
       if (error) { toast.error(error.message); setLoading(false); return }
       toast.success('Live class updated')
+      // A published class whose day/time changed: students and parents must be told (Terms §6).
+      const before = describeSchedule(liveClass as any)
+      const after = describeSchedule(payload)
+      if (liveClass.is_published && payload.is_published && before !== after) {
+        await notifyClassChange({ gradeId: payload.grade_id, classTitle: payload.title, kind: 'moved', detail: after })
+      }
     } else {
       const { data: { user } } = await supabase.auth.getUser()
       const { error } = await supabase.from('live_classes').insert({ ...payload, created_by: user!.id })
@@ -133,6 +158,12 @@ export function LiveClassForm({ grades, liveClass }: LiveClassFormProps) {
     const { error } = await supabase.from('live_classes').delete().eq('id', liveClass.id)
     if (error) { toast.error(error.message); setDeleting(false); return }
     toast.success('Live class deleted')
+    // Deleting a published class that hasn't ended yet cancels it for enrolled students.
+    const d = new Date(liveClass.scheduled_at)
+    const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 1)
+    if (liveClass.is_published && monthEnd > new Date()) {
+      await notifyClassChange({ gradeId: liveClass.grade_id, classTitle: liveClass.title, kind: 'cancelled' })
+    }
     router.push('/admin/live-classes')
     router.refresh()
   }

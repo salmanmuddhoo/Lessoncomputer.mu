@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Logo } from '@/components/lc/logo'
+import { CookieSettingsButton } from '@/components/ConsentManager'
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,6 +17,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <Link href="/privacy" className="hover:text-foreground lc-transition">Privacy</Link>
         {' · '}
         <Link href="/terms" className="hover:text-foreground lc-transition">Terms</Link>
+        {' · '}
+        <Link href="/cookies" className="hover:text-foreground lc-transition">Cookies</Link>
+        {' · '}
+        <CookieSettingsButton className="hover:text-foreground lc-transition" />
       </div>
     </div>
   )

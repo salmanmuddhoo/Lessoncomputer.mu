@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { createMipsPayment, type MipsEnvironment } from '@/lib/mips'
+import { isInternationalBuyer } from '@/lib/currency'
+import { CONSENT_TEXT, type ConsentTicks, type ConsentType } from '@/lib/legal/checkout-consents'
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,12 +19,29 @@ export async function POST(req: NextRequest) {
       description: string
       isRecurring?: boolean
       liveAmount?: number
+      consents?: ConsentTicks
     }
 
-    const { orderType, packageIds, description, isRecurring = false } = body
+    const { orderType, packageIds, description, isRecurring = false, consents = {} } = body
 
     if (!orderType || !packageIds?.length) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Checkout confirmations (Developer Work §5): no payment is ever started without every
+    // required tick — the Pay button enforces this too, but the server is authoritative.
+    const international = await isInternationalBuyer()
+    if (typeof consents.studentUnder18 !== 'boolean') {
+      return NextResponse.json({ error: 'Please tell us whether the student is under 18.' }, { status: 400 })
+    }
+    const requiredConsents: ConsentType[] = [
+      'terms',
+      ...(consents.studentUnder18 ? (['guardian'] as const) : []),
+      ...(international ? (['immediate_access'] as const) : []),
+    ]
+    const missingConsent = requiredConsents.find((t) => !consents[t])
+    if (missingConsent) {
+      return NextResponse.json({ error: 'Please tick every required confirmation before paying.' }, { status: 400 })
     }
 
     // Guarantee a profiles row exists: mips_orders.student_id has an FK to profiles,
@@ -199,6 +218,32 @@ export async function POST(req: NextRequest) {
 
     const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_SITE_URL ?? ''
     const orderId = (order as { id: string }).id
+
+    // Store date, time and account against every tick, with the exact wording shown. Service
+    // role: students can't write consent records directly. Recording failure blocks payment —
+    // a payment must never be taken without its confirmations on file.
+    {
+      const consentAdmin = createServiceRoleClient()
+      const recordedAt = new Date().toISOString()
+      const rows = requiredConsents.map((type) => {
+        const ticked = Date.parse(consents[type] ?? '')
+        return {
+          student_id: user.id,
+          order_id: orderId,
+          consent_type: type,
+          consent_text: CONSENT_TEXT[type],
+          ticked_at: Number.isFinite(ticked) ? new Date(ticked).toISOString() : recordedAt,
+        }
+      })
+      const { error: consentError } = await (consentAdmin as any).from('checkout_consents').insert(rows)
+      if (consentError) {
+        console.error('[payment/create] Failed to record consents:', consentError)
+        await (consentAdmin as any).from('mips_orders').update({ status: 'cancelled' }).eq('id', orderId)
+        return NextResponse.json({ error: 'Could not start payment. Please try again.' }, { status: 500 })
+      }
+      // Known age drives whether analytics may run in the student area (Cookie Policy §4).
+      await (consentAdmin as any).from('profiles').update({ is_under_18: consents.studentUnder18 }).eq('id', user.id)
+    }
 
     // Debug: confirm env vars are present (lengths only, never values). Off by default.
     if (process.env.DEBUG_PAYMENTS === 'true') {

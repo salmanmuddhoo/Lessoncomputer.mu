@@ -9,6 +9,7 @@ import {
   ChevronRight, User, Menu, X, Package, Bell, ClipboardList,
 } from 'lucide-react'
 import { Logo } from '@/components/lc/logo'
+import { CookieSettingsButton } from '@/components/ConsentManager'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -87,6 +88,12 @@ function NavContent({ userName, gradeName, hasLiveSubscription, hasVideoSubscrip
           <LogOut className="w-4 h-4" />
           Sign out
         </button>
+        <div className="px-3 pt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <Link href="/terms" onClick={onNav} className="hover:text-foreground">Terms</Link>
+          <Link href="/privacy" onClick={onNav} className="hover:text-foreground">Privacy</Link>
+          <Link href="/safeguarding" onClick={onNav} className="hover:text-foreground">Safeguarding</Link>
+          <CookieSettingsButton className="hover:text-foreground" />
+        </div>
       </div>
     </>
   )

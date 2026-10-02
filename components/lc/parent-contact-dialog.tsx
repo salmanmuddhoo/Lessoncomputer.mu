@@ -94,6 +94,9 @@ export function ParentContactDialog({ open, onClose, onSuccess }: Props) {
             <p className="text-xs text-muted-foreground">
               Include the country code. Mauritius is 230 (e.g. +230 57123456).
             </p>
+            <p className="text-xs text-muted-foreground">
+              Used to contact a parent or guardian about the student’s account, classes and attendance. Never used for marketing.
+            </p>
           </div>
 
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 flex gap-2.5 text-xs text-muted-foreground">

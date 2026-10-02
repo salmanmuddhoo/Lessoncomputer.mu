@@ -21,8 +21,20 @@ export async function getCurrencyInfo(): Promise<CurrencyInfo> {
     const { data } = await (supabase as any)
       .from('site_settings').select('usd_rate').eq('id', 1).single()
     const rate = Number(data?.usd_rate ?? 0)
-    if (rate > 0) return { currency: 'USD', rate }
+    if (rate > 0) return { currency: 'USD', rate, international: true }
   } catch { /* fall through */ }
 
-  return DEFAULT_CURRENCY // rate not configured → keep MUR
+  return { ...DEFAULT_CURRENCY, international: true } // rate not configured → keep MUR
+}
+
+// Server-side check for checkout: is this buyer outside Mauritius? Unknown location (local/dev)
+// is treated as domestic, matching the currency shown.
+export async function isInternationalBuyer(): Promise<boolean> {
+  try {
+    const h = await headers()
+    const country = (h.get('x-vercel-ip-country') || h.get('x-country') || '').toUpperCase()
+    return !!country && country !== 'MU'
+  } catch {
+    return false
+  }
 }

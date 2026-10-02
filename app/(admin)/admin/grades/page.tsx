@@ -91,6 +91,21 @@ function GradeDialog({ grade, onDone }: { grade?: Grade; onDone: () => void }) {
       const { error } = await supabase.from('grades').update(data).eq('id', grade.id)
       if (error) { toast.error(error.message); setLoading(false); return }
       toast.success('Grade updated')
+      // Recurring subscribers must be told before a changed monthly amount is ever charged.
+      const oldPrice = Number((grade as any).live_subscription_price ?? 0)
+      const newPrice = Number(data.live_subscription_price ?? 0)
+      if (oldPrice !== newPrice) {
+        const res = await fetch('/api/admin/notices/price-change', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gradeId: grade.id, oldPrice, newPrice }),
+        })
+        const r = await res.json().catch(() => ({}))
+        if (res.ok) {
+          if (r.notices > 0) toast.success(`Price-change notice sent to ${r.notices} subscriber${r.notices === 1 ? '' : 's'}.`)
+        } else {
+          toast.error(r.error ?? 'Price saved, but the subscriber notices could not be sent.')
+        }
+      }
     } else {
       const { error } = await supabase.from('grades').insert(data)
       if (error) { toast.error(error.message); setLoading(false); return }

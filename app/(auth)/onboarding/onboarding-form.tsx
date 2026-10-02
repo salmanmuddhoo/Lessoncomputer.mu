@@ -19,6 +19,7 @@ export function OnboardingForm({ grades, initialName }: { grades: { id: string; 
   const [countryOther, setCountryOther] = useState('')
   const [referralSource, setReferralSource] = useState('')
   const [referralOther, setReferralOther] = useState('')
+  const [ageConfirmed, setAgeConfirmed] = useState(false)
   const [saving, setSaving] = useState(false)
 
   async function save() {
@@ -28,6 +29,7 @@ export function OnboardingForm({ grades, initialName }: { grades: { id: string; 
     if (country === 'Other' && !countryOther.trim()) { toast.error('Please tell us your country'); return }
     if (!referralSource) { toast.error('Please tell us how you heard about us'); return }
     if (referralSource === 'other' && !referralOther.trim()) { toast.error('Please tell us where you heard about us'); return }
+    if (!ageConfirmed) { toast.error('You must be at least 11 years old to use LessonComputer.mu'); return }
     setSaving(true)
     try {
       const res = await fetch('/api/onboarding', {
@@ -40,6 +42,7 @@ export function OnboardingForm({ grades, initialName }: { grades: { id: string; 
           countryOther: country === 'Other' ? countryOther.trim() : undefined,
           referralSource,
           referralOther: referralSource === 'other' ? referralOther.trim() : undefined,
+          ageConfirmed,
         }),
       })
       const data = await res.json() as { ok?: boolean; error?: string }
@@ -102,6 +105,10 @@ export function OnboardingForm({ grades, initialName }: { grades: { id: string; 
           />
         )}
       </div>
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input type="checkbox" checked={ageConfirmed} onChange={(e) => setAgeConfirmed(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
+        <span className="text-xs text-muted-foreground">I confirm the student is at least 11 years old.</span>
+      </label>
       <Button
         onClick={save}
         disabled={saving}

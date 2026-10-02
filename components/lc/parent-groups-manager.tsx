@@ -332,7 +332,11 @@ function ReportDialog({ member, onClose }: { member: Member; onClose: () => void
     })
     setSending(false)
     const data = await res.json().catch(() => ({}))
-    if (res.ok) { toast.success('Report sent to parent.'); onClose() }
+    if (res.ok) {
+      if (data.warning) toast.warning(data.warning)
+      else toast.success('Report saved in the student’s account and sent to the parent.')
+      onClose()
+    }
     else toast.error(data.error ?? 'Could not send.')
   }
 

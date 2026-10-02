@@ -1,6 +1,8 @@
 // Pure currency formatting shared by server and client (no server-only imports).
 
-export type CurrencyInfo = { currency: 'MUR' | 'USD'; rate: number }
+// `international`: the visitor is outside Mauritius (by connection country) — drives the
+// checkout's 14-day-cancellation waiver, independent of whether USD is displayed.
+export type CurrencyInfo = { currency: 'MUR' | 'USD'; rate: number; international?: boolean }
 
 export const DEFAULT_CURRENCY: CurrencyInfo = { currency: 'MUR', rate: 1 }
 
