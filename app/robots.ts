@@ -1,14 +1,15 @@
 import type { MetadataRoute } from 'next'
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://lessoncomputer.mu'
+import { SITE_URL, IS_INDEXABLE } from '@/lib/seo'
 
 export default function robots(): MetadataRoute.Robots {
   return {
+    // Crawling stays allowed on the test domain so search engines can see each page's
+    // noindex tag and drop anything already indexed. Only the sitemap is withheld there.
     rules: {
       userAgent: '*',
       allow: '/',
       disallow: ['/admin', '/dashboard', '/api', '/onboarding', '/payment/result'],
     },
-    sitemap: `${SITE_URL}/sitemap.xml`,
+    ...(IS_INDEXABLE ? { sitemap: `${SITE_URL}/sitemap.xml` } : {}),
   }
 }

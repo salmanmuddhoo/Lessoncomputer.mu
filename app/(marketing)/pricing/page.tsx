@@ -1,22 +1,17 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Check } from 'lucide-react'
 import { getCurrencyInfo } from '@/lib/currency'
 import { formatMoney } from '@/lib/currency-format'
 
-export const metadata: Metadata = {
-  title: 'Pricing',
+export const metadata: Metadata = pageMetadata({
+  title: 'Pricing — Cambridge Computer Science Tuition',
   description: 'Affordable Cambridge Computer Science tuition — video lessons and live classes. Pay per package or access all content.',
-  alternates: { canonical: '/pricing' },
-  openGraph: {
-    title: 'Pricing | LessonComputer.mu',
-    description: 'Affordable Cambridge Computer Science tuition for every student.',
-    siteName: 'LessonComputer.mu',
-    url: '/pricing',
-    type: 'website',
-  },
-}
+  path: '/pricing',
+  ogDescription: 'Affordable Cambridge Computer Science tuition for every student.',
+})
 
 const FREE_FEATURES = [
   'Access to all free video lessons',

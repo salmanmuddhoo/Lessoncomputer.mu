@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { DEFAULT_OG_IMAGE, absoluteUrl, breadcrumbJsonLd, organizationRef } from '@/lib/seo'
+import { JsonLd } from '@/components/lc/json-ld'
 import Link from 'next/link'
 import { ArrowLeft, Calendar } from 'lucide-react'
 
@@ -20,6 +22,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!data) return { title: 'Blog' }
 
+  const image = data.cover_image_url ? { url: data.cover_image_url as string, alt: data.title } : DEFAULT_OG_IMAGE
   return {
     title: data.title,
     description: data.excerpt ?? undefined,
@@ -30,9 +33,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       siteName: 'LessonComputer.mu',
       url: `/blog/${slug}`,
       type: 'article',
-      images: data.cover_image_url ? [data.cover_image_url] : undefined,
+      images: [image],
     },
-    twitter: { card: 'summary_large_image', title: data.title, description: data.excerpt ?? undefined },
+    twitter: { card: 'summary_large_image', title: data.title, description: data.excerpt ?? undefined, images: [image.url] },
   }
 }
 
@@ -48,8 +51,26 @@ export default async function BlogPostPage({ params }: PageProps) {
 
   if (!post) notFound()
 
+  const postJsonLd = {
+    '@type': 'BlogPosting',
+    headline: post.title,
+    ...(post.excerpt ? { description: post.excerpt } : {}),
+    ...(post.cover_image_url ? { image: [post.cover_image_url] } : {}),
+    ...(post.published_at ? { datePublished: new Date(post.published_at).toISOString() } : {}),
+    ...(post.updated_at ? { dateModified: new Date(post.updated_at).toISOString() } : {}),
+    author: organizationRef(),
+    publisher: organizationRef(),
+    mainEntityOfPage: absoluteUrl(`/blog/${slug}`),
+  }
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: 'Home', path: '/' },
+    { name: 'Blog', path: '/blog' },
+    { name: post.title, path: `/blog/${slug}` },
+  ])
+
   return (
     <div className="min-h-screen bg-background">
+      <JsonLd data={[postJsonLd, breadcrumbs]} />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-20">
         <Link
           href="/blog"

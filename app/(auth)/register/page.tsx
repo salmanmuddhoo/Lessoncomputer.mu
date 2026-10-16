@@ -2,12 +2,13 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { RegisterForm } from './register-form'
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Create Account',
-  description: 'Create your account to enrol, watch lessons and join live classes.',
-  alternates: { canonical: '/register' },
-}
+  description: 'Create your LessonComputer.mu account to enrol in Cambridge Computer Science courses, watch video lessons and join live classes.',
+  path: '/register',
+})
 
 export default async function RegisterPage() {
   const supabase = await createClient()

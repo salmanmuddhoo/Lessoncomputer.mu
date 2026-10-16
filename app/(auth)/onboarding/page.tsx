@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { OnboardingForm } from './onboarding-form'
 
-export const metadata: Metadata = { title: 'Complete your profile' }
+export const metadata: Metadata = { title: 'Complete your profile', robots: { index: false, follow: false } }
 
 export default async function OnboardingPage() {
   const supabase = await createClient()

@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { DEFAULT_OG_IMAGE, absoluteUrl, breadcrumbJsonLd, organizationRef } from '@/lib/seo'
+import { JsonLd } from '@/components/lc/json-ld'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { StreamablePlayer } from '@/components/lc/streamable-player'
@@ -19,26 +21,33 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const supabase = await createClient()
   const { data } = await supabase
     .from('videos_catalogue')
-    .select('title, description, grade_id')
+    .select('title, description, grade_id, thumbnail_url, is_published')
     .eq('id', id)
     .maybeSingle()
 
-  if (!data) return { title: 'Video Lesson | LessonComputer.mu' }
+  if (!data) return { title: 'Video Lesson' }
+  const image = (data as any).thumbnail_url
+    ? { url: (data as any).thumbnail_url as string, alt: (data as any).title as string }
+    : DEFAULT_OG_IMAGE
 
   const { data: gradeRow } = await supabase
     .from('grades').select('name').eq('id', (data as any).grade_id).maybeSingle()
   const grade = gradeRow as { name: string } | null
-  const title = `${data.title}${grade ? ` — ${grade.name}` : ''} | LessonComputer.mu`
+  // The root layout's title template appends "| LessonComputer.mu".
+  const title = `${data.title}${grade ? ` — ${grade.name}` : ''}`
+  const socialTitle = `${title} | LessonComputer.mu`
   const description =
     data.description ??
-    `Watch "${data.title}" on LessonComputer.mu — quality video lessons for Mauritian students.`
+    `Watch "${data.title}" on LessonComputer.mu — Cambridge Computer Science video lessons for students in Mauritius and worldwide.`
 
   return {
     title,
     description,
     alternates: { canonical: `/videos/${id}` },
-    openGraph: { title, description, type: 'video.other', siteName: 'LessonComputer.mu', url: `/videos/${id}` },
-    twitter: { card: 'summary_large_image', title, description },
+    // Live-only videos are reachable only with ?live=1, so the canonical URL would 404.
+    ...((data as any).is_published ? {} : { robots: { index: false, follow: false } }),
+    openGraph: { title: socialTitle, description, type: 'video.other', siteName: 'LessonComputer.mu', url: `/videos/${id}`, images: [image] },
+    twitter: { card: 'summary_large_image', title: socialTitle, description, images: [image.url] },
   }
 }
 
@@ -277,8 +286,31 @@ export default async function VideoPage({ params, searchParams }: PageProps) {
       : ((urlRow as any)?.streamable_url ?? null)
   }
 
+  // VideoObject only where anyone can watch (free or demo) and a thumbnail exists — Google
+  // requires both for video results.
+  const videoJsonLd = (video.is_free || video.is_demo) && video.thumbnail_url
+    ? {
+        '@type': 'VideoObject',
+        name: video.title,
+        description: video.description || `${video.title} — Cambridge Computer Science video lesson.`,
+        thumbnailUrl: [video.thumbnail_url],
+        ...(video.created_at ? { uploadDate: new Date(video.created_at).toISOString() } : {}),
+        ...(video.duration_minutes ? { duration: `PT${video.duration_minutes}M` } : {}),
+        url: absoluteUrl(`/videos/${video.id}`),
+        isFamilyFriendly: true,
+        publisher: organizationRef(),
+      }
+    : null
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: 'Home', path: '/' },
+    { name: 'Courses', path: '/grades' },
+    ...(video.grade?.slug ? [{ name: video.grade.name as string, path: `/grades/${video.grade.slug}` }] : []),
+    { name: video.title, path: `/videos/${video.id}` },
+  ])
+
   return (
     <div className="min-h-screen bg-background">
+      <JsonLd data={videoJsonLd ? [videoJsonLd, breadcrumbs] : breadcrumbs} />
       {/* Back nav */}
       <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-2 max-w-screen-2xl mx-auto">
         <Link

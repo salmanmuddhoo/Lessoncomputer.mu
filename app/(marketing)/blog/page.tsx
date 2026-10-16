@@ -1,21 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { ArrowRight, Calendar } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
-export const metadata: Metadata = {
-  title: 'Blog',
+export const metadata: Metadata = pageMetadata({
+  title: 'Blog — Cambridge Computer Science Tips',
   description: 'Tips, guides and news for Cambridge IGCSE, O Level and A Level Computer Science students.',
-  alternates: { canonical: '/blog' },
-  openGraph: {
-    title: 'Blog | LessonComputer.mu',
-    description: 'Tips, guides and news for Cambridge IGCSE, O Level and A Level Computer Science students.',
-    siteName: 'LessonComputer.mu',
-    url: '/blog',
-    type: 'website',
-  },
-}
+  path: '/blog',
+})
 
 export default async function BlogPage() {
   const supabase = await createClient()

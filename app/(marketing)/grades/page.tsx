@@ -1,20 +1,15 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import { createClient } from '@/lib/supabase/server'
 import { GradesSection } from '@/components/lc/grades-section'
 import type { Grade } from '@/lib/types/database'
 
-export const metadata: Metadata = {
-  title: 'Courses',
+export const metadata: Metadata = pageMetadata({
+  title: 'Computer Science Courses: IGCSE, O Level, A Level',
   description: 'Browse Cambridge IGCSE 0478, O Level 2210 and AS & A Level 9618 Computer Science courses on LessonComputer.mu — video lessons and live classes, taught from Mauritius, open to students worldwide.',
-  alternates: { canonical: '/grades' },
-  openGraph: {
-    title: 'Courses | LessonComputer.mu',
-    description: 'Browse Cambridge IGCSE, O Level and A Level Computer Science courses — video lessons and live classes, open to students worldwide.',
-    siteName: 'LessonComputer.mu',
-    url: '/grades',
-    type: 'website',
-  },
-}
+  path: '/grades',
+  ogDescription: 'Browse Cambridge IGCSE, O Level and A Level Computer Science courses — video lessons and live classes, open to students worldwide.',
+})
 
 export default async function GradesPage() {
   const supabase = await createClient()

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { absoluteUrl, pageMetadata, organizationRef } from '@/lib/seo'
+import { JsonLd } from '@/components/lc/json-ld'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/server'
@@ -6,18 +8,12 @@ import {
   GraduationCap, BookOpen, Users, Video, Globe, Mail,
 } from 'lucide-react'
 
-export const metadata: Metadata = {
-  title: 'About',
+export const metadata: Metadata = pageMetadata({
+  title: 'About Your Teacher, Mr Muddhoo Shoheb',
   description: 'Meet your Cambridge Computer Science teacher — 15+ years teaching IGCSE (0478), O Level (2210) and A Level (9618) Computer Science.',
-  alternates: { canonical: '/about' },
-  openGraph: {
-    title: 'About | LessonComputer.mu',
-    description: 'Meet your Cambridge Computer Science teacher — 15+ years teaching IGCSE, O Level and A Level Computer Science.',
-    siteName: 'LessonComputer.mu',
-    url: '/about',
-    type: 'website',
-  },
-}
+  path: '/about',
+  ogDescription: 'Meet your Cambridge Computer Science teacher — 15+ years teaching IGCSE, O Level and A Level Computer Science.',
+})
 
 const SYLLABUSES = [
   { code: '9618', name: 'AS & A Level Computer Science', years: '15+ years' },
@@ -38,6 +34,27 @@ export default async function AboutPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+      <JsonLd
+        data={{
+          '@type': 'Person',
+          '@id': absoluteUrl('/about#teacher'),
+          name: 'Muddhoo Shoheb',
+          honorificPrefix: 'Mr',
+          jobTitle: 'Cambridge Computer Science Teacher',
+          image: absoluteUrl('/Teacher.png'),
+          url: absoluteUrl('/about'),
+          worksFor: organizationRef(),
+          hasCredential: ['BSc Electronics and Computer Science', 'PGCE'].map((name) => ({
+            '@type': 'EducationalOccupationalCredential',
+            name,
+          })),
+          knowsAbout: [
+            'Cambridge IGCSE Computer Science (0478)',
+            'Cambridge O Level Computer Science (2210)',
+            'Cambridge AS & A Level Computer Science (9618)',
+          ],
+        }}
+      />
       {/* 1. Photo and name */}
       <div className="text-center mb-10">
         {/* eslint-disable-next-line @next/next/no-img-element */}

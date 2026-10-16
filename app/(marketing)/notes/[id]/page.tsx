@@ -18,7 +18,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     .select('title')
     .eq('id', id)
     .single()
-  return { title: data?.title ? `${data.title} | Revision Notes` : 'Revision Notes' }
+  return {
+    title: data?.title ? `${data.title} | Revision Notes` : 'Revision Notes',
+    alternates: { canonical: `/notes/${id}` },
+  }
 }
 
 function sanitiseHtml(raw: string): string {
