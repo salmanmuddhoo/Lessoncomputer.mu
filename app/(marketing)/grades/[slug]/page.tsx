@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation'
+import { JsonLd } from '@/components/lc/json-ld'
+import { absoluteUrl, breadcrumbJsonLd, organizationRef } from '@/lib/seo'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrencyInfo } from '@/lib/currency'
@@ -338,8 +340,40 @@ export default async function GradePage({ params, searchParams }: PageProps) {
     expiresDays: p.expires_days,
   }))
 
+  const g = grade as any
+  const courseDescription =
+    g.description ??
+    `${g.name} Cambridge Computer Science tuition — video lessons and live online classes, taught from Mauritius, open to students worldwide.`
+  const courseJsonLd = {
+    '@type': 'Course',
+    '@id': absoluteUrl(`/grades/${g.slug}#course`),
+    name: `${g.name} — Cambridge Computer Science`,
+    description: courseDescription,
+    url: absoluteUrl(`/grades/${g.slug}`),
+    inLanguage: 'en',
+    provider: organizationRef(),
+    hasCourseInstance: { '@type': 'CourseInstance', courseMode: 'online' },
+    ...(liveSubscriptionEnabled && liveSubscriptionPrice > 0
+      ? {
+          offers: {
+            '@type': 'Offer',
+            category: 'Subscription',
+            price: liveSubscriptionPrice,
+            priceCurrency: 'MUR',
+            url: absoluteUrl(`/grades/${g.slug}`),
+          },
+        }
+      : {}),
+  }
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: 'Home', path: '/' },
+    { name: 'Courses', path: '/grades' },
+    { name: g.name, path: `/grades/${g.slug}` },
+  ])
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+      <JsonLd data={[courseJsonLd, breadcrumbs]} />
       <header className="mb-8">
         <div className="flex items-center gap-3 mb-3">
           <div

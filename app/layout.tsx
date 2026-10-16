@@ -8,6 +8,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import PageViewTracker from '@/components/PageViewTracker'
 import AuthEventTracker from '@/components/AuthEventTracker'
 import { ConsentManager } from '@/components/ConsentManager'
+import { SITE_URL, IS_INDEXABLE } from '@/lib/seo'
 import './globals.css'
 
 const dmSans = DM_Sans({
@@ -22,8 +23,6 @@ const playfairDisplay = Playfair_Display({
   weight: ['400', '500', '600', '700'],
 })
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://lessoncomputer.mu'
-
 export const metadata: Metadata = {
   title: {
     default: 'Cambridge Computer Science Online Tuition — IGCSE 0478, O Level 2210, A Level 9618',
@@ -32,7 +31,10 @@ export const metadata: Metadata = {
   description: 'Online Cambridge Computer Science tuition — live classes and full video courses for IGCSE 0478, O Level 2210 and AS & A Level 9618. Taught from Mauritius, open to students worldwide.',
   // No `keywords` tag — it's obsolete and ignored by every major search engine.
   metadataBase: new URL(SITE_URL),
-  alternates: { canonical: '/' },
+  // No site-wide canonical: a child page without its own would otherwise claim to be the
+  // homepage. Each indexable page sets its canonical (see pageMetadata in lib/seo.ts).
+  // Off the production domain (the test deployment) nothing may be indexed.
+  robots: IS_INDEXABLE ? { index: true, follow: true } : { index: false, follow: false },
   icons: {
     icon: [
       { url: '/favicon.ico?v=2', sizes: '32x32' },
@@ -49,7 +51,6 @@ export const metadata: Metadata = {
     siteName: 'LessonComputer.mu',
     title: 'Cambridge Computer Science Online Tuition | LessonComputer.mu',
     description: 'Cambridge Computer Science taught live from Mauritius, to students anywhere in the world.',
-    url: SITE_URL,
     type: 'website',
     locale: 'en_US',
   },

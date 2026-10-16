@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import { createClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -6,18 +7,12 @@ import { LiveClassSchedule } from '@/components/lc/live-class-schedule'
 import Link from 'next/link'
 import { Users, Clock } from 'lucide-react'
 
-export const metadata: Metadata = {
-  title: 'Live Classes',
+export const metadata: Metadata = pageMetadata({
+  title: 'Live Online Computer Science Classes',
   description: 'Join live online Cambridge Computer Science classes — IGCSE 0478, O Level 2210, AS & A Level 9618 — taught from Mauritius, open to students worldwide.',
-  alternates: { canonical: '/live-classes' },
-  openGraph: {
-    title: 'Live Classes | LessonComputer.mu',
-    description: 'Join live online Cambridge Computer Science classes, open to students worldwide.',
-    siteName: 'LessonComputer.mu',
-    url: '/live-classes',
-    type: 'website',
-  },
-}
+  path: '/live-classes',
+  ogDescription: 'Join live online Cambridge Computer Science classes, open to students worldwide.',
+})
 
 export default async function LiveClassesPage() {
   const supabase = await createClient()

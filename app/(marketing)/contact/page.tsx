@@ -1,22 +1,17 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import { Mail, MapPin, MessageSquare, Clock } from 'lucide-react'
 import { ContactForm } from './contact-form'
 import { createClient } from '@/lib/supabase/server'
 import { formatWhatsAppDisplay, normalizeWhatsAppDigits } from '@/lib/phone'
 import { TrackedWhatsAppLink } from '@/components/lc/tracked-whatsapp-link'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Contact Us',
   description: 'Contact LessonComputer — questions about Cambridge Computer Science courses, class times or enrolment. We reply within 24 hours, from any country.',
-  alternates: { canonical: '/contact' },
-  openGraph: {
-    title: 'Contact Us | LessonComputer.mu',
-    description: 'Questions about Cambridge Computer Science courses, class times or enrolment — we reply within 24 hours.',
-    siteName: 'LessonComputer.mu',
-    url: '/contact',
-    type: 'website',
-  },
-}
+  path: '/contact',
+  ogDescription: 'Questions about Cambridge Computer Science courses, class times or enrolment — we reply within 24 hours.',
+})
 
 export default async function ContactPage() {
   const supabase = await createClient()

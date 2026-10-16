@@ -1,7 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { createClient } from '@/lib/supabase/server'
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://lessoncomputer.mu'
+import { SITE_URL } from '@/lib/seo'
 
 // Always fetch fresh — grades/blog posts change independently of deploys.
 export const dynamic = 'force-dynamic'
@@ -9,22 +8,23 @@ export const dynamic = 'force-dynamic'
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient()
 
+  // Static pages carry no lastModified: stamping "now" on every request teaches crawlers to
+  // ignore the field. Sign-in and sign-up pages are left out (nothing to rank for).
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: `${SITE_URL}/`, lastModified: new Date(), changeFrequency: 'weekly', priority: 1 },
-    { url: `${SITE_URL}/grades`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.9 },
-    { url: `${SITE_URL}/about`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${SITE_URL}/contact`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.6 },
-    { url: `${SITE_URL}/pricing`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${SITE_URL}/blog`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.6 },
-    { url: `${SITE_URL}/privacy`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${SITE_URL}/terms`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${SITE_URL}/refunds`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${SITE_URL}/delivery`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${SITE_URL}/payment`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${SITE_URL}/safeguarding`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${SITE_URL}/cookies`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${SITE_URL}/login`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.2 },
-    { url: `${SITE_URL}/register`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.5 },
+    { url: `${SITE_URL}/`, changeFrequency: 'weekly', priority: 1 },
+    { url: `${SITE_URL}/grades`, changeFrequency: 'weekly', priority: 0.9 },
+    { url: `${SITE_URL}/live-classes`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${SITE_URL}/pricing`, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${SITE_URL}/about`, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${SITE_URL}/contact`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE_URL}/blog`, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${SITE_URL}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE_URL}/terms`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE_URL}/refunds`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE_URL}/delivery`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE_URL}/payment`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE_URL}/safeguarding`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE_URL}/cookies`, changeFrequency: 'yearly', priority: 0.3 },
   ]
 
   const { data: grades } = await supabase
@@ -49,5 +49,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }))
 
-  return [...staticRoutes, ...gradeRoutes, ...blogRoutes]
+  // Published video lessons have public pages (title, description, demo or upsell).
+  const { data: videos } = await supabase
+    .from('videos_catalogue')
+    .select('id, created_at')
+    .eq('is_published', true)
+  const videoRoutes: MetadataRoute.Sitemap = ((videos ?? []) as { id: string; created_at: string | null }[]).map((v) => ({
+    url: `${SITE_URL}/videos/${v.id}`,
+    ...(v.created_at ? { lastModified: new Date(v.created_at) } : {}),
+    changeFrequency: 'monthly',
+    priority: 0.5,
+  }))
+
+  return [...staticRoutes, ...gradeRoutes, ...blogRoutes, ...videoRoutes]
 }
